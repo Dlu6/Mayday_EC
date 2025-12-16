@@ -1,0 +1,449 @@
+{
+  "info": {
+    "name": "Asterisk AMI Call Management",
+    "description": "Collection for testing Asterisk AMI commands for call management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "asterisk_host",
+      "value": "65.1.149.92",
+      "type": "string"
+    },
+    {
+      "key": "asterisk_port",
+      "value": "5038",
+      "type": "string"
+    },
+    {
+      "key": "ami_username",
+      "value": "admin",
+      "type": "string"
+    },
+    {
+      "key": "ami_password",
+      "value": "admin",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "noauth"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "AMI Login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: Login\nUsername: {{ami_username}}\nSecret: {{ami_password}}\nEvents: all\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Login to Asterisk AMI interface"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Call Management",
+      "item": [
+        {
+          "name": "Originate Call",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: Originate\nChannel: PJSIP/1001\nContext: from-internal\nExten: 1234567890\nPriority: 1\nCallerid: 1001 <1001>\nTimeout: 30000\nAsync: yes\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Initiate an outbound call from extension 1001 to number 1234567890"
+          },
+          "response": []
+        },
+        {
+          "name": "Blind Transfer",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: BlindTransfer\nChannel: PJSIP/1001-00000001\nContext: from-internal\nExten: 1002\nPriority: 1\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Transfer call on channel PJSIP/1001-00000001 to extension 1002"
+          },
+          "response": []
+        },
+        {
+          "name": "Attended Transfer",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: Atxfer\nChannel: PJSIP/1001-00000001\nContext: from-internal\nExten: 1002\nPriority: 1\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Start attended transfer to extension 1002"
+          },
+          "response": []
+        },
+        {
+          "name": "Hangup Call",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: Hangup\nChannel: PJSIP/1001-00000001\nCause: 16\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Hangup call on channel PJSIP/1001-00000001"
+          },
+          "response": []
+        },
+        {
+          "name": "Redirect Call",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: Redirect\nChannel: PJSIP/1001-00000001\nContext: from-internal\nExten: 1003\nPriority: 1\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Redirect call to extension 1003"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Call Information",
+      "item": [
+        {
+          "name": "Get Active Channels",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: CoreShowChannels\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Get list of all currently active channels"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Channel Status",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: Status\nChannel: PJSIP/1001-00000001\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Get status of specific channel"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Extension Status",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: ExtensionState\nContext: from-internal\nExten: 1001\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Get status of extension 1001"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Queue Management",
+      "item": [
+        {
+          "name": "Add Agent to Queue",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: QueueAdd\nQueue: support\nInterface: PJSIP/1001\nMemberName: Agent 1001\nPenalty: 0\nPaused: 0\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Add extension 1001 to support queue"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Queue Status",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: QueueStatus\nQueue: support\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Get status of support queue"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Queue Summary",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: QueueSummary\nQueue: support\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Get summary of support queue"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "PJSIP Management",
+      "item": [
+        {
+          "name": "Show PJSIP Endpoints",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: PJSIPShowEndpoints\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Show all PJSIP endpoints"
+          },
+          "response": []
+        },
+        {
+          "name": "Show PJSIP Contacts",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: PJSIPShowContacts\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Show all PJSIP contacts"
+          },
+          "response": []
+        },
+        {
+          "name": "Show PJSIP AORs",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: PJSIPShowAors\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Show all PJSIP AORs (Address of Record)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "System Information",
+      "item": [
+        {
+          "name": "Get Core Settings",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: CoreSettings\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Get Asterisk core settings"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Core Status",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: CoreStatus\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Get Asterisk core status"
+          },
+          "response": []
+        },
+        {
+          "name": "Ping",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: Ping\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Ping Asterisk server"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Call Recording",
+      "item": [
+        {
+          "name": "Start Call Recording",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: MixMonitor\nChannel: PJSIP/1001-00000001\nFile: /var/spool/asterisk/monitor/call_1001_$(date +%Y%m%d_%H%M%S).wav\nOptions: ab\nCommand: \n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Start recording call on channel PJSIP/1001-00000001"
+          },
+          "response": []
+        },
+        {
+          "name": "Stop Call Recording",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "Action: StopMixMonitor\nChannel: PJSIP/1001-00000001\n\n"
+            },
+            "url": {
+              "raw": "http://{{asterisk_host}}:{{asterisk_port}}",
+              "protocol": "http",
+              "host": ["{{asterisk_host}}"],
+              "port": "{{asterisk_port}}"
+            },
+            "description": "Stop recording call on channel PJSIP/1001-00000001"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,143 @@
+📋 Full AMI Call Lifecycle Management Implementation To-Do List
+Phase 1: Redis Infrastructure Setup ��️
+1.1 Redis Server Installation & Configuration
+[ ] Install Redis server on VM
+[ ] Configure Redis for production use (persistence, security)
+[ ] Set up Redis cluster/replication if needed
+[ ] Configure Redis password and access controls
+[ ] Test Redis connectivity from Node.js server
+1.2 Redis Service Layer
+[ ] Create server/services/redisService.js
+[ ] Implement Redis connection pooling
+[ ] Add Redis health monitoring
+[ ] Create Redis error handling and reconnection logic
+[ ] Add Redis metrics and logging
+1.3 Redis Data Models
+[ ] Design Redis key structure for:
+Call sessions (call:{callId})
+Agent status (agent:{extension})
+Call queues (queue:{queueName})
+Transfer operations (transfer:{transferId})
+Session data (session:{sessionId})
+Phase 2: AMI Authentication & Registration Flow 🔐
+2.1 Enhanced Login System
+[x] Modify electron-softphone/src/components/Login.jsx (AMI/JWT-only, no SIP.js init)
+[ ] Add AMI user registration during login
+[ ] Implement dual authentication (JWT + AMI)
+[ ] Add extension validation and registration
+[ ] Create login state management for AMI
+2.2 AMI User Management
+[ ] Create server/controllers/amiUserController.js
+[ ] Implement AMI user creation/registration
+[ ] Add extension-to-user mapping
+[ ] Create AMI user status tracking
+[ ] Add AMI user cleanup on logout
+2.3 Authentication Middleware Updates
+[ ] Update server/middleware/authMiddleware.js
+[ ] Add AMI authentication verification
+[ ] Implement dual token validation
+[ ] Add AMI session management
+[ ] Create AMI permission checking
+Phase 3: New SIP-AMI Service Architecture 🏗️
+3.1 Create New SIP-AMI Service
+[ ] Create electron-softphone/src/services/sipAmiService.js
+[ ] Implement AMI-based call origination
+[ ] Add AMI call state management
+[ ] Create AMI event handling
+[ ] Implement AMI-SIP bridge functionality
+3.2 AMI Call Lifecycle Management
+[ ] Implement AMI Originate action for calls
+[ ] Add AMI call monitoring and state tracking
+[ ] Create AMI call control (hold, unhold, transfer)
+[ ] Implement AMI call recording
+[ ] Add AMI call statistics collection
+3.3 Redis Session Management
+[ ] Store call sessions in Redis
+[ ] Implement session persistence and recovery
+[ ] Add session timeout handling
+[ ] Create session cleanup mechanisms
+[ ] Implement session sharing across components
+Phase 4: Call Transfer System Enhancement 📞
+4.1 AMI-Based Transfer Implementation
+[ ] Replace SIP transfer with AMI transfer
+[ ] Implement AMI Redirect action
+[ ] Add AMI transfer monitoring
+[ ] Create transfer state persistence in Redis
+[ ] Implement transfer rollback mechanisms
+4.2 Enhanced Transfer Features
+[ ] Add queue-based transfers via AMI
+[ ] Implement external number transfers
+[ ] Add transfer consultation via AMI
+[ ] Create transfer history tracking
+[ ] Implement transfer analytics
+Phase 5: Real-Time Event System ⚡
+5.1 Redis Pub/Sub Implementation
+[ ] Set up Redis pub/sub channels
+[ ] Implement real-time event broadcasting
+[ ] Create event filtering and routing
+[ ] Add event persistence and replay
+[ ] Implement event acknowledgment system
+5.2 AMI Event Processing
+[ ] Process AMI events in real-time
+[ ] Store events in Redis for persistence
+[ ] Broadcast events to connected clients
+[ ] Implement event queuing and delivery
+[ ] Add event error handling and recovery
+Phase 6: Frontend Integration ��
+6.1 Appbar.jsx Updates
+[x] Replace SIP service calls with AMI-backed endpoints (originate/hangup)
+[x] Update call state management to consume AMI/Redis socket events
+[x] Modify transfer dialog functionality (blind/managed via AMI)
+[x] Add AMI status indicators (socket-driven `extension:status`)
+[x] Implement Redis-based real-time updates
+6.2 Dashboard Integration
+[ ] Update dashboard with AMI data
+[ ] Add Redis-based real-time metrics
+[ ] Implement AMI call monitoring
+[ ] Add transfer status tracking
+[ ] Create AMI health monitoring
+Phase 7: Testing & Validation 🧪
+7.1 Unit Testing
+[ ] Test Redis service functionality
+[ ] Test AMI service methods
+[ ] Test authentication flow
+[ ] Test call lifecycle management
+[ ] Test transfer operations
+7.2 Integration Testing
+[ ] Test AMI-SIP integration
+[ ] Test Redis data persistence
+[ ] Test real-time event system
+[ ] Test authentication flow
+[ ] Test error handling and recovery
+7.3 End-to-End Testing
+[ ] Test complete call flow
+[ ] Test transfer operations
+[ ] Test real-time updates
+[ ] Test session persistence
+[ ] Test system recovery
+Phase 8: Performance & Optimization 🚀
+8.1 Redis Optimization
+[ ] Implement Redis connection pooling
+[ ] Add Redis data compression
+[ ] Optimize Redis key structure
+[ ] Implement Redis caching strategies
+[ ] Add Redis performance monitoring
+8.2 AMI Optimization
+[ ] Optimize AMI event processing
+[ ] Implement AMI connection pooling
+[ ] Add AMI request batching
+[ ] Optimize AMI response handling
+[ ] Implement AMI load balancing
+Phase 9: Documentation & Deployment 📚
+9.1 Documentation Updates
+[ ] Update API documentation
+[ ] Create Redis integration guide
+[ ] Document AMI call lifecycle
+[ ] Update deployment instructions
+[ ] Create troubleshooting guide
+9.2 Deployment Preparation
+[ ] Create Redis deployment scripts
+[ ] Update environment configuration
+[ ] Prepare migration scripts
+[ ] Create rollback procedures
+[ ] Test deployment process

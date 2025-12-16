@@ -1,0 +1,1169 @@
+
+######################################################################
+# Nginx configuration (CURRENT VM)                                     #
+######################################################################
+
+Active config path (compiled Nginx install):
+- Main file: /usr/local/nginx/conf/nginx.conf
+- Validate: nginx -t
+- Reload:   systemctl restart nginx   (or)  nginx -s reload
+
+What it does:
+- HTTP (port 80) → 301 redirect to HTTPS
+- HTTPS (port 443) serves the React build and proxies backend/WebRTC:
+  - location /            → root /home/admin/Mayday-CRM-Scracth/client/build; try_files $uri /index.html;
+  - location /api         → proxy_pass http://127.0.0.1:8004; (Node backend)
+  - location /ws          → proxy_pass http://127.0.0.1:8088/ws;  (Asterisk WS)
+  - location /wss         → proxy_pass https://127.0.0.1:8089/ws; (Asterisk WSS, if used)
+  - location /ari         → proxy_pass http://127.0.0.1:8088/ari; (Asterisk ARI)
+
+Notes:
+- If you used the Debian package layout, an alternative site file may live at:
+  /etc/nginx/sites-available/mayday (symlinked into sites-enabled). On this VM, the
+  active config is /usr/local/nginx/conf/nginx.conf (see snippet above).
+
+Quick checks:
+- Port check on VM:  ss -ltnp | grep :8004            # backend
+- Test API (from VM):  curl -s http://127.0.0.1:8004/api/ami/status
+- Test via domain:      curl -s https://mhuhelpline.com/api/ami/status
+  If you get index.html instead of JSON, re-check the /api location block.
+
+WebSocket tips:
+- Ensure Upgrade/Connection headers are set in /ws and /wss locations.
+- For Electron dev, ws://localhost:8004 remains separate from the Nginx proxy paths.
+
+
+#To start redis on a local machine 
+~Run redis-server || Install redis if not installed, on windows, choco install redis-64, on mac, brew install redis
+~Connect to any terminal with || redis-cli
+- Connect to any terminal with || redis-cli
+- ping ~ Response should be pong
+
+#Don't for to include .env with the required variables
+
+*Change Redis Configuration When switching to production*
+-Use preferably aws elasticache
+-Use a different port
+-Use a different host
+-Use a different password
+######################################################################
+# Installing Asterisk on a Mac || Locally                               #
+######################################################################
+*Installing Asterisk*
+- We install asterisk on a local machine in development to test our application
+- The purpose of asterisk is to make calls so that we can connect to it using and Asterisk Manager Interface (AMI)
+- This is mostly about a proper network configuration
+- We use homebrew to install asterisk on a mac
+- We use the following command to install asterisk ~ brew install asterisk
+- We can start asterisk using ~ asterisk -vvvvvvc
+- But in production, we use a linux based server preferably AWS EC2 || Debian 12 s
+
+~We can install asterisk by downloading and then unzipping it~
+wget http://downloads.asterisk.org/pub/telephony/asterisk/asterisk-18-current.tar.gz
+tar -zxvf asterisk-18-current.tar.gz
+cd asterisk-18.*/
+./configure
+make
+sudo make install
+sudo make samples
+sudo make config
+
+*Or, can navigate to directory where it was downloaded to and make installation from there *
+1. Extract the Tarball:
+use tar -zxvf to extract the tarball. For context [zxvf - z: filter the archive through gzip, x: extract the files, v: verbose, f: use archive file or device ARCHIVE]
+tar -zxvf asterisk-18.20.2.tar.gz
+
+2. Change to the extracted directory: [After the tarball has been extracted, change to the directory that was created.]
+cd asterisk-18.20.2
+
+3. Run the configure script:
+./contrib/scripts/install_prereq install
+
+4. Run the configure script:
+./configure
+make menuselect  # Optional, to select specific options.
+make
+make install
+make config
+make samples
+
+*To start asterisk*
+sudo systemctl start asterisk
+sudo systemctl enable asterisk
+
+*To stop asterisk*
+sudo systemctl stop asterisk
+
+*To restart asterisk*
+sudo systemctl restart asterisk
+
+*To check asterisk status*
+sudo systemctl status asterisk
+
+*To check asterisk version*
+asterisk -V
+
+*To check asterisk modules*
+asterisk -x 'module show'
+
+*To check asterisk configuration*
+asterisk -x 'core show settings'
+
+*To check asterisk channels*
+asterisk -x 'core show channels'
+
+*To check asterisk peers*
+asterisk -x 'sip show peers'
+
+*To check asterisk registry*
+asterisk -x 'sip show registry'
+
+*To check asterisk sip history*
+asterisk -x 'sip history'
+
+######################################################################
+# Installing Asterisk to a cloud server || AWS                       #
+######################################################################
+*AWS Profile*
+- We need to have an AWS account
+-Launch Debian 12 is the preferred OS for asterisk
+-Connect to the server using ssh || ssh -i "MHU_Debian_Mumb.pem" admin@ec2-13-232-143-190.ap-south-1.compute.amazonaws.com
+-apt-get update
+-apt-get dist-upgrade
+-timedatectl set-timezone <Your Timezone>
+-Reboot
+-apt-get install wget
+-apt-get -y install curl
+# curl -u 'public:bs4#)W]h8+VK),RV' --silent --location https://repository.xenialab.com/repository/provisioning/installer/install | bash
+curl -u 'public:bs4#)W]h8+VK),RV' --silent --location https://repository.mayday.com/repository/provisioning/installer/install | bash
+
+
+-We can use the following command to install asterisk ~ sudo apt-get install asterisk
+-Set date and time
+-Set timezone
+-Set locale
+-Install wget
+-reboot
+
+*Install asterisk
+Install Necessary Dependencies:
+Before installing Asterisk, you need to install some dependencies. The exact dependencies can vary based on your Linux distribution, but here is a general command for Debian/Ubuntu-based systems:
+#sudo apt update && sudo apt install -y build-essential wget libxml2-dev libncurses5-dev libsqlite3-dev uuid-dev libjansson-dev
+
+-We can install asterisk by downloading and then unzipping it || Official Asterisk Website ~ https://www.asterisk.org/downloads/
+wget wget https://downloads.asterisk.org/pub/telephony/asterisk/asterisk-18.21.0.tar.gz
+tar -zxvf asterisk-18-current.tar.gz
+cd asterisk-18.*/
+sudo contrib/scripts/install_prereq install
+
+./configure
+make
+sudo make install
+sudo make samples
+sudo make config
+asterisk -V for asterisk version || Stable version is 18.21.0
+
+*Or, can navigate to directory where it was downloaded to and make installation from there *
+1. Extract the Tarball:
+use tar -zxvf to extract the tarball. For context [zxvf - z: filter the archive through gzip, x: extract the files, v: verbose, f: use archive file or device ARCHIVE]
+tar -zxvf asterisk-18.20.2.tar.gz
+
+2. Change to the extracted directory: [After the tarball has been extracted, change to the directory that was created.]
+
+3. Run the configure script:
+./contrib/scripts/install_prereq install
+
+4. Run the configure script:
+./configure
+make menuselect  # Optional, to select specific options.
+make
+make install
+make config
+make samples
+
+*To start asterisk*
+sudo systemctl start asterisk
+sudo systemctl enable asterisk
+
+#Add Message of the day Script#
+1. Create a folder in the home directory
+2. mkdir maydayScripts
+3. cd into directory
+4. touch set_motd.sh
+5. Contents of the script;
+
+echo " -------------------------------------------------- " > /etc/motd
+echo "|      __  ___                    __               |" >> /etc/motd
+echo "|     /  |/  / ____ _ __  __ ____/ /____ _ __  __  |" >> /etc/motd
+echo "|    / /|_/ / / __  // / / // __  // __  // / / /  |" >> /etc/motd
+echo "|   / /  / / / /_/ // /_/ // /_/ // /_/ // /_/ /   |" >> /etc/motd
+echo "|  /_/  /_/  \____/ \__  / \____/ \____/ \__  /    |" >> /etc/motd
+echo "|                  /____/               /____/     |" >> /etc/motd
+echo "|                                                  |" >> /etc/motd
+echo "|         Maday CRM Powered By MM-iCT              |" >> /etc/motd
+echo "|                                                  |" >> /etc/motd
+echo "|              2023-2024 © MM-iCT                  |" >> /etc/motd
+echo "|                                                  |" >> /etc/motd
+echo "|            Starter Script v3.6.1                 |" >> /etc/motd
+echo "|                                                  |" >> /etc/motd
+echo "|  Version Packages:                               |" >> /etc/motd
+echo "|  Asterisk v18.21.0                               |" >> /etc/motd
+echo "|  MySQL v8.0.xx                                   |" >> /etc/motd
+echo "|  Nodejs v16.x.x                                  |" >> /etc/motd
+echo "|                                                  |" >> /etc/motd
+echo "|                                                  |" >> /etc/motd
+echo "|  For more information, please visit              |" >> /etc/motd
+echo "|  our website www.mmict.it                        |" >> /etc/motd
+echo "|  Email medhi.matovu@gmail.com                    |" >> /etc/motd
+echo "|                                                  |" >> /etc/motd
+echo "|  `/bin/date`                                     |" >> /etc/motd
+echo " -------------------------------------------------- " >> /etc/motd
+
+1. vim set_motd.sh
+2. make sure to make the script executable ~ chmod +x set_motd.sh || Run this command while still in the maydayScripts directory
+3. Run the script ~ sudo ./set_motd.sh
+4. We need to create a script that runs all these processes
+<!---------------------------------------------------------------------------------------!>
+
+
+<----------------------------------------------------------------------------------------->
+#Asterisk Manager Interface(AMI)
+Next step is to Connect AMI not nodejs asterisk-manager
+1. Typically located at /etc/asterisk/manager.conf
+2. Add a new user with a password and the necessary permissions to interact with the AMI. For example;
+[maydayuser]
+enabled = yes
+port = 5038
+bindaddr = 0.0.0.0
+secret=maydaypassword
+deny=0.0.0.0/0.0.0.0
+permit=127.0.0.1/255.255.255.0
+read=system,call,log,verbose,agent,user,config,dtmf,reporting,cdr,dialplan
+write=system,call,agent,user,config,command,reporting,originate,message
+3. Contents of manager.conf available in google doc ~ https://docs.google.com/document/d/1_pl9C6JQxPX5QpoCq5tMtpe6r7WrgXCtpuapjzN-7zs/edit?usp=sharing
+4. Wherever we found xcally in manager.conf, we shall switch to mayday
+5. [maydayuser]
+   Secret set = LotusmayDaKm1759
+   read = all
+   write = all
+   deny = 0.0.0.0/0.0.0.0
+   permit = 127.0.0.1/255.255.255.255
+6. Save the changes and reload the Asterisk configuration or restart the Asterisk service || systemctl restart asterisk or service restart asterisk
+
+#Nodejs || Server
+1. npm install asterisk-manager
+2. In the Node.js server, create a new file to manage the Asterisk connection, for example, ami.js
+3. When running in development, remember to start redis with ~ `redis-server` command
+
+
+OR
+#Asterisk Manager Interface(AMI) || OPTION 2
+1. To complete the connection to the Asterisk server on AWS instance, 
+2. SSH into your AWS instance where Asterisk is installed
+3. Open the manager.conf file using a text editor, for example, nano or vim
+4. sudo nano /etc/asterisk/manager.conf
+5. Add a new user with a password and the necessary permissions to interact with the AMI. For example;
+6. Example configs;
+[mayday_ami_user]
+-secret = LotusmayDaKm1759
+-;read = all
+-read = system,call,log,verbose,command,agent,user,config
+-;write = all
+-write = system,call,log,verbose,command,agent,user,config
+-;deny = 0.0.0.0/0.0.0.0
+-;permit = 102.222.71.12/255.255.255.0
+-;permit = 127.0.0.1/255.255.255.255
+7. Save the changes and reload the Asterisk configuration or restart the Asterisk service || systemctl restart asterisk or service restart asterisk
+8. In the Node.js server, create a new file to manage the Asterisk connection, for example, ami.js 
+9. Setup environment variables  
+-AMI_USER=someuser
+-AMI_PASSWORD=somesecret
+-AMI_HOST=<your AWS instance IP or domain name>
+-AMI_PORT=5038
+10. sudo asterisk -rx "core restart now"
+11. sudo asterisk -rx "manager reload"
+12. sudo asterisk -rx "manager show users"
+
+
+
+<----------------------------------------------------------------------->
+INSTALLING MYSQL TO THE SERVER
+1. sudo apt-get update
+2. wget https://dev.mysql.com/get/mysql-apt-config_0.8.29-1_all.deb
+3. sudo dpkg -i mysql-apt-config_0.8.29-1_all.deb
+4. sudo apt-get update
+5. sudo apt-get install mysql-server
+6. sudo mysql_secure_installation || Root password is Mayday@1759
+7. sudo systemctl status mysql
+
+#Contents of /etc/mysql/mysql.conf.d/mysqld.cnf
+[mysqld]
+pid-file	= /var/run/mysqld/mysqld.pid
+socket		= /var/run/mysqld/mysqld.sock
+datadir		= /var/lib/mysql
+log-error	= /var/log/mysql/error.log
+
+early-plugin-load = keyring_file.so
+default_password_lifetime = 0
+event_scheduler=ON
+max_allowed_packet = 32M
+local_infile = ON
+#Validate Plugin
+validate_password.policy=MEDIUM
+validate_password.check_user_name=ON
+
+innodb_buffer_pool_size = 1640M
+key_buffer_size = 192M
+join_buffer_size = 16M
+sort_buffer_size = 16M
+read_buffer_size = 16M
+read_rnd_buffer_size = 16M
+
+
+#CREATING REMOTE USER || Create a new user account and grant it the necessary permissions. Replace remote_user with your desired username, remote_password with a strong password, and % with the specific remote IP address if you want to restrict access to a certain IP.
+mysql -u root -p || Enter the root password || Mayday@1759
+1. mysql> CREATE USER 'mayday_user'@'%' IDENTIFIED BY 'Mayday@1759';
+2. GRANT ALL PRIVILEGES ON *.* TO 'mayday_user'@'%' WITH GRANT OPTION;
+3. FLUSH PRIVILEGES;
+4. exit;
+
+5. restart mysql
+sudo systemctl restart mysql
+
+7. Open the MySQL port on the server firewall using iptables
+sudo iptables -A INPUT -p tcp --dport 3306 -j ACCEPT
+sudo iptables -A OUTPUT -p tcp --sport 3306 -j ACCEPT
+
+8. Granting user access to specific databases
+mysql -u root -p
+1. mysql> GRANT ALL PRIVILEGES ON example_db.example_table.* TO 'mayday_user'@'%'; 
+2. mysql> FLUSH PRIVILEGES;
+3. mysql> exit;
+
+#CREATING MSQL SPECIFIC SCRIPTS TO AUTOMATE TASKS LIKE TABLE CREATION
+1. Create a folder in the home directory or any preferred location. I created a folder in the home directory named mysql_stuff
+2. cd into the directory
+3. touch create_tables.sql
+4. Contents of the script
+5. vim create_tables.sql
+CREATE TABLE `report_queue` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `type` varchar(255) DEFAULT NULL,
+  `uniqueid` varchar(255) DEFAULT NULL,
+  `calleridnum` varchar(255) DEFAULT NULL,
+  `calleridname` varchar(255) DEFAULT NULL,
+  `queue` varchar(255) DEFAULT NULL,
+  `queuecallerjoinAt` datetime DEFAULT NULL,
+  `queuecallerleaveAt` datetime DEFAULT NULL,
+  `position` int(11) DEFAULT NULL,
+  `count` int(11) DEFAULT NULL,
+  `queuecallerabandon` tinyint(1) DEFAULT '0',
+  `queuecallerabandonAt` datetime DEFAULT NULL,
+  `queuecallercomplete` tinyint(1) DEFAULT '0',
+  `queuecallercompleteAt` datetime DEFAULT NULL,
+  `queuecallerexit` tinyint(1) DEFAULT '0',
+  `queuecallerexitAt` datetime DEFAULT NULL,
+  `queuecallerexitreason` varchar(255) DEFAULT NULL,
+  `originalposition` int(11) DEFAULT NULL,
+  `channel` varchar(255) DEFAULT NULL,
+  `connectedlinenum` varchar(255) DEFAULT NULL,
+  `connectedlinename` varchar(255) DEFAULT NULL,
+  `accountcode` varchar(255) DEFAULT NULL,
+  `context` varchar(255) DEFAULT NULL,
+  `exten` varchar(255) DEFAULT NULL,
+  `priority` varchar(255) DEFAULT NULL,
+  `holdtime` int(11) DEFAULT NULL,
+  `mohtime` int(11) DEFAULT '0',
+  `assigned` tinyint(1) DEFAULT '0',
+  `lastAssignedTo` varchar(255) DEFAULT NULL,
+  `transfer` tinyint(1) DEFAULT '0',
+  `transfertype` varchar(255) DEFAULT NULL,
+  `transferexten` varchar(255) DEFAULT NULL,
+  `transferuniqueid` varchar(255) DEFAULT NULL,
+  `disposition` varchar(255) DEFAULT NULL,
+  `secondDisposition` varchar(255) DEFAULT NULL,
+  `thirdDisposition` varchar(255) DEFAULT NULL,
+  `queuecallerenterreason` int(11) DEFAULT '0',
+  `createdAt` datetime NOT NULL,
+  `updatedAt` datetime NOT NULL,
+  `note` varchar(255) DEFAULT NULL,
+  `linkedid` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`,`createdAt`),
+  KEY `report_queue_uniqueid` (`uniqueid`),
+  KEY `report_queue_calleridnum` (`calleridnum`),
+  KEY `report_queue_linkedid` (`linkedid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8
+PARTITION BY RANGE (TO_DAYS(createdAt)) (
+  PARTITION p0 VALUES LESS THAN (739290),
+  PARTITION p1 VALUES LESS THAN MAXVALUE
+);
+6. Save the changes and reload the Asterisk configuration or restart the Asterisk service || systemctl restart asterisk or service restart asterisk
+7. mysql -u your_username -p
+7. mysql> SHOW DATABASES;
+8. mysql> USE mayday_crm_db;
+8. mysql> source /root/mysql_stuff/create_table_report_queue.sql;
+9. mysql> SHOW TABLES;
+10. mysql> exit;
+NOTES: The PARTITION BY RANGE (TO_DAYS(createdAt)) clause is used to create partitions based on the days calculated from the createdAt date. Adjust the PARTITION p0 VALUES LESS THAN (TO_DAYS(NOW())) if you want to specify a different range or start partitioning from a specific date.
+The TO_DAYS(NOW()) function returns the current day as a numerical value, which may not be practical for a partition that is meant to hold past data, so you may want to replace NOW() with a specific past OR Current date like p0 VALUES LESS THAN (739290).
+-partitioning expression in your CREATE TABLE statement might fail. MySQL expects constant values for partition definitions, and using functions like TO_DAYS(NOW()) that return a non-constant value is not allowed. To fix this, you need to replace TO_DAYS(NOW()) with a constant value 
+representing the date from which you want to start your partitioning. For example, if you want to start partitioning from today, you would first find out the numeric value of today's date using TO_DAYS() function in MySQL and then hardcode this value into your partition definition.
+ => mysql -u username -p
+   => SELECT TO_DAYS(NOW()); || This will return a numeric value, such as 738152 (the actual number will correspond to the current date). Use the obtained numeric value in your partition definition instead of TO_DAYS(NOW()). For example:
+
+
+#TO PERMIT PASSWORD USAGE IN DEVELOPMENT ON A REMOTE INSTANCE || This is not recommended in production. It's also because of the new authentication plugin that was introduced in MySQL 8.0
+-ALTER USER 'mayday_user'@'%' IDENTIFIED WITH 'mysql_native_password' BY 'Mayday@1759';
+-FLUSH PRIVILEGES;
+-EXIT;
+
+
+
+<!-----------------------------------------------------------------------!>
+
+
+
+<-------------------------------------------------------------------------->
+#SETTING UP ASTERISK TO USE MYSQL AND NODEJS WITH A WEB CLIENT OVERVIEW
+SETTING UP ASTERISK MANAGER || MYSQL || NODEJS || CLIENT
+Implementing SIP account management via the Asterisk Realtime Database (ARI) with MySQL and ensuring security and data consistency involves a systematic approach. Here are the steps and milestones for a scalable and secure implementation:
+
+1. Milestone 1: Database and Asterisk Configuration
+Prepare MySQL Database:
+
+Ensure your MySQL instance is set up and accessible.
+Create the necessary tables for Realtime configuration according to Asterisk's schema. This usually includes tables like ps_endpoints, ps_auths, ps_aors, and possibly others depending on your needs.
+Configure Asterisk for Realtime:
+
+Install and configure res_config_mysql in Asterisk to connect to your MySQL database.
+Modify extconfig.conf in Asterisk to map the necessary SIP entities to your MySQL tables.
+Adjust res_pjsip.conf and other related configuration files to enable PJSIP to use Realtime database.
+2. Milestone 2: Backend Application Logic
+Secure Backend API:
+
+Implement authentication and authorization for your API endpoints. Use JWTs or another secure method for API requests.
+Validate input rigorously to prevent SQL injection and other common vulnerabilities.
+Implement User and SIP Account Management Logic:
+
+Create API endpoints for user/SIP account creation, update, and deletion.
+On creating a new user, insert corresponding records into the Realtime tables (ps_endpoints, ps_auths, ps_aors, etc.).
+Ensure updates and deletions in your application user table are reflected in the Asterisk Realtime tables.
+
+3. Milestone 3: Asterisk Realtime Operation and Security
+Test Realtime SIP Account Functionality:
+
+Create, update, and delete SIP accounts via your backend. Verify that Asterisk correctly reads and applies these changes in real-time.
+Perform test calls to ensure SIP accounts are operational and that call routing works as expected.
+Secure Asterisk and Database:
+
+Limit network access to your Asterisk AMI and MySQL. Use firewalls to restrict access to trusted IP addresses.
+Regularly update Asterisk and MySQL to apply security patches.
+Use secure passwords and consider encrypting sensitive data in the database.
+
+4. Milestone 4: Data Consistency and Backup
+Implement Data Consistency Checks:
+Regularly verify the synchronization between your application's user table and the Asterisk Realtime tables. Consider automated scripts or a backend service for consistency checks.
+Backup Strategy:
+Implement a backup strategy for both your application's database and the Asterisk configuration. Ensure you can restore operations quickly in case of data loss.
+
+5. Milestone 5: Deployment and Monitoring
+Deploy Securely:
+When deploying your backend and Asterisk, ensure that all components are secured, and access is restricted as necessary. Use HTTPS for your backend API.
+Monitoring and Alerts:
+Set up monitoring for both your application and Asterisk. Monitor API usage, database integrity, and Asterisk's operational status. Set up alerts for any anomalies.
+Implementation Steps:
+Database Setup: Begin with setting up your MySQL tables according to the Asterisk schema for Realtime configuration.
+Asterisk Configuration: Configure Asterisk to use MySQL for Realtime SIP management.
+Backend Development: Develop the secure backend logic for managing users and corresponding SIP accounts.
+Testing and Security: Thoroughly test the system and implement the security measures outlined.
+Deployment and Monitoring: Deploy your system, ensuring all components are secure, and set up monitoring and alerts.
+
+<!------------------------------------------------------------------------!>
+
+#Where there's motion2, we use mayday2
+dbname: mayday_crm_db
+dbuser: mayday_user
+
+
+#How to start the server
+When using nodemon
+~npm run server || To start the server
+~cd client then npm start || To start the client
+
+After switching to PM2,
+~pm2 start ecosystem.config.cjs
+~pm2 save || To start the server in development
+
+~cd client then npm start || To start the client in devevlopment
+
+#For development with the production server running (MHU) 
+-cd client then npm start || To start the client in development || Username: admin Password: Pasword@1759
+~Connect to the server using ssh || ssh -i "MHU_Debian_Mumb.pem" admin@ec2-43-205-229-152.ap-south-1.compute.amazonaws.com
+~npm run server || To start the server in development
+
+# ADVANCED SET UP
+~Cloned the repository from github in /home/admin/Mayday-CRM-Scratch
+~cd /home/admin/Mayday-CRM-Scratch
+~npm install
+~Update the .env file with the correct database credentials esp using 127.0.0.1 instead of localhost
+~Added nginx;
+1. sudo apt-get update
+2. sudo apt-get install nginx
+3. Created a new site configuration file in /etc/nginx/sites-available/mayday
+4. Created a symbolic link to the new site configuration file in /etc/nginx/sites-enabled/mayday
+5. Tested the Nginx configuration with sudo nginx -t
+6. Restarted Nginx with sudo systemctl restart nginx
+7. Enabled the new site with sudo systemctl enable mayday
+Here is the content of the new site configuration file;
+server {
+    listen 80;
+    server_name 65.1.149.92;
+
+    # Frontend React app
+    location / {
+        root /home/admin/Mayday-CRM-Scracth/client/build;
+        try_files $uri $uri/ /index.html;
+        
+        # CORS headers for frontend
+        add_header 'Access-Control-Allow-Origin' '*';
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
+        add_header 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization';
+        add_header 'Access-Control-Allow-Credentials' 'true';
+
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '*';
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
+            add_header 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
+    }
+
+    # Backend API with CORS
+    location /api {
+        proxy_pass http://localhost:8004;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        
+        # CORS headers for API
+        add_header 'Access-Control-Allow-Origin' '*';
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
+        add_header 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization';
+        add_header 'Access-Control-Allow-Credentials' 'true';
+        
+        # Timeouts
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+        proxy_send_timeout 300;
+
+        # Handle OPTIONS
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' '*';
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
+            add_header 'Access-Control-Allow-Headers' 'DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
+    }
+
+    # Socket.IO
+    location /socket.io {
+        proxy_pass http://localhost:8004;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        
+        # WebSocket specific settings
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Asterisk WebSocket
+    location /ws {
+        proxy_pass http://localhost:8088;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        
+        # WebSocket specific settings
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 86400;
+    }
+
+    # Swagger Documentation
+    location /api-docs {
+        proxy_pass http://localhost:8004;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}.
+
+8. Restart Nginx
+sudo systemctl restart nginx
+9. FOR THE CLIENT TO WORK
+-cd client
+-Add the .env.production file to the client folder
+{
+  REACT_APP_API_URL=http://65.1.149.92:8004
+  REACT_APP_SOCKET_URL=http://65.1.149.92:8088
+}
+-npm run build
+
+######### TO START THE SERVER & THE CLIENT IN PRODUCTION #########
+~pm2 start ecosystem.config.js
+~pm2 save --force || To save the pm2 configuration
+~pm2 list || To list all the pm2 processes
+~pm2 startup || To start the pm2 service on system startup
+~pm2 start mayday
+~pm2 stop mayday
+~pm2 status mayday || To check the status of the server
+~pm2 logs mayday || To check the logs of the server
+~pm2 restart mayday || To restart the server
+~pm2 delete mayday || To delete the server
+
+#Added a softphone in the Mayday-phonebar folder
+~To start it, cd into the folder (cd mayday-phonebar) and run ~ npm start
+~This is using electron to run the softphone
+~We shall later on create it's own repository and distribute it as a standalone application to the various app stores
+
+#Environment Variables for the server in production are in;
+/home/admin/Mayday-CRM-Scracth || .env
+
+#Environment Variables for the server in development are in;
+-The root directory || .env
+
+
+
+USING DOCKER TO RUN ASTERISK ON A LOCAL MACHINE
+~docker run -it --name asterisk \
+  --net=host \
+  -v ~/asterisk/config:/etc/asterisk \
+  andrius/asterisk
+
+OPEN A DIFFERENT TAB AND RUN;
+~docker exec -it asterisk asterisk -rvvv
+
+OR TO START ASTERISK WITH DOCKER
+~docker exec -it asterisk sh
+
+
+START REDIS
+~brew install redis
+~brew services start redis
+
+
+Install Mysql on the local machine
+~brew install mysql
+~brew services start mysql
+-Set root password
+-Remove anonymous users
+-Disallow root login remotely
+-Remove test database
+-Reload privilege tables
+
+Check if mysql is running
+~brew services list | grep mysql
+
+# Connect to MySQL
+mysql -u root -p
+
+# Create database
+CREATE DATABASE mayday_db;
+
+# Create user (optional but recommended)
+CREATE USER 'mayday_user'@'localhost' IDENTIFIED BY 'Pasword@256';
+
+# Grant privileges
+GRANT ALL PRIVILEGES ON mayday_db.* TO 'mayday_user'@'localhost';
+FLUSH PRIVILEGES;
+
+
+#MOVED THE ELECTRON SOFTPHONE TO THE SAME REPOSITORY
+~To run electron softphone, cd into electron-softphone and run ~ npm start
+
+SWAGGER API DOCUMENTATION
+~http://localhost:8004/api-docs
+
+
+CREATE DTMF TABLE IN MYSQL
+~mysql -u root -p
+~SELECT DATABASE mayday_db;
+~ALTER TABLE ps_endpoints ADD COLUMN dtmf_mode VARCHAR(10) DEFAULT 'auto';
+//Update any existing endpoint to use the new dtmf_mode column
+~UPDATE ps_endpoints SET dtmf_mode = 'auto' WHERE dtmf_mode IS NULL;
+
+TREE FOLDER STRUCTURE
+~brew install tree
+~tree -I 'node_modules' || To view the folder structure excluding the node_modules folder
+
+
+DOCKER CONTAINER TAKE 2 || cd asterisk-take2
+~docker run -d \
+   --name asterisk-server \
+   -p 5060:5060/udp \
+   -p 10000-20000:10000-20000/udp \
+   -p 3306:3306 \
+   -p 8088:8088 \
+   -p 8089:8089 \
+   asterisk-mysql
+
+~docker exec -it asterisk-server bash
+-- Create the database
+
+##########SWITCHED TO USING DOCKER TO RUN ASTERISK PERSISTENTLY##########
+~cd asterisk-take2 || /Users/matovumedhi/asterisk-take2
+~docker-compose up -d || To start the docker container
+~docker-compose down || To stop the docker container
+~docker exec -it asterisk-server bash || To get into the docker container
+
+#### TO FIND THE DOCKER CONTAINER IP ADDRESS ####
+*From outside the docker container
+~docker inspect asterisk-server | grep IPAddress
+
+*From inside the docker container
+~hostname -I
+##TO VERIFY ODBC CONNECTION
+~odbcinst -j || When inside the docker container
+
+
+####DATA BASE GRANT USER 
+GRANT ALL PRIVILEGES ON *.* TO 'mayday_user'@'%' IDENTIFIED BY 'Pasword@256' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+
+
+
+
+
+CREATE DATABASE mayday_db;
+
+-- Create user with password
+CREATE USER 'mayday_user'@'localhost' IDENTIFIED BY 'mayday_password';
+
+-- Grant privileges to the user for the database
+GRANT ALL PRIVILEGES ON mayday_db.* TO 'mayday_user'@'localhost';
+
+-- Apply the privileges
+FLUSH PRIVILEGES;
+
+-- Show the grants to verify
+SHOW GRANTS FOR 'mayday_user'@'localhost';
+
+-- Switch to the new database
+USE mayday_db;
+
+-- Show the databases to verify
+SHOW DATABASES;
+
+FOR THE REAL DATA TABLES NEEDED FOR OUR PROJECT
+-- Connect to the mayday_db
+USE mayday_db;
+
+-- Create ps_endpoints table
+CREATE TABLE ps_endpoints (
+    id VARCHAR(255) PRIMARY KEY,
+    transport VARCHAR(255) DEFAULT 'transport-udp',
+    aors VARCHAR(255),
+    auth VARCHAR(255),
+    context VARCHAR(255) DEFAULT 'from-internal',
+    disallow VARCHAR(255) DEFAULT 'all',
+    allow VARCHAR(255) DEFAULT 'ulaw,alaw',
+    direct_media BOOLEAN DEFAULT false,
+    force_rport BOOLEAN DEFAULT true,
+    dtls_auto_generate_cert BOOLEAN DEFAULT true,
+    dtls_verify BOOLEAN DEFAULT false,
+    dtls_setup ENUM('active', 'passive', 'actpass') DEFAULT 'actpass',
+    webrtc BOOLEAN DEFAULT true,
+    ice_support BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Create ps_auths table
+CREATE TABLE ps_auths (
+    id VARCHAR(255) PRIMARY KEY,
+    auth_type VARCHAR(255) DEFAULT 'userpass',
+    username VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Create ps_aors table
+CREATE TABLE ps_aors (
+    id VARCHAR(255) PRIMARY KEY,
+    max_contacts INT DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Create users table
+CREATE TABLE users (
+    id VARCHAR(36) PRIMARY KEY,
+    username VARCHAR(255) UNIQUE,
+    name VARCHAR(255),
+    password VARCHAR(255),
+    email VARCHAR(255) UNIQUE,
+    full_name VARCHAR(255) NOT NULL DEFAULT 'John Doe',
+    role ENUM('admin', 'user', 'agent', 'manager') NOT NULL DEFAULT 'user',
+    typology VARCHAR(255),
+    voicemail VARCHAR(255),
+    extension VARCHAR(255) UNIQUE,
+    sip_registered BOOLEAN NOT NULL DEFAULT false,
+    internal INT,
+    type VARCHAR(255) NOT NULL DEFAULT 'friend',
+    context VARCHAR(255) DEFAULT 'from-sip',
+    recording_to_user_extension VARCHAR(255) DEFAULT 'inactive',
+    phone VARCHAR(255),
+    mobile VARCHAR(255),
+    transport VARCHAR(255) DEFAULT 'udp',
+    nat VARCHAR(255),
+    dtmf_mode ENUM('rfc2833', 'info', 'shortinfo', 'inband', 'auto') DEFAULT 'rfc2833',
+    direct_media VARCHAR(255) NOT NULL DEFAULT 'no',
+    trustrpid VARCHAR(255) NOT NULL DEFAULT 'no',
+    trust_id_outbound VARCHAR(255) NOT NULL DEFAULT 'no',
+    callerid VARCHAR(255) DEFAULT '"" <>', 
+    callcounter ENUM('yes', 'no') DEFAULT 'yes',
+    online BOOLEAN DEFAULT false,
+    last_login_at DATETIME,
+    pause_type VARCHAR(255) DEFAULT 'DEFAULT PAUSE',
+    mail_capacity INT DEFAULT 0,
+    chat_capacity INT DEFAULT 0,
+    sms_capacity INT DEFAULT 0,
+    openchannel_capacity INT DEFAULT 0,
+    whatsapp_capacity INT DEFAULT 0,
+    phone_bar_auto_answer BOOLEAN DEFAULT false,
+    phone_bar_enable_settings BOOLEAN DEFAULT true,
+    phone_bar_listen_port INT DEFAULT 5160,
+    phone_bar_expires INT DEFAULT 120,
+    phone_bar_remote_control BOOLEAN DEFAULT false,
+    phone_bar_remote_control_port INT DEFAULT 9888,
+    phone_bar_enable_recording BOOLEAN DEFAULT false,
+    phone_bar_ring_in_use BOOLEAN DEFAULT false,
+    chan_spy BOOLEAN DEFAULT false,
+    description VARCHAR(255),
+    host VARCHAR(255) DEFAULT 'dynamic',
+    ipaddr VARCHAR(255),
+    port INT,
+    deny VARCHAR(255),
+    permit VARCHAR(255),
+    secret VARCHAR(255),
+    md5secret VARCHAR(255),
+    remotesecret VARCHAR(255),
+    directmediapermit VARCHAR(255),
+    directmediadeny VARCHAR(255),
+    call_group VARCHAR(255),
+    pickup_group VARCHAR(255),
+    language VARCHAR(255) DEFAULT 'en',
+    disallow VARCHAR(255) DEFAULT 'all',
+    allow VARCHAR(255) DEFAULT 'ulaw;alaw;gsm',
+    insecure VARCHAR(255),
+    allowtransfer VARCHAR(255) NOT NULL DEFAULT 'no',
+    videosupport VARCHAR(255) NOT NULL DEFAULT 'no',
+    encryption VARCHAR(255) NOT NULL DEFAULT 'no',
+    avpf VARCHAR(255) NOT NULL DEFAULT 'no',
+    icesupport VARCHAR(255),
+    dtlsenable VARCHAR(255) NOT NULL DEFAULT 'no',
+    dtlsverify VARCHAR(255) NOT NULL DEFAULT 'no',
+    dtlssetup ENUM('active', 'passive', 'actpass'),
+    useragentphone VARCHAR(255) NOT NULL DEFAULT 'no',
+    force_avp VARCHAR(255) NOT NULL DEFAULT 'no',
+    canreinvite VARCHAR(255) NOT NULL DEFAULT 'no',
+    login_in_pause BOOLEAN DEFAULT false,
+    reset_password_token VARCHAR(255),
+    reset_password_expires DATETIME,
+    password_reset_at DATETIME DEFAULT NULL,
+    previous_passwords VARCHAR(255),
+    show_web_bar INT DEFAULT 0,
+    permissions VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME DEFAULT NULL,
+    ProfileId INT,
+    user_profile_id INT
+);
+
+-- Add foreign key relationships
+ALTER TABLE users ADD FOREIGN KEY (extension) REFERENCES ps_endpoints(id) ON DELETE CASCADE;
+ALTER TABLE ps_endpoints ADD FOREIGN KEY (auth) REFERENCES ps_auths(id);
+ALTER TABLE ps_endpoints ADD FOREIGN KEY (aors) REFERENCES ps_aors(id);
+
+
+
+ASTERISK CONFIGURATION
+-- Edit /etc/asterisk/res_config_mysql.conf
+[general]
+dbhost = localhost
+dbname = mayday_db
+dbuser = your_mysql_user
+dbpass = your_mysql_password
+dbport = 3306
+dbsock = /var/run/mysqld/mysqld.sock
+
+-- Edit /etc/asterisk/extconfig.conf
+[settings]
+ps_endpoints => mysql,mayday_db,ps_endpoints
+ps_auths => mysql,mayday_db,ps_auths
+ps_aors => mysql,mayday_db,ps_aors
+
+--Edit /etc/asterisk/pjsip.conf
+[global]
+type=global
+user_agent=Asterisk PBX
+debug=yes
+
+[transport-udp]
+type=transport
+protocol=udp
+bind=0.0.0.0:5060
+allow_reload=yes
+
+[transport-ws]
+type=transport
+protocol=ws
+bind=0.0.0.0:8088
+allow_reload=yes
+
+; Template for dynamic endpoints
+[endpoint-template](!)
+type=endpoint
+transport=transport-ws
+context=from-internal
+disallow=all
+allow=ulaw,alaw
+direct_media=no
+dtls_auto_generate_cert=yes
+dtls_verify=no
+dtls_setup=actpass
+webrtc=yes
+media_encryption=sdes
+ice_support=yes
+force_rport=yes
+rtcp_mux=yes
+dtmf_mode=auto
+
+--Restart Modules
+asterisk -rx "module reload res_config_mysql.so"
+asterisk -rx "module reload res_pjsip.so"
+
+
+--Edit /etc/asterisk/http.conf
+[general]
+enabled=yes
+bindaddr=0.0.0.0
+bindport=8088
+tlsenable=no
+
+; Allow unauthenticated websocket connections
+websocket_write_timeout=100
+websocket_client_timeout=100
+
+
+--Edit ARI /etc/asterisk/ari.conf
+ [general]
+  enabled=yes
+  pretty=yes
+  allowed_origins=*
+
+  [mayday]
+  type=user
+  password=mayday
+  password_format=plain
+  read_only=no
+
+--Edit Modules /etc/asterisk/modules.conf
+  load => res_http.so
+  load => res_http_websocket.so
+  load => res_ari.so
+  load => res_ari_applications.so
+  load => res_ari_asterisk.so
+  load => res_ari_bridges.so
+  load => res_ari_channels.so
+  load => res_ari_device_states.so
+  load => res_ari_endpoints.so
+  load => res_ari_events.so
+  load => res_ari_model.so
+  load => res_ari_playbacks.so
+  load => res_ari_recordings.so
+  load => res_ari_sounds.so
+
+  load = res_pjsip.so
+  load = res_pjsip_session.so
+  load = res_pjsip_pubsub.so
+  load = res_pjsip_transport_websocket.so
+  load = res_pjsip_outbound_publish.so
+  load = res_pjsip_outbound_registration.so
+  load = res_pjsip_registrar.so
+  load = res_pjsip_endpoint_identifier_ip.so
+  load = res_pjsip_mwi.so
+  load = chan_pjsip.so
+
+  ; Optional PJSIP modules depending on your needs
+  ;load = res_pjsip_messaging.so
+  ;load = res_pjsip_dlg_options.so
+  ;load = res_pjsip_notify.so
+  ;load = res_pjsip_one_touch_recording.so
+
+  FUNCTIONALITY
+  I'll explain the purpose of each PJSIP module:
+
+1. `res_pjsip.so`
+- The core PJSIP module that provides the basic SIP stack functionality
+- Handles fundamental SIP message processing and routing
+
+2. `res_pjsip_session.so`
+- Manages SIP dialog sessions and media negotiations
+- Handles call setup, modifications, and teardown
+
+3. `res_pjsip_pubsub.so`
+- Handles SIP subscription and publication events
+- Used for features like presence monitoring and event notifications
+
+4. `res_pjsip_transport_websocket.so`
+- Enables WebSocket transport for WebRTC applications
+- Allows SIP communication over WebSocket connections
+
+5. `res_pjsip_outbound_publish.so`
+- Manages outbound SIP PUBLISH requests
+- Used for sending state information to external services
+
+6. `res_pjsip_outbound_registration.so`
+- Handles registration to external SIP providers
+- Essential for trunk connections to SIP providers
+
+7. `res_pjsip_registrar.so`
+- Acts as a SIP registrar for endpoints
+- Manages registration state for SIP phones and devices
+
+8. `res_pjsip_endpoint_identifier_ip.so`
+- Identifies endpoints based on IP address
+- Used for IP-based authentication
+
+9. `res_pjsip_mwi.so`
+- Handles Message Waiting Indicator functionality
+- Used for voicemail notification services
+
+10. `chan_pjsip.so`
+- The channel driver for PJSIP
+- Bridges PJSIP with Asterisk's channel architecture
+
+Optional modules:
+
+11. `res_pjsip_messaging.so`
+- Handles SIP MESSAGE requests
+- Used for text messaging functionality
+
+12. `res_pjsip_dlg_options.so`
+- Manages SIP OPTIONS requests within dialogs
+- Used for keeping track of endpoint availability
+
+13. `res_pjsip_notify.so`
+- Handles SIP NOTIFY requests
+- Used for various notification services
+
+14. `res_pjsip_one_touch_recording.so`
+- Enables one-touch recording features
+- Used for call recording initiated by endpoints
+
+Most basic installations need only the core modules. The optional modules can be enabled based on specific features you need in your system.
+
+
+
+#####------------ASTERISK 16 DOCKER FILE-----------------######
+# Use Debian as base image
+FROM debian:bullseye-slim
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install required packages
+RUN apt-get update && apt-get install -y \
+    asterisk \
+    mariadb-client \
+    mariadb-server \
+    default-libmysqlclient-dev \
+    asterisk-mysql \
+    asterisk-config \
+    asterisk-modules \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure MySQL to listen on all interfaces
+RUN sed -i 's/bind-address.*=.*/bind-address = 0.0.0.0/' /etc/mysql/mariadb.conf.d/50-server.cnf
+
+# Initialize Asterisk configuration directory
+RUN mkdir -p /etc/asterisk
+
+# Copy default Asterisk configurations
+COPY asterisk/* /etc/asterisk/
+
+# Create directory for Asterisk modules if it doesn't exist
+RUN mkdir -p /usr/lib/asterisk/modules
+
+# Expose necessary ports
+EXPOSE 5060
+EXPOSE 10000-20000
+EXPOSE 3306
+EXPOSE 8088
+
+
+# Start script to run both services
+COPY start.sh /start.sh
+COPY mysql-setup.sql /mysql-setup.sql
+RUN chmod +x /start.sh
+
+CMD ["/start.sh"]
+
+
+
+####TO BACKUP DOCKER CONTAINER
+~docker ps | grep asterisk
+~ docker inspect 5d5478da7cac -f '{{ .Mounts }}'
+~mkdir asterisk_backup
+~docker cp 5d5478da7cac:/etc/asterisk/. ./asterisk_backup/
+
+
+############SYSTEM UPDATE ############
+Manual Update (UI Button)
+-User clicks the update button in the about page
+-Server executes script
+-Script pull latests changes from github, rebuilds and restarts the application
+
+Automatic Update (Github Actions)
+-Github Actions workflow executes `github/.workflows/deploy.yml`
+-Copies files to the server
+-Executes the same script with environment variables set to automatically restart the application
+
+============= Make sure the script is executable: =========================
+~ chmod +x /home/admin/Mayday-CRM-Scracth/update_and_restart_after_gitpull.sh
+
+============= Make sure the script is in the correct directory: =========================
+~ ls -l /home/admin/Mayday-CRM-Scracth/update_and_restart_after_gitpull.sh
+
+########## CREATE LOG FILES ###########
+~ sudo touch /var/log/mayday-deployment.log
+~ sudo chown admin:admin /var/log/mayday-deployment.log
+########## CREATE LOG FILES ###########
+
+
+
+-------->>>>
+To start the server:
+~ cd /home/admin/Mayday-CRM-Scracth
+~ npm run server_client [This will start the server and the client]
+
+To start the electron softphone:
+~ cd /home/admin/electron-softphone
+~ npm run electron:dev
+

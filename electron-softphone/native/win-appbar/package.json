@@ -1,0 +1,29 @@
+{
+  "name": "win-appbar",
+  "version": "1.0.0",
+  "description": "Native Windows AppBar implementation for Electron - reserves screen space like the Windows taskbar",
+  "main": "lib/index.js",
+  "scripts": {
+    "install": "node-gyp rebuild",
+    "build": "node-gyp rebuild",
+    "clean": "node-gyp clean"
+  },
+  "dependencies": {
+    "node-addon-api": "^7.0.0",
+    "node-gyp": "^10.0.1"
+  },
+  "os": ["win32"],
+  "cpu": ["x64", "ia32"],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "keywords": [
+    "windows",
+    "appbar",
+    "taskbar",
+    "electron",
+    "native",
+    "shell"
+  ],
+  "license": "MIT"
+}

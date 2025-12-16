@@ -1,0 +1,370 @@
+# Asterisk Telephony System Architecture
+
+## System Components Overview
+
+### 1. Core Infrastructure
+
+- **Asterisk 20**
+  - PJSIP (Real-time database configuration)
+  - ARI (Asterisk REST Interface)
+  - AMI (Asterisk Manager Interface)
+  - WebSocket connectivity
+- **Database Layer**
+  - MariaDB with ODBC connectivity
+  - Sequelize ORM for database operations
+- **Backend Server (Node.js)**
+  - ES6 modules
+  - WebSocket server for real-time communications
+  - REST API endpoints
+- **Electron Softphone Client**
+  - PJSIP library integration
+  - WebSocket client for real-time updates
+
+## Communication Flows
+
+### 1. SIP Registration Monitoring
+
+```
+Electron Client (PJSIP) → Asterisk → AMI → Node.js → WebSocket → Client UI
+```
+
+- Use AMI events for real-time registration status
+- Implement heartbeat mechanism for connection health
+- Store registration state in Redux/state management
+- Update Appbar UI based on registration status
+
+### 2. Call Handling Architecture
+
+#### Outbound Calls
+
+```
+Softphone → PJSIP → Asterisk → Trunk → PSTN
+```
+
+- Use ARI for call control and monitoring
+- Implement call state machine in Node.js
+- Real-time call status updates via WebSocket
+- Call recording and quality monitoring
+
+#### Inbound Calls
+
+```
+PSTN → Trunk → Asterisk → ARI → Node.js → WebSocket → Client
+```
+
+- Real-time route lookup from database
+- Queue assignment based on rules
+- Agent availability checking
+- Call distribution logic
+
+### 3. Queue Management
+
+```
+Calls → ARI → Queue Manager (Node.js) → WebSocket → Agents
+```
+
+- Real-time queue statistics
+- Agent state management
+- Priority queue implementation
+- Callback queue for missed calls
+
+## Development Roadmap
+
+### Phase 1: Registration and Basic Calls
+
+1. Complete registration monitoring
+   - AMI event handlers for registration
+   - WebSocket updates to client
+   - UI status indicators
+2. Basic call handling
+   - Outbound call implementation
+   - Inbound call routing
+   - Call state management
+
+### Phase 2: Queue Implementation
+
+1. Queue core features
+   - Queue creation and management
+   - Agent login/logout
+   - Basic call distribution
+2. Queue monitoring
+   - Real-time statistics
+   - Agent status tracking
+   - Queue performance metrics
+
+### Phase 3: Advanced Features
+
+1. Call recording
+2. Quality monitoring
+3. Advanced routing rules
+4. Reporting and analytics
+
+## Technology Recommendations
+
+### 1. Call Control
+
+- **Primary: ARI**
+  - Better control over call flow
+  - RESTful interface
+  - WebSocket events
+  - Modern API design
+- **Secondary: AMI**
+  - Registration monitoring
+  - System status events
+  - Legacy feature support
+
+### 2. Database Schema Requirements
+
+```sql
+-- Key tables needed:
+- extensions
+- queues
+- queue_members
+- call_logs
+- routing_rules
+- trunk_configs
+```
+
+### 3. Client Architecture
+
+- React for UI components
+- Redux for state management
+- WebSocket service for real-time updates
+- PJSIP for SIP communications
+
+## Monitoring and Logging
+
+### 1. System Health
+
+- Registration status
+- Trunk status
+- Queue status
+- Agent status
+- Call quality metrics
+
+### 2. Performance Metrics
+
+- Call success rate
+- Queue waiting times
+- Agent performance
+- System resource usage
+
+## Security Considerations
+
+1. SIP authentication
+2. API authentication
+3. WebSocket security
+4. Database access control
+5. Call encryption
+
+## Error Handling
+
+1. Network disconnections
+2. Registration failures
+3. Call failures
+4. Database connectivity issues
+5. WebSocket reconnection logic
+
+# Asterisk Telephony System Architecture
+
+[Previous sections remain the same...]
+
+## Testing Strategy
+
+### 1. Unit Testing
+
+- Backend API endpoints
+- Queue distribution logic
+- Route selection algorithms
+- WebSocket event handlers
+- Authentication/Authorization
+
+### 2. Integration Testing
+
+- SIP registration flow
+- Call handling sequences
+- Queue operations
+- Database transactions
+- WebSocket communication
+
+### 3. Load Testing
+
+- Concurrent call handling
+- Queue performance under load
+- WebSocket connection limits
+- Database query performance
+- Registration capacity
+
+## Deployment Considerations
+
+### 1. Environment Setup
+
+```bash
+# Required system configurations
+- Kernel parameters for real-time audio
+- UDP buffer sizes for SIP
+- File descriptor limits
+- Network tuning for VoIP
+```
+
+### 2. High Availability
+
+- Database replication
+- Asterisk failover
+- Load balancing
+- Session persistence
+- WebSocket redundancy
+
+### 3. Monitoring Stack
+
+- Prometheus metrics
+- Grafana dashboards
+- ELK stack for logs
+- Alert management
+- Performance monitoring
+
+## Development Workflow
+
+### 1. Version Control Strategy
+
+- Feature branching
+- Environment-specific configs
+- Database migration management
+- Asterisk config versioning
+- Client-server version compatibility
+
+### 2. CI/CD Pipeline
+
+```
+Code → Test → Build → Stage → Deploy
+```
+
+- Automated testing
+- Build verification
+- Config validation
+- Database migrations
+- Deployment automation
+
+## Documentation Requirements
+
+### 1. Technical Documentation
+
+- API specifications
+- WebSocket event catalog
+- Database schema
+- Configuration guide
+- Deployment procedures
+
+### 2. User Documentation
+
+- Admin manual
+- Agent guide
+- Softphone user guide
+- Troubleshooting guide
+- Queue management guide
+
+## Scaling Considerations
+
+### 1. Horizontal Scaling
+
+- Multiple Asterisk instances
+- Load balancer configuration
+- Database sharding
+- Session management
+- Media server scaling
+
+### 2. Resource Planning
+
+- CPU requirements
+- Memory allocation
+- Network bandwidth
+- Storage capacity
+- Backup strategy
+
+## Feature Extensions
+
+### 1. Analytics Dashboard
+
+- Real-time metrics
+- Historical reports
+- Agent performance
+- Queue analytics
+- Call quality metrics
+
+### 2. Integration Points
+
+- CRM systems
+- Ticketing systems
+- SMS/Email notifications
+- Calendar integration
+- External APIs
+
+### 3. Advanced Features
+
+- IVR builder
+- Call recording management
+- Quality monitoring
+- Supervisor dashboard
+- Custom reports builder
+
+## Error Recovery Scenarios
+
+### 1. Network Issues
+
+- SIP registration recovery
+- WebSocket reconnection
+- Database connection pooling
+- Call preservation
+- State recovery
+
+### 2. System Failures
+
+- Graceful degradation
+- Data consistency
+- Session recovery
+- Queue state preservation
+- Configuration reload
+
+## Performance Optimization
+
+### 1. Database
+
+- Query optimization
+- Index strategy
+- Connection pooling
+- Cache implementation
+- Real-time query tuning
+
+### 2. Real-time Communication
+
+- Event batching
+- Message compression
+- Connection multiplexing
+- Buffer management
+- Priority queuing
+
+### 3. Media Handling
+
+- Codec selection
+- Buffer optimization
+- Packet loss handling
+- Jitter management
+- Echo cancellation
+
+## Compliance and Regulations
+
+### 1. Call Recording
+
+- Storage requirements
+- Retention policies
+- Access controls
+- Encryption standards
+- Deletion procedures
+
+### 2. Security Requirements
+
+- Data protection
+- Call encryption
+- Access logging
+- Audit trails
+- Compliance reporting

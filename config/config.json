@@ -1,0 +1,23 @@
+{
+  "development": {
+    "username": "mayday_user",
+    "password": "Pasword@256",
+    "database": "mayday_db",
+    "host": "127.0.0.1",
+    "dialect": "mysql"
+  },
+  "test": {
+    "username": "mayday_user",
+    "password": "Pasword@256",
+    "database": "mayday_db_test",
+    "host": "127.0.0.1",
+    "dialect": "mysql"
+  },
+  "production": {
+    "username": "mayday_user",
+    "password": "Pasword@256",
+    "database": "mayday_db_production",
+    "host": "127.0.0.1",
+    "dialect": "mysql"
+  }
+}

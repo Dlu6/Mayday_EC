@@ -1,0 +1,152 @@
+{
+  "mcpServers": {
+    "mayday-asterisk-vm": {
+      "command": "ssh",
+      "args": [
+        "-i",
+        "/Users/matovumedhi/Downloads/MHU_Debian_Mumb.pem",
+        "admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com"
+      ],
+      "env": {
+        "TERM": "xterm-256color"
+      },
+      "cwd": "/home/admin/Mayday-CRM-Scracth"
+    },
+    "mayday-local-dev": {
+      "command": "node",
+      "args": ["server/server.js"],
+      "env": {
+        "NODE_ENV": "development",
+        "PORT": "8004"
+      },
+      "cwd": "/Users/matovumedhi/Downloads/Mayday-CRM-Scracth"
+    },
+    "mayday-main-database": {
+      "command": "mysql",
+      "args": [
+        "-h",
+        "65.1.149.92",
+        "-P",
+        "3306",
+        "-u",
+        "mayday_user",
+        "-p",
+        "asterisk"
+      ],
+      "env": {
+        "MYSQL_PWD": "Pasword@256"
+      },
+      "cwd": "/Users/matovumedhi/Downloads/Mayday-CRM-Scracth",
+      "description": "Main CRM database (VM public IP)"
+    },
+    "mayday-datatool-database": {
+      "command": "mysql",
+      "args": ["-h", "localhost", "-P", "3306", "-u", "root", "-p"],
+      "cwd": "/Users/matovumedhi/Downloads/Mayday-CRM-Scracth",
+      "description": "DataTool analytics database"
+    },
+    "mayday-database-monitor": {
+      "command": "node",
+      "args": ["scripts/db-monitor.js"],
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "cwd": "/Users/matovumedhi/Downloads/Mayday-CRM-Scracth",
+      "description": "Database connection monitoring service"
+    },
+    "mayday-pm2-status": {
+      "command": "ssh",
+      "args": [
+        "-i",
+        "/Users/matovumedhi/Downloads/MHU_Debian_Mumb.pem",
+        "admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com",
+        "bash",
+        "-lc",
+        "cd /home/admin/Mayday-CRM-Scracth && sudo -u mayday pm2 status mayday | cat"
+      ],
+      "cwd": "/home/admin/Mayday-CRM-Scracth",
+      "description": "Check PM2 status for mayday app on VM"
+    },
+    "mayday-pm2-restart": {
+      "command": "ssh",
+      "args": [
+        "-i",
+        "/Users/matovumedhi/Downloads/MHU_Debian_Mumb.pem",
+        "admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com",
+        "bash",
+        "-lc",
+        "cd /home/admin/Mayday-CRM-Scracth && sudo -u mayday pm2 restart mayday"
+      ],
+      "cwd": "/home/admin/Mayday-CRM-Scracth",
+      "description": "Restart mayday app via PM2 on VM"
+    },
+    "mayday-pm2-logs": {
+      "command": "ssh",
+      "args": [
+        "-i",
+        "/Users/matovumedhi/Downloads/MHU_Debian_Mumb.pem",
+        "admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com",
+        "bash",
+        "-lc",
+        "cd /home/admin/Mayday-CRM-Scracth && sudo -u mayday pm2 logs mayday --lines 200 | tail -n 200"
+      ],
+      "cwd": "/home/admin/Mayday-CRM-Scracth",
+      "description": "Tail PM2 logs for mayday app on VM"
+    }
+  },
+  "context7": {
+    "enabled": true,
+    "libraries": [
+      "asterisk-ami",
+      "asterisk-ari",
+      "sipjs",
+      "node-ami",
+      "asterisk-manager",
+      "mysql2",
+      "sequelize",
+      "odbc"
+    ]
+  },
+  "development": {
+    "hotReload": true,
+    "debugMode": true,
+    "logLevel": "debug",
+    "autoRestart": true
+  },
+  "asterisk": {
+    "ami": {
+      "host": "localhost",
+      "port": 5038,
+      "username": "admin",
+      "password": "admin"
+    },
+    "ari": {
+      "host": "localhost",
+      "port": 8088,
+      "username": "asterisk",
+      "password": "asterisk"
+    }
+  },
+  "databases": {
+    "main": {
+      "host": "65.1.149.92",
+      "port": 3306,
+      "name": "asterisk",
+      "user": "mayday_user",
+      "description": "Main CRM database with call records, users, and voice extensions (VM public IP)"
+    },
+    "datatool": {
+      "host": "localhost",
+      "port": 3306,
+      "name": "mayday_crm_db",
+      "user": "mayday_user",
+      "description": "DataTool analytics database with posts, sessions, and reporting data"
+    }
+  },
+  "monitoring": {
+    "databaseHealth": true,
+    "connectionPooling": true,
+    "queryPerformance": true,
+    "backupStatus": true
+  }
+}

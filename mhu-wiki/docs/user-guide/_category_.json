@@ -1,0 +1,8 @@
+{
+  "label": "User Guide",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "description": "Comprehensive guides for agents and supervisors using the MHU Helpline system."
+  }
+}

@@ -1,0 +1,104 @@
+        #!/bin/bash
+        # restore_asterisk.sh
+        # Add this near the top of restore_asterisk.sh
+        check_status() {
+            if [ $? -eq 0 ]; then
+                echo -e "${GREEN}✓ $1 successful${NC}"
+            else
+                echo -e "${RED}✗ $1 failed${NC}"
+                exit 1
+            fi
+        }
+        RED='\033[0;31m'
+        GREEN='\033[0;32m'
+        YELLOW='\033[1;33m'
+        NC='\033[0m'
+
+        BACKUP_DIR="/backup/asterisk"
+
+        # Function to list available backups
+        list_backups() {
+            echo -e "${YELLOW}Available backups:${NC}"
+            echo "----------------------------------------"
+            if [ -f "${BACKUP_DIR}/backup_register.txt" ]; then
+                cat "${BACKUP_DIR}/backup_register.txt" | while IFS='|' read -r timestamp id date user; do
+                    echo "ID: $id"
+                    echo "Date: $date"
+                    echo "By: $user"
+                    echo "----------------------------------------"
+                done
+            else
+                echo "No backups found"
+                exit 1
+            fi
+        }
+
+        # Function to restore a specific backup
+        restore_backup() {
+            local BACKUP_ID=$1
+            local BACKUP_FILES=($(find "${BACKUP_DIR}" -name "*${BACKUP_ID}*"))
+            
+            if [ ${#BACKUP_FILES[@]} -eq 0 ]; then
+                echo -e "${RED}No backup found with ID: ${BACKUP_ID}${NC}"
+                exit 1
+            fi
+
+            echo -e "${YELLOW}WARNING: This will overwrite your current Asterisk configuration${NC}"
+            read -p "Are you sure you want to continue? (y/n) " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                exit 1
+            fi
+
+            # Stop Asterisk
+            echo -e "${YELLOW}Stopping Asterisk...${NC}"
+            systemctl stop asterisk
+            check_status "Stopping Asterisk"
+
+            # Restore configuration files
+            echo -e "${YELLOW}Restoring configuration files...${NC}"
+            CONFIG_BACKUP="${BACKUP_DIR}/configs/asterisk_*_${BACKUP_ID}_configs.tar.gz"
+            if [ -f $CONFIG_BACKUP ]; then
+                tar xzf $CONFIG_BACKUP -C /
+                check_status "Configuration restore"
+            fi
+
+            # Restore database
+            echo -e "${YELLOW}Restoring database...${NC}"
+            DB_BACKUP="${BACKUP_DIR}/databases/asterisk_*_${BACKUP_ID}_asterisk.sql"
+            if [ -f $DB_BACKUP ]; then
+                mysql -u$MYSQL_USER -p$MYSQL_PASS asterisk < $DB_BACKUP
+                check_status "Database restore"
+            fi
+
+            # Start Asterisk
+            echo -e "${YELLOW}Starting Asterisk...${NC}"
+            systemctl start asterisk
+            check_status "Starting Asterisk"
+
+            # Verify Asterisk is running
+            sleep 5
+            if asterisk -rx 'core show version' &>/dev/null; then
+                echo -e "${GREEN}Asterisk successfully restored and running${NC}"
+            else
+                echo -e "${RED}Warning: Asterisk may not have started properly${NC}"
+            fi
+        }
+
+        # Main script
+        case "$1" in
+            list)
+                list_backups
+                ;;
+            restore)
+                if [ -z "$2" ]; then
+                    echo "Usage: $0 restore <backup-id>"
+                    exit 1
+                fi
+                restore_backup $2
+                ;;
+            *)
+                echo "Usage: $0 {list|restore <backup-id>}"
+                exit 1
+                ;;
+        esac

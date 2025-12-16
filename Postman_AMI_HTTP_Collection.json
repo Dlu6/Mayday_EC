@@ -1,0 +1,488 @@
+{
+  "info": {
+    "name": "Asterisk AMI - HTTP API Collection",
+    "description": "Collection for testing Asterisk AMI functions via HTTP API endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8004",
+      "type": "string"
+    },
+    {
+      "key": "vm_base_url",
+      "value": "http://65.1.149.92:8004",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "noauth"
+  },
+  "item": [
+    {
+      "name": "🔌 AMI Connection Management",
+      "item": [
+        {
+          "name": "Get AMI Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ami/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Connect to AMI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ami/connect",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "connect"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Disconnect from AMI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ami/disconnect",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "disconnect"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📞 Call Management",
+      "item": [
+        {
+          "name": "Originate Call",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fromExtension\": \"1001\",\n  \"toNumber\": \"1234567890\",\n  \"callerId\": \"1001 <1001>\",\n  \"options\": {\n    \"timeout\": 30000\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ami/originate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "originate"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Blind Transfer Call",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"PJSIP/1001-00000001\",\n  \"targetExtension\": \"1002\",\n  \"transferType\": \"blind\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ami/transfer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "transfer"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Attended Transfer Call",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"PJSIP/1001-00000001\",\n  \"targetExtension\": \"1002\",\n  \"transferType\": \"attended\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ami/transfer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "transfer"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Hangup Call",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"PJSIP/1001-00000001\",\n  \"cause\": 16\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ami/hangup",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "hangup"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Redirect Call",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"PJSIP/1001-00000001\",\n  \"targetExtension\": \"1003\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ami/redirect",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "redirect"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📊 System Information",
+      "item": [
+        {
+          "name": "Get Active Channels",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ami/channels",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "channels"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Channel Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ami/channel/PJSIP/1001-00000001/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "channel", "PJSIP/1001-00000001", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get PJSIP Endpoints",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ami/endpoints",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "endpoints"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get PJSIP Contacts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ami/contacts",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "contacts"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get PJSIP Registrations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ami/registrations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "registrations"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Extension Statuses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ami/extensions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "extensions"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Specific Extension Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ami/extensions/1001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "extensions", "1001"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔀 Queue Management",
+      "item": [
+        {
+          "name": "Get Queue Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ami/queues",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "queues"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Queue Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ami/queues/summary",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "queues", "summary"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add Agent to Queue",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"queueName\": \"support\",\n  \"agentInterface\": \"PJSIP/1001\",\n  \"options\": {\n    \"memberName\": \"Agent 1001\",\n    \"penalty\": 0,\n    \"paused\": 0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ami/queues/agent",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "queues", "agent"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Agent from Queue",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"queueName\": \"support\",\n  \"agentInterface\": \"PJSIP/1001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ami/queues/agent",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "queues", "agent"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📹 Call Recording",
+      "item": [
+        {
+          "name": "Start Call Recording",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"PJSIP/1001-00000001\",\n  \"options\": {\n    \"filename\": \"/var/spool/asterisk/monitor/call_123.wav\",\n    \"options\": \"ab\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ami/recording/start",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "recording", "start"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Stop Call Recording",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"PJSIP/1001-00000001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ami/recording/stop",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "recording", "stop"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔧 Custom AMI Actions",
+      "item": [
+        {
+          "name": "Execute Custom AMI Action",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": {\n    \"Action\": \"CoreStatus\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ami/execute",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "execute"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📞 Call Monitoring & Management",
+      "item": [
+        {
+          "name": "Register Call for AMI Monitoring",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"callId\": \"call_123\",\n  \"extension\": \"1001\",\n  \"remoteNumber\": \"1234567890\",\n  \"direction\": \"outbound\",\n  \"timestamp\": \"2024-01-01T00:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ami/call-events",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "call-events"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Call Information",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ami/call-info/PJSIP/1001-00000001",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ami", "call-info", "PJSIP/1001-00000001"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

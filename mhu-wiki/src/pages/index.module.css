@@ -1,0 +1,65 @@
+/**
+ * CSS files with the .module.css suffix will be treated as CSS modules
+ * and scoped locally.
+ */
+
+.heroBanner {
+  padding: 4rem 0;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+@media screen and (max-width: 996px) {
+  .heroBanner {
+    padding: 2rem;
+  }
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.heroGradient {
+  background: linear-gradient(135deg, #4f8cff 0%, #27cdf3 100%);
+}
+
+.getStartedSection {
+  background: #f8fafc;
+  padding: 3rem 0 2rem 0;
+  margin-top: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 2px 16px rgba(13, 72, 181, 0.936);
+}
+
+.testimonialSection {
+  background: #fff;
+  padding: 3rem 0 2rem 0;
+  margin-top: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 2px 16px rgba(13, 72, 181, 0.936);
+}
+
+.testimonial {
+  font-size: 1.25rem;
+  font-style: italic;
+  color: #161616;
+  margin: 1.5rem auto 0 auto;
+  max-width: 600px;
+}
+
+.margin-right--md {
+  margin-right: 1rem;
+}
+
+[data-theme="dark"] .getStartedSection,
+[data-theme="dark"] .testimonialSection {
+  background: var(--ifm-background-surface-color);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .testimonial {
+  color: var(--ifm-font-color-secondary);
+}

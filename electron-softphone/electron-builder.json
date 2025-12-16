@@ -1,0 +1,39 @@
+{
+  "appId": "com.mayday.appbar",
+  "productName": "Appbar",
+  "directories": {
+    "output": "release/"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "native/win-appbar/lib/**/*",
+    "native/win-appbar/build/Release/*.node"
+  ],
+  "extraResources": [
+    {
+      "from": "native/win-appbar/build/Release/",
+      "to": "native/win-appbar/build/Release/",
+      "filter": ["*.node"]
+    }
+  ],
+  "win": {
+    "target": ["nsis"],
+    "icon": "build/mayday_app_icon.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Appbar"
+  },
+  "asarUnpack": [
+    "**/*.node",
+    "native/**/*"
+  ],
+  "publish": {
+    "provider": "generic",
+    "url": "https://mhuhelpline.com/downloads/"
+  }
+}

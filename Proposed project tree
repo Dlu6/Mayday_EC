@@ -1,0 +1,195 @@
+call-center/
+├── client/                      # Frontend React application
+│   ├── public/
+│   │   ├── index.html
+│   │   └── assets/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── common/         # Reusable components
+│   │   │   │   ├── StatusChip.jsx
+│   │   │   │   ├── TimeDisplay.jsx
+│   │   │   │   └── LoadingSpinner.jsx
+│   │   │   ├── layout/
+│   │   │   │   ├── AppBar.jsx
+│   │   │   │   ├── Sidebar.jsx
+│   │   │   │   └── Layout.jsx
+│   │   │   ├── ivr/
+│   │   │   │   ├── IVRBuilder.jsx
+│   │   │   │   ├── IVRTester.jsx
+│   │   │   │   └── nodes/
+│   │   │   │       ├── MenuNode.jsx
+│   │   │   │       ├── QueueNode.jsx
+│   │   │   │       └── ...
+│   │   │   ├── queues/
+│   │   │   │   ├── QueueManager.jsx
+│   │   │   │   ├── QueueStats.jsx
+│   │   │   │   └── AgentPanel.jsx
+│   │   │   ├── monitoring/
+│   │   │   │   ├── RealTimeMonitoring.jsx
+│   │   │   │   ├── CallsMonitor.jsx
+│   │   │   │   └── AgentMonitor.jsx
+│   │   │   └── settings/
+│   │   │       ├── SystemSettings.jsx
+│   │   │       └── UserSettings.jsx
+│   │   ├── services/
+│   │   │   ├── sipService.js
+│   │   │   ├── queueService.js
+│   │   │   ├── ivrService.js
+│   │   │   ├── socketService.js
+│   │   │   └── authService.js
+│   │   ├── hooks/
+│   │   │   ├── useSocket.js
+│   │   │   ├── useAuth.js
+│   │   │   └── useQueue.js
+│   │   ├── contexts/
+│   │   │   ├── AuthContext.js
+│   │   │   └── SocketContext.js
+│   │   ├── utils/
+│   │   │   ├── formatters.js
+│   │   │   └── validators.js
+│   │   ├── App.jsx
+│   │   └── index.jsx
+│   ├── package.json
+│   └── vite.config.js
+│
+├── server/                      # Backend Node.js application
+│   ├── src/
+│   │   ├── config/
+│   │   │   ├── database.js
+│   │   │   ├── asterisk.js
+│   │   │   └── socket.js
+│   │   ├── models/
+│   │   │   ├── UserModel.js
+│   │   │   ├── QueueModel.js
+│   │   │   ├── IVRModel.js
+│   │   │   └── CallModel.js
+│   │   ├── services/
+│   │   │   ├── amiService.js
+│   │   │   ├── queueService.js
+│   │   │   ├── ivrService.js
+│   │   │   └── callService.js
+│   │   ├── controllers/
+│   │   │   ├── authController.js
+│   │   │   ├── queueController.js
+│   │   │   ├── ivrController.js
+│   │   │   └── monitoringController.js
+│   │   ├── routes/
+│   │   │   ├── authRoutes.js
+│   │   │   ├── queueRoutes.js
+│   │   │   ├── ivrRoutes.js
+│   │   │   └── monitoringRoutes.js
+│   │   ├── middleware/
+│   │   │   ├── auth.js
+│   │   │   ├── validation.js
+│   │   │   └── error.js
+│   │   ├── utils/
+│   │   │   ├── logger.js
+│   │   │   └── helpers.js
+│   │   └── app.js
+│   ├── asterisk/
+│   │   ├── extensions/
+│   │   │   ├── ivr.conf
+│   │   │   └── queues.conf
+│   │   └── scripts/
+│   │       └── reload.sh
+│   ├── package.json
+│   └── nodemon.json
+│
+├── shared/                      # Shared types and utilities
+│   ├── types/
+│   │   ├── queue.types.ts
+│   │   ├── ivr.types.ts
+│   │   └── call.types.ts
+│   └── constants/
+│       └── index.js
+│
+├── docker/
+│   ├── docker-compose.yml
+│   ├── Dockerfile.client
+│   ├── Dockerfile.server
+│   └── Dockerfile.asterisk
+│
+├── docs/
+│   ├── api/
+│   ├── setup/
+│   └── diagrams/
+│
+├── .env.example
+├── .gitignore
+├── README.md
+└── package.json
+
+
+
+
+######################################
+CURRENT PROJECT TREE TWEEAKED
+├── README.md
+├── System Architecture and Development Guide
+├── client
+│   ├── src
+│   │   ├── components
+│   │   │   ├── common/
+│   │   │   │   ├── StatusChip.jsx
+│   │   │   │   ├── TimeDisplay.jsx
+│   │   │   │   └── LoadingSpinner.jsx
+│   │   │   ├── ivr/
+│   │   │   │   ├── IVRBuilder.jsx
+│   │   │   │   ├── IVRTester.jsx
+│   │   │   │   └── nodes/
+│   │   │   │       ├── MenuNode.jsx
+│   │   │   │       ├── QueueNode.jsx
+│   │   │   │       ├── ExtensionNode.jsx
+│   │   │   │       ├── AnnouncementNode.jsx
+│   │   │   │       └── BusinessHoursNode.jsx
+│   │   │   ├── monitoring/
+│   │   │   │   ├── RealTimeMonitoring.jsx
+│   │   │   │   ├── QueueMonitor.jsx
+│   │   │   │   ├── AgentMonitor.jsx
+│   │   │   │   └── CallsMonitor.jsx
+│   │   │   ├── Layout.js
+│   │   │   ├── LoginForm.js
+│   │   │   ├── AgentEdit.js
+│   │   │   └── ... (existing components)
+│   │   ├── services
+│   │   │   ├── sipService.js
+│   │   │   ├── dtmfService.js
+│   │   │   ├── ivrService.js
+│   │   │   ├── monitoringService.js
+│   │   │   └── storageService.js
+│   │   ├── hooks
+│   │   │   ├── useAuth.js
+│   │   │   ├── useSIPEvents.js
+│   │   │   └── useWebSocket.js
+│   │   └── utils
+│   │       ├── statusMappers.js
+│   │       └── timeFormatters.js
+├── server
+│   ├── models
+│   │   ├── UsersModel.js
+│   │   ├── IVRModel.js
+│   │   ├── IVROptionsModel.js
+│   │   ├── pjsipModel.js
+│   │   └── ... (existing models)
+│   ├── services
+│   │   ├── amiService.js
+│   │   ├── ariService.js
+│   │   ├── ivrService.js
+│   │   ├── queueService.js
+│   │   ├── socketService.js
+│   │   └── monitoringService.js
+│   ├── controllers
+│   │   ├── ivrController.js
+│   │   ├── monitoringController.js
+│   │   └── ... (existing controllers)
+│   ├── routes
+│   │   ├── ivrRoutes.js
+│   │   ├── monitoringRoutes.js
+│   │   └── ... (existing routes)
+│   └── utils
+│       ├── dialplanGenerator.js
+│       ├── ivrFlowValidator.js
+│       └── ... (existing utils)
+├── electron-softphone
+│   └── ... (keep existing structure)
+└── ... (other existing files and directories)
