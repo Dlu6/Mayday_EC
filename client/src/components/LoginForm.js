@@ -90,14 +90,16 @@ const LoginForm = () => {
       style={{ minHeight: "100vh", backgroundColor: "#f0f4f8" }}
     >
       <Grid item xs={12} sm={6} md={4}>
-        <Paper elevation={6} style={{ padding: "2rem" }}>
-          <Box textAlign="center" mb={2}>
+        <Paper elevation={6} style={{ padding: "1.5rem" }}>
+          <Box textAlign="center" 
+          // mb={2}
+          >
             <img
               src={maydaylogo}
               alt="Mayday Logo"
-              style={{ width: "120px", height: "120px" }}
+              style={{ width: "320px", height: "320px", marginBottom: "-70px" }}
             />
-            <Typography
+            {/* <Typography
               variant="h3"
               component="h1"
               color="primary"
@@ -110,7 +112,7 @@ const LoginForm = () => {
               }}
             >
               Mayday
-            </Typography>
+            </Typography> */}
           </Box>
           <Typography
             variant="h5"
@@ -122,10 +124,10 @@ const LoginForm = () => {
               fontWeight: "lighter",
               fontStyle: "italic",
               fontFamily: "Arial, sans-serif",
-              fontSize: "1.2rem",
+              fontSize: "1rem",
             }}
           >
-            Login to your account
+            Login to your account!
           </Typography>
           <form onSubmit={handleSubmit}>
             <TextField

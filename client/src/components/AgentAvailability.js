@@ -20,6 +20,7 @@ import InfoIcon from "@mui/icons-material/Info";
 import PhoneIcon from "@mui/icons-material/Phone";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import HeadsetMicIcon from "@mui/icons-material/HeadsetMic";
+import WifiOffIcon from "@mui/icons-material/WifiOff";
 import { useState, useEffect } from "react";
 import callStatsService from "../services/callStatsService";
 
@@ -56,15 +57,22 @@ const AgentAvailability = () => {
       case "available":
       case "ready":
       case "registered":
+      case "online":
         return theme.palette.success.main;
       case "on call":
       case "oncall":
       case "busy":
       case "talking":
+      case "ringing":
         return theme.palette.error.main;
       case "paused":
       case "break":
+      case "away":
         return theme.palette.warning.main;
+      case "offline":
+      case "unavailable":
+      case "unregistered":
+        return theme.palette.grey[500];
       default:
         return theme.palette.grey[500];
     }
@@ -76,17 +84,24 @@ const AgentAvailability = () => {
       case "available":
       case "ready":
       case "registered":
+      case "online":
         return <CheckCircleIcon sx={{ fontSize: 16 }} />;
       case "on call":
       case "oncall":
       case "busy":
       case "talking":
+      case "ringing":
         return <PhoneInTalkIcon sx={{ fontSize: 16 }} />;
       case "paused":
       case "break":
+      case "away":
         return <PauseCircleIcon sx={{ fontSize: 16 }} />;
+      case "offline":
+      case "unavailable":
+      case "unregistered":
+        return <WifiOffIcon sx={{ fontSize: 16 }} />;
       default:
-        return <PersonIcon sx={{ fontSize: 16 }} />;
+        return <WifiOffIcon sx={{ fontSize: 16 }} />;
     }
   };
 
@@ -179,7 +194,7 @@ const AgentAvailability = () => {
               sx={{
                 backgroundColor: alpha(theme.palette.success.main, 0.1),
                 color: theme.palette.success.main,
-                fontWeight: 600,
+                fontWeight: 400,
                 "& .MuiChip-icon": { color: theme.palette.success.main },
               }}
             />
@@ -190,7 +205,7 @@ const AgentAvailability = () => {
               sx={{
                 backgroundColor: alpha(theme.palette.error.main, 0.1),
                 color: theme.palette.error.main,
-                fontWeight: 600,
+                fontWeight: 400,
                 "& .MuiChip-icon": { color: theme.palette.error.main },
               }}
             />
@@ -201,7 +216,7 @@ const AgentAvailability = () => {
               sx={{
                 backgroundColor: alpha(theme.palette.warning.main, 0.1),
                 color: theme.palette.warning.main,
-                fontWeight: 600,
+                fontWeight: 400,
                 "& .MuiChip-icon": { color: theme.palette.warning.main },
               }}
             />

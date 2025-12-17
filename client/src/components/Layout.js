@@ -23,6 +23,7 @@ import PeopleIcon from "@mui/icons-material/People";
 import AnalyticsIcon from "@mui/icons-material/Assessment";
 import IntegrationIcon from "@mui/icons-material/IntegrationInstructions";
 import UsersIcon from "@mui/icons-material/SupportAgent";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import VoiceIcon from "@mui/icons-material/DialerSip";
 import { Outlet } from "react-router-dom";
 import ExpandMore from "@mui/icons-material/NavigateNext";
@@ -124,6 +125,7 @@ const Layout = () => {
     Analytics: <AnalyticsIcon sx={{ color: "white" }} />,
     Integrations: <IntegrationIcon sx={{ color: "white" }} />,
     Staff: <UsersIcon sx={{ color: "white" }} />,
+    Support: <HelpOutlineIcon sx={{ color: "white" }} />,
   };
 
   const drawerWidth = 240;
@@ -285,7 +287,7 @@ const Layout = () => {
             {drawerOpen ? <MenuOpenIcon /> : <MenuIcon />}
           </IconButton>
           <Typography variant="h6" noWrap sx={{ flexGrow: 1 }}>
-            Mayday CRM Dashboard
+            Simi Valley CRM
           </Typography>
 
           {/* User Profile Section */}
