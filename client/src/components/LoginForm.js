@@ -16,7 +16,7 @@ import {
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useSnackbar } from "notistack";
 import useAuth from "../hooks/useAuth";
-import mhulogo from "../assets/images/mhu_logo.jpg";
+import maydaylogo from "../assets/images/mayday_logo.png";
 const LoginForm = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -93,7 +93,7 @@ const LoginForm = () => {
         <Paper elevation={6} style={{ padding: "2rem" }}>
           <Box textAlign="center" mb={2}>
             <img
-              src={mhulogo}
+              src={maydaylogo}
               alt="Mayday Logo"
               style={{ width: "120px", height: "120px" }}
             />
@@ -109,7 +109,7 @@ const LoginForm = () => {
                 textShadow: "2px 2px 4px rgba(0, 0, 0, 0.1)",
               }}
             >
-              MHU
+              Mayday
             </Typography>
           </Box>
           <Typography

@@ -1,65 +1,65 @@
-# Mayday CRM Project Setup Guide
+# Mayday EC Project Setup Guide
 
 ## Project Overview
 
-Mayday CRM is a comprehensive customer relationship management system with Asterisk PBX integration, featuring:
+Mayday EC is a comprehensive customer relationship management system with Asterisk PBX integration, featuring:
 
 - React frontend with SIP.js softphone
 - Node.js backend with AMI/ARI integration
 - Asterisk PBX system for call management
 - Advanced call transfer functionality (managed and blind)
 - Real-time call monitoring and management
-- MySQL database with Sequelize ORM
+- MariaDB database with Sequelize ORM
 
 ## Current Development Status ✅
 
 ### Completed Features
 
-- **Enhanced Transfer System**: Fully implemented and deployed
-- **MCP Server Integration**: Configured for remote VM development
-- **Development Environment**: Automated setup and deployment scripts
-- **Import Issues**: All module import problems resolved
-- **VM Deployment**: Successfully running on feature branch
+- **Enhanced Transfer System**: Fully implemented
+- **On-Prem Server Migration**: Migrated from AWS to local on-prem server (192.168.1.14)
+- **SSH Key Authentication**: Configured for seamless server access
+- **Database Migration**: Schema replicated from AWS to on-prem MariaDB
+- **Datatool Removal**: Removed unused datatool_server and MongoDB dependencies
 
 ### Development Branch
 
-- **Current Branch**: `feature/enhanced-transfer-system`
-- **Status**: Active development with working server deployment
-- **Last Commit**: Import fixes for CDR, amiService, and authMiddleware
+- **Current Branch**: `development`
+- **Status**: Active development on on-prem infrastructure
+- **GitHub Repo**: https://github.com/Dlu6/Mayday_EC.git
 
 ## Prerequisites
 
-### Local Development
+### Local Development (macOS)
 
 - Node.js 18.x
 - npm or yarn
 - Git
-- SSH key for VM access
+- SSH key configured for on-prem server access (`~/.ssh/id_ed25519`)
 
-### VM Requirements
+### On-Prem Server Requirements (192.168.1.14)
 
 - Debian/Ubuntu server with Asterisk
 - Node.js 18.x
 - PM2 for process management
-- MySQL/MariaDB
+- MariaDB 10.11+
+- SSH user: `medhi`
 
 ## Project Structure
 
 ```
-Mayday-CRM-Scracth/
-├── client/                 # React frontend
+Mayday_EC/
+├── client/                 # React frontend (admin dashboard)
 ├── server/                 # Node.js backend
 │   ├── controllers/        # Business logic
-│   │   ├── enhancedTransferController.js  # ✅ Enhanced transfer system
+│   │   ├── enhancedTransferController.js  # Enhanced transfer system
 │   │   └── transferController.js          # Legacy transfer system
 │   ├── routes/             # API endpoints
-│   │   ├── enhancedTransferRoutes.js      # ✅ New transfer API
-│   │   └── transferRoutes.js              # Legacy transfer API
 │   ├── services/           # External service integrations
 │   │   ├── amiService.js   # Asterisk Manager Interface
 │   │   └── ariService.js   # Asterisk REST Interface
-│   └── models/             # Database models
+│   └── models/             # Database models (Sequelize)
 ├── electron-softphone/     # Electron-based softphone
+├── mhu-wiki/               # Docusaurus documentation
 └── config/                 # Configuration files
 ```
 
@@ -69,192 +69,97 @@ Mayday-CRM-Scracth/
 
 ```bash
 # Clone repository
-git clone https://github.com/Dlu6/Mayday-CRM-Scracth.git
-cd Mayday-CRM-Scracth
+git clone https://github.com/Dlu6/Mayday_EC.git
+cd Mayday_EC
 
-# Create feature branch
-git checkout -b feature/enhanced-transfer-system
+# Switch to development branch
+git checkout development
 
 # Install dependencies
 npm install
 cd client && npm install && cd ..
 
+# Copy environment file and configure
+cp .env.example .env
+# Edit .env with your credentials
+
 # Run development servers
-pwd ~ /Users/Mydhe Files/Mayday-CRM-Scracth
 npm run server_client  # Backend + Dashboard
 
-pwd ~ /Users/Mydhe Files/Mayday-CRM-Scracth/electron-softphone
-npm run electron:dev   # Electron softphone
+# For Electron softphone (separate terminal)
+cd electron-softphone
+npm install
+npm run electron:dev
 ```
 
-### 2. VM Deployment (Production)
+### 2. On-Prem Server Access
 
-To deploy updates to the production VM server:
+SSH to the on-prem Asterisk server:
 
 ```bash
-# SSH into the VM
-ssh -i /path/to/MHU_Debian_Mumb.pem admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com
+# SSH using key authentication
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14
 
-# Navigate to project and pull latest changes
-cd /home/admin/Mayday-CRM-Scracth
-git pull
-
-# Build the client dashboard
-cd client
-npm run build
-
-# Return to root and deploy
-cd ..
-npm run deploy
-
-# Restart PM2 (runs under 'mayday' user)
-sudo -u mayday pm2 restart mayday
-
-# Verify status
-sudo -u mayday pm2 status
+# Or simply (if key is default)
+ssh medhi@192.168.1.14
 ```
 
-**Expected output after successful deployment:**
-```
-┌────┬───────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┐
-│ id │ name      │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │
-├────┼───────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┤
-│ 0  │ mayday    │ default     │ 1.0.0   │ fork    │ XXXXXX   │ Xs     │ XX   │ online    │
-└────┴───────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┘
-```
+### 3. Database Connection
 
-**Quick one-liner for deployment:**
+The database is hosted on the on-prem server:
+
+| Setting    | Value           |
+|------------|-----------------|
+| Host       | 192.168.1.14    |
+| Port       | 3306            |
+| Database   | asterisk        |
+| User       | mayday_user     |
+| Password   | (see .env file) |
+
 ```bash
-ssh -i MHU_Debian_Mumb.pem admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com \
-  "cd /home/admin/Mayday-CRM-Scracth && git pull && cd client && npm run build && cd .. && npm run deploy && sudo -u mayday pm2 restart mayday && sudo -u mayday pm2 status"
+# Connect to database from local machine
+mysql -h 192.168.1.14 -u mayday_user -p asterisk
 ```
 
-### 3. MCP Server Configuration
+### 4. MCP Server Configuration
 
-The project includes `mcp-server-config.json` for seamless development with **dual database tracking**:
+The project includes `mcp-server-config.json` for seamless development with the on-prem server:
 
 ```json
 {
   "mcpServers": {
-    "mayday-asterisk-vm": {
+    "mayday-asterisk-server": {
       "command": "ssh",
-      "args": [
-        "-i",
-        "MHU_Debian_Mumb.pem",
-        "admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com"
-      ],
-      "cwd": "/home/admin/mayday-crm"
+      "args": ["-i", "~/.ssh/id_ed25519", "medhi@192.168.1.14"],
+      "description": "On-prem Asterisk server - SSH key authentication"
     },
     "mayday-local-dev": {
       "command": "node",
       "args": ["server/server.js"],
       "env": { "NODE_ENV": "development", "PORT": "8004" }
     },
-    "mayday-main-database": {
+    "mayday-database": {
       "command": "mysql",
-      "args": [
-        "-h",
-        "65.1.149.92",
-        "-P",
-        "3306",
-        "-u",
-        "mayday_user",
-        "-p",
-        "asterisk"
-      ],
-      "description": "Main CRM database (VM public IP)"
-    },
-    "mayday-datatool-database": {
-      "command": "mysql",
-      "args": ["-h", "localhost", "-P", "3306", "-u", "mayday_user", "-p"],
-      "description": "DataTool analytics database"
-    },
-    "mayday-database-monitor": {
-      "command": "node",
-      "args": ["scripts/db-monitor.js"],
-      "description": "Database connection monitoring service"
+      "args": ["-h", "192.168.1.14", "-P", "3306", "-u", "mayday_user", "-p", "asterisk"],
+      "description": "Main CRM database on on-prem server"
     }
   },
   "databases": {
     "main": {
-      "host": "52.66.181.114",
+      "host": "192.168.1.14",
       "port": 3306,
       "name": "asterisk",
       "description": "Main CRM database with call records, users, and voice extensions"
-    },
-    "datatool": {
-      "host": "localhost",
-      "port": 3306,
-      "name": "mayday_crm_db",
-      "description": "DataTool analytics database with posts, sessions, and reporting data"
     }
   }
 }
 ```
 
-#### Database Tracking Features
-
-- **Dual Database Monitoring**: Tracks both main CRM and DataTool databases
-- **Connection Health Checks**: Real-time status monitoring
-- **Schema Information**: Table counts, sizes, and metadata
-- **Performance Metrics**: Connection pooling and query performance
-- **Backup Management**: Automated database backup creation
-
-### 3. Database Management
-
-The project includes comprehensive database management tools:
-
-#### Database Manager Script (`scripts/db-manager.sh`)
+### 5. On-Prem Server & Asterisk Configuration
 
 ```bash
-# Check database status
-npm run db:status
-
-# Test database connections
-npm run db:test
-
-# Show table information
-npm run db:tables
-
-# Start monitoring service
-npm run db:monitor
-
-# Create backups
-npm run db:backup
-
-# Connect to main database
-npm run db:main
-
-# Connect to DataTool database
-npm run db:datatool
-```
-
-#### Database Monitor Service (`scripts/db-monitor.js`)
-
-- **Real-time Monitoring**: Health checks every 30 seconds
-- **Connection Pooling**: Monitors active/idle connections
-- **Performance Metrics**: Query execution and response times
-- **Event-driven**: Emits events for health status changes
-- **CLI Interface**: Standalone monitoring with visual indicators
-
-#### Database Configurations
-
-| Database     | Host        | Port | User        | Database      | Purpose                                  |
-| ------------ | ----------- | ---- | ----------- | ------------- | ---------------------------------------- |
-| **Main CRM** | 65.1.149.92 | 3306 | mayday_user | asterisk      | Call management, users, voice extensions |
-| **DataTool** | localhost   | 3306 | mayday_user | mayday_crm_db | Analytics, posts, sessions, reporting    |
-
-### 4. VM Connection & Asterisk Configuration
-
-```bash
-# SSH to VM
-ssh -i "MHU_Debian_Mumb.pem" admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com
-
-# Navigate to project
-cd /home/admin/Mayday-CRM-Scracth
-
-# Switch to development branch
-git checkout feature/enhanced-transfer-system
+# SSH to on-prem server
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14
 
 # Check Asterisk status
 sudo systemctl status asterisk
@@ -263,11 +168,14 @@ sudo /usr/sbin/asterisk -rx 'manager show status'
 # Check dialplan and realtime status
 sudo /usr/sbin/asterisk -rx 'dialplan show from-internal'
 sudo /usr/sbin/asterisk -rx 'core show version'
+
+# Check MariaDB status
+sudo systemctl status mariadb
 ```
 
 #### Asterisk Realtime Database Configuration
 
-The VM uses a **realtime database-driven dialplan** system for dynamic call routing:
+The on-prem server uses a **realtime database-driven dialplan** system for dynamic call routing:
 
 **Main Configuration Files:**
 
@@ -303,7 +211,7 @@ Database = asterisk
 Server = localhost
 Port = 3306
 Username = mayday_user
-Password = Pasword@256
+Password = (configured in /etc/odbc.ini)
 Option = 3
 ```
 
@@ -395,29 +303,15 @@ GET    /api/enhanced-transfers/analytics     # Agent analytics
 # Make changes locally
 git add .
 git commit -m "Description of changes"
-git push origin feature/enhanced-transfer-system
+git push origin development
 ```
 
-### 2. VM Deployment
+### 2. Testing
 
 ```bash
-# SSH to VM
-ssh -i "MHU_Debian_Mumb.pem" admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com
-
-# Pull latest changes
-cd /home/admin/Mayday-CRM-Scracth
-git pull origin feature/enhanced-transfer-system
-
-# Restart server
-sudo -u mayday pm2 restart mayday
-```
-
-### 3. Testing
-
-```bash
-# Test endpoints (will return "Unauthorized" - expected)
-curl -X GET "http://65.1.149.92:8004/api/enhanced-transfers/health"
-curl -X GET "http://65.1.149.92:8004/api/enhanced-transfers/capabilities"
+# Test local server endpoints
+curl -X GET "http://localhost:8004/api/enhanced-transfers/health"
+curl -X GET "http://localhost:8004/api/enhanced-transfers/capabilities"
 ```
 
 ## Configuration Files
@@ -465,14 +359,17 @@ curl -X GET "http://65.1.149.92:8004/api/enhanced-transfers/capabilities"
 ### Debug Commands
 
 ```bash
-# Check server status
-sudo -u mayday pm2 status mayday
+# Check local server (development)
+lsof -i :8004
 
-# View server logs
-sudo -u mayday pm2 logs mayday --lines 20
+# Check on-prem server status
+ssh medhi@192.168.1.14 "pm2 status mayday"
 
-# Check port binding
-netstat -tlnp | grep 8004
+# View on-prem server logs
+ssh medhi@192.168.1.14 "pm2 logs mayday --lines 20"
+
+# Check MariaDB on on-prem server
+ssh medhi@192.168.1.14 "sudo systemctl status mariadb"
 
 # Verify file changes
 git status
@@ -483,9 +380,9 @@ git log --oneline -5
 
 ### Immediate Tasks
 
-1. **Frontend Integration**: Connect SIP.js softphone to enhanced transfer API
-2. **Transfer Testing**: Test blind and managed transfer scenarios
-3. **Error Handling**: Implement comprehensive error handling in frontend
+1. **Asterisk Configuration**: Configure AMI/ARI on on-prem server (192.168.1.14)
+2. **Frontend Integration**: Connect SIP.js softphone to enhanced transfer API
+3. **Transfer Testing**: Test blind and managed transfer scenarios
 4. **User Interface**: Create transfer management UI components
 
 ### Future Enhancements
@@ -493,7 +390,7 @@ git log --oneline -5
 1. **Transfer Analytics**: Advanced reporting and metrics
 2. **Queue Management**: Enhanced queue transfer capabilities
 3. **Call Recording**: Integration with call recording system
-4. **Performance Optimization**: Caching and connection pooling
+4. **Production Deployment**: Deploy to on-prem server with PM2
 
 ## Electron Softphone Auto-Update System
 
@@ -695,7 +592,8 @@ Users can manually check for updates via:
 ---
 
 **Last Updated**: December 16, 2025  
-**Development Status**: Enhanced Transfer System ✅ Complete  
-**Current Branch**: `feature/enhanced-transfer-system`  
-**Server Status**: Running on VM (Port 8004)  
-**Last Build**: December 16, 2025 - v5.1.5 with native appbar module ✅ Deployed
+**Development Status**: On-Prem Migration ✅ Complete  
+**Current Branch**: `development`  
+**On-Prem Server**: 192.168.1.14 (MariaDB configured, Asterisk pending)  
+**Local Dev Server**: http://localhost:8004  
+**GitHub Repo**: https://github.com/Dlu6/Mayday_EC.git

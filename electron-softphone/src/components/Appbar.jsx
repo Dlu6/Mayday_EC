@@ -107,13 +107,12 @@ import WhatsAppElectronComponent from "./WhatsAppElectronComponent";
 import transferHistoryService from "../services/transferHistoryService";
 import { agentService } from "../services/agentService";
 import { pauseService } from "../services/pauseService";
-import SessionAnalytics from "./SessionAnalytics";
-import Clients from "./Clients";
+// SessionAnalytics and Clients removed - datatool_server not used in this project
 import ConfirmDialog from "./ConfirmDialog";
 import { useNavigate } from "react-router-dom";
 import CallPopup from "./CallPopup";
 import AppUpdater from "./AppUpdater";
-import { searchPosts } from "../api/datatoolApi";
+// datatoolApi removed - not used in this project
 import { useStickyAppbar } from "../hooks/useStickyAppbar";
 import APPBAR_CONFIG from "../config/appbarConfig";
 
@@ -298,111 +297,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
   const [reconnectionTimeout, setReconnectionTimeout] = useState(null);
   const [connectionHealth, setConnectionHealth] = useState(100);
 
-  // Matched client record for current ringing call
-  const [matchedClient, setMatchedClient] = useState(null);
-  const [clientLookupLoading, setClientLookupLoading] = useState(false);
-
-  // Simple in-memory cache for number -> client
-  const clientLookupCacheRef = useRef(new Map());
-
-  // Normalize phone numbers for Uganda (UG): local 07XXXXXXXX and E.164 2567XXXXXXXX
-  const normalizePhone = useCallback((raw) => {
-    if (!raw) return "";
-    const digits = String(raw).replace(/[^0-9]/g, "");
-    if (!digits) return "";
-    const v = new Set();
-    v.add(digits);
-    // Common variants: last 10 (07XXXXXXXX), last 9 (7XXXXXXXX)
-    if (digits.length > 10) v.add(digits.slice(-10));
-    if (digits.length > 9) v.add(digits.slice(-9));
-    // If starts with 0 (local), add 256 + national significant number
-    if (digits.length >= 10 && digits[0] === "0") {
-      v.add(`256${digits.slice(1)}`);
-    }
-    // If starts with 256 (E.164 without +), add local 0 + NSN
-    if (digits.startsWith("256") && digits.length >= 12) {
-      v.add(`0${digits.slice(3)}`);
-    }
-    return Array.from(v);
-  }, []);
-
-  // When a call rings inbound, attempt client lookup by callerId/remoteIdentity
-  useEffect(() => {
-    const fetchClient = async () => {
-      try {
-        if (
-          callState.state === "ringing" &&
-          callState.direction === "inbound" &&
-          mongoUser?.id &&
-          mongoUser?.user_role
-        ) {
-          const incomingNumber =
-            callState.remoteIdentity ||
-            callState.callerid ||
-            callState.callerId ||
-            callState.src ||
-            callState.CallerIDNum ||
-            callState.callerIdNum ||
-            callState.clid ||
-            callState.CallerID ||
-            callState.callerid_num ||
-            callState.from ||
-            "";
-
-          if (!incomingNumber) return;
-
-          // Check cache first using normalized variants
-          const variants = normalizePhone(incomingNumber);
-          for (const key of variants) {
-            if (clientLookupCacheRef.current.has(key)) {
-              setMatchedClient(clientLookupCacheRef.current.get(key));
-              return;
-            }
-          }
-
-          setClientLookupLoading(true);
-          let found = null;
-          // Try variants quickly, stop at first hit
-          for (const variant of variants) {
-            const tryQuery = [variant, incomingNumber];
-            for (const q of tryQuery) {
-              const resp = await searchPosts(
-                mongoUser.id,
-                mongoUser.user_role,
-                String(q)
-              );
-              const list = resp?.data?.data || [];
-              if (list.length > 0) {
-                found = list[0];
-                break;
-              }
-            }
-            if (found) break;
-          }
-
-          // Cache all variants to the same object (even null to avoid repeats during ring switches)
-          for (const key of variants) {
-            clientLookupCacheRef.current.set(key, found);
-          }
-          setMatchedClient(found);
-          setClientLookupLoading(false);
-        } else if (callState.state !== "ringing") {
-          // Clear match when not ringing
-          setMatchedClient(null);
-          setClientLookupLoading(false);
-        }
-      } catch (e) {
-        setMatchedClient(null);
-        setClientLookupLoading(false);
-      }
-    };
-    fetchClient();
-  }, [
-    callState.state,
-    callState.direction,
-    callState.remoteIdentity,
-    mongoUser,
-  ]);
+  // Client lookup removed - datatool_server not used in this project
 
   // Registration status (align with DashboardView): prefer contactUri, fall back to AMI flags
   const isRegistered = useMemo(() => {
@@ -1842,10 +1737,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
           video: false,
         },
       });
-      // If we have a matched client, open Clients section so counselor can edit during the call
-      if (matchedClient?.mobile) {
-        setActiveSection("clients");
-      }
+      // Clients section removed - datatool_server not used in this project
     } catch (error) {
       setCallFeedback(`Failed to answer call: ${error.message}`);
       setTimeout(() => setCallFeedback(null), 3000);
@@ -2204,18 +2096,6 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
       text: "Call History",
       action: () => setActiveSection("callHistory"),
       id: "callHistory",
-    },
-    {
-      icon: <Timeline />,
-      text: "Session Analytics",
-      action: () => setActiveSection("sessionAnalytics"),
-      id: "sessionAnalytics",
-    },
-    {
-      icon: <Group />,
-      text: "Clients",
-      action: () => setActiveSection("clients"),
-      id: "clients",
     },
     {
       icon: <PersonAdd />,
@@ -4758,15 +4638,11 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                         <CallPopup
                           open={true}
                           call={callState}
-                          client={matchedClient}
-                          loading={clientLookupLoading}
+                          client={null}
+                          loading={false}
                           onAnswer={handleAnswer}
                           onReject={handleReject}
-                          onOpenRecord={() => {
-                            if (matchedClient?.mobile) {
-                              setActiveSection("clients");
-                            }
-                          }}
+                          onOpenRecord={() => {}}
                         />
                       )}
                   </Box>
@@ -5392,19 +5268,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
         onClose={handleCloseSection}
         onCallNumber={handleSetDialNumber}
       />
-      <SessionAnalytics
-        open={activeSection === "sessionAnalytics"}
-        onClose={handleCloseSection}
-      />
-      <Clients
-        open={activeSection === "clients"}
-        onClose={handleCloseSection}
-        user={mongoUser}
-        initialPhone={
-          matchedClient?.mobile || callState?.remoteIdentity || null
-        }
-        focusOnMatch={Boolean(matchedClient)}
-      />
+      {/* SessionAnalytics and Clients removed - datatool_server not used in this project */}
       <Reports
         open={activeSection === "reports"}
         onClose={handleCloseSection}

@@ -30,7 +30,7 @@ import { EventBusService } from "../services/eventBus.js";
 import amiService from "../services/amiService.js";
 import QueueMember from "../models/queueMemberModel.js";
 import VoiceExtension from "../models/voiceExtensionModel.js";
-import User from "../../datatool_server/models/datatoolUsersModel.js";
+// datatool User model removed - not used in this project
 
 dotenv.config();
 

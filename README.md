@@ -1,13 +1,14 @@
-# Mayday CRM - Asterisk Integration System
+# Mayday EC - Asterisk Integration System
 
 A comprehensive Customer Relationship Management (CRM) system with advanced Asterisk PBX integration, featuring real-time call management, transfer functionality, SIP.js-based softphone capabilities, and a multi-component architecture designed for enterprise call centers.
 
 ## 🚀 Current Status
 
-**Development Phase**: Enhanced Transfer System Implementation ✅  
-**Now In Progress**: Full AMI Call Lifecycle Management with Redis Integration 🚧  
-**Current Branch**: `feature/enhanced-transfer-system`  
-**Server Status**: Running on VM (Port 8004)  
+**Development Phase**: On-Prem Migration ✅  
+**Current Branch**: `development`  
+**On-Prem Server**: 192.168.1.14 (MariaDB configured, Asterisk pending)  
+**Local Dev Server**: http://localhost:8004  
+**GitHub Repo**: https://github.com/Dlu6/Mayday_EC.git  
 **Last Update**: December 2025
 
 ### ✅ Completed Features
@@ -245,9 +246,9 @@ The Mayday CRM system consists of four main components that work together to pro
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐ │
-│  │   @client/      │    │@electron-       │    │@datatool_   │ │
-│  │   Web Dashboard │    │softphone/       │    │server/      │ │
-│  │   (Admin UI)    │    │Desktop App      │    │CRM Data     │ │
+│  │   @client/      │    │@electron-       │    │  @mhu-wiki/ │ │
+│  │   Web Dashboard │    │softphone/       │    │  Docusaurus │ │
+│  │   (Admin UI)    │    │Desktop App      │    │  Docs       │ │
 │  └─────────────────┘    └─────────────────┘    └─────────────┘ │
 │           │                       │                       │     │
 │           │                       │                       │     │
@@ -263,8 +264,8 @@ The Mayday CRM system consists of four main components that work together to pro
 │  │  └─────────────┘  └─────────────┘  └─────────────────────┘ │ │
 │  │                                                             │ │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │ │
-│  │  │   MySQL     │  │   MongoDB   │  │    Redis Cache      │ │ │
-│  │  │  Database   │  │  Database   │  │   + Session Store   │ │ │
+│  │  │  MariaDB    │  │   Redis     │  │    On-Prem Server   │ │ │
+│  │  │  Database   │  │   Cache     │  │    192.168.1.14     │ │ │
 │  │  └─────────────┘  └─────────────┘  └─────────────────────┘ │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                   │                             │
@@ -339,16 +340,15 @@ The Mayday CRM system consists of four main components that work together to pro
   - WhatsApp Integration - Multi-channel communication
   - **Redis Session Management** - Persistent session state 🆕
 
-#### 4. **@datatool_server/ (CRM Data Management)**
+#### 4. **@mhu-wiki/ (Documentation)**
 
-- **Purpose**: Manages client data, sessions, and CRM functionality integrated with the main system
-- **Technology**: Express.js with MongoDB, Mongoose ODM
+- **Purpose**: Project documentation built with Docusaurus
+- **Technology**: Docusaurus static site generator
 - **Key Features**:
-  - Client Management - Client profiles and data
-  - Session Tracking - Call and interaction sessions
-  - Analytics - Performance metrics and reporting
-  - User Management - Role-based access control
-  - **Redis Integration** - Enhanced session persistence 🆕
+  - System documentation
+  - API reference
+  - User guides
+  - Development guides
 
 ## 🔄 Component Interactions
 
@@ -492,18 +492,14 @@ Each agent's edit page includes a Dialplan tab showing:
 
 ## �🗄️ Database Architecture
 
-### **MySQL (Asterisk Database)**
+### **MariaDB (On-Prem Server: 192.168.1.14)**
 
-- **Tables**: `ps_endpoints`, `ps_auths`, `ps_aors`, `ps_contacts`, `queue_members`, `voice_extensions`
-- **Purpose**: PJSIP configuration, endpoint management, queue membership, dialplan
+- **Tables**: `ps_endpoints`, `ps_auths`, `ps_aors`, `ps_contacts`, `queue_members`, `voice_extensions`, `users`, `cdr`
+- **Purpose**: PJSIP configuration, endpoint management, queue membership, dialplan, call records
 - **Access**: Via Sequelize ORM
 - **Connection Pool**: max=20, min=2, acquire=60s (optimized for concurrent queries)
-
-### **MongoDB (CRM Database)**
-
-- **Collections**: Users, Posts, Sessions, WhatsApp messages
-- **Purpose**: Client data, session tracking, analytics
-- **Access**: Via Mongoose ODM
+- **User**: `mayday_user`
+- **Database**: `asterisk`
 
 ### **Redis (Session Store & Cache)** 🆕
 
@@ -588,59 +584,56 @@ app.use("/api/calls/*", [authMiddleware, amiAuthMiddleware, callPermissionMiddle
 ### Prerequisites
 
 - Node.js 18.x or higher
-- MySQL 8.0 or higher
-- MongoDB 6.0 or higher
-- **Redis 6.0 or higher** 🆕
+- MariaDB 10.11+ (on on-prem server 192.168.1.14)
 - Git
-- SSH key for VM access
+- SSH key configured for on-prem server access (`~/.ssh/id_ed25519`)
 
 ### Local Development
 
 ```bash
 # Clone repository
-git clone https://github.com/Dlu6/Mayday-CRM-Scracth.git
-cd Mayday-CRM-Scracth
+git clone https://github.com/Dlu6/Mayday_EC.git
+cd Mayday_EC
 
-# Create development branch
-git checkout -b feature/ami-redis-integration
+# Switch to development branch
+git checkout development
 
 # Install dependencies
 npm install
 cd client && npm install && cd ..
-cd electron-softphone && npm install && cd ..
 
-# Start Redis server (new requirement)
-redis-server
+# Copy environment file and configure
+cp .env.example server/.env
+# Edit server/.env with your credentials
 
 # Start development servers
 npm run server_client  # Backend + Dashboard
-npm run electron:dev   # Electron softphone
+
+# For Electron softphone (separate terminal)
+cd electron-softphone && npm install && npm run electron:dev
 ```
 
-### VM Connection
+### On-Prem Server Connection
 
 ```bash
-# SSH to Asterisk VM
-ssh -i "MHU_Debian_Mumb.pem" admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com
+# SSH to on-prem Asterisk server (key authentication)
+ssh medhi@192.168.1.14
 
-# Navigate to project
-cd /home/admin/Mayday-CRM-Scracth
+# Or with explicit key
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14
 
-# Switch to development branch
-git checkout feature/ami-redis-integration
+# Check MariaDB status
+sudo systemctl status mariadb
 
-# Install and start Redis
-sudo apt update
-sudo apt install redis-server
-sudo systemctl enable redis-server
-sudo systemctl start redis-server
+# Check Asterisk status (once configured)
+sudo systemctl status asterisk
 ```
 
 ## 📁 Project Structure
 
 ```
-Mayday-CRM-Scracth/
-├── client/                 # React frontend application
+Mayday_EC/
+├── client/                 # React frontend application (admin dashboard)
 │   ├── src/
 │   │   ├── components/     # UI components
 │   │   ├── features/       # Redux slices and services
@@ -648,45 +641,24 @@ Mayday-CRM-Scracth/
 │   │   └── services/       # API and WebSocket services
 ├── server/                 # Node.js backend server
 │   ├── controllers/        # Business logic controllers
-│   │   ├── enhancedTransferController.js  # ✅ Enhanced transfer system
-│   │   ├── transferController.js          # Legacy transfer system
-│   │   ├── adminStatsController.js        # Admin dashboard stats
-│   │   ├── cdrController.js               # Call detail records
-│   │   └── amiUserController.js           # 🆕 AMI user management
 │   ├── routes/             # API endpoint definitions
-│   │   ├── enhancedTransferRoutes.js      # ✅ New transfer API
-│   │   ├── transferRoutes.js              # Legacy transfer API
-│   │   ├── adminRoutes.js                 # Admin endpoints
-│   │   ├── cdrRoutes.js                   # CDR endpoints
-│   │   └── amiUserRoutes.js               # 🆕 AMI user API
 │   ├── services/           # External service integrations
 │   │   ├── amiService.js   # Asterisk Manager Interface
 │   │   ├── ariService.js   # Asterisk REST Interface
-│   │   ├── callMonitoringService.js       # Real-time call monitoring
-│   │   ├── socketService.js               # WebSocket management
-│   │   └── redisService.js                # 🆕 Redis integration
-│   ├── models/             # Database models and associations
+│   │   └── socketService.js # WebSocket management
+│   ├── models/             # Database models (Sequelize)
 │   └── config/             # Configuration files
 ├── electron-softphone/     # Desktop softphone application
 │   ├── src/
 │   │   ├── components/     # Softphone UI components
 │   │   ├── services/       # SIP and connection services
-│   │   │   ├── sipService.js              # Legacy SIP service
-│   │   │   └── sipAmiService.js           # 🆕 New AMI-based service
 │   │   └── hooks/          # Custom hooks
-├── datatool_server/        # CRM data management system
-│   ├── controllers/        # CRM business logic
-│   ├── models/             # MongoDB models
-│   └── routes/             # CRM API endpoints
+├── mhu-wiki/               # Docusaurus documentation
 ├── scripts/                # Development and deployment scripts
-├── context7/               # Context7 integration files
 ├── mcp-server-config.json  # MCP server configuration
 ├── .cursorrules            # Cursor IDE development rules
-├── redis/                  # 🆕 Redis configuration and scripts
-│   ├── redis.conf          # Redis server configuration
-│   ├── setup.sh            # Redis installation script
-│   └── health-check.js     # Redis health monitoring
-└── docs/                   # Project documentation
+├── .env.example            # Environment template
+└── PROJECT_SETUP.md        # Project setup guide
 ```
 
 ## 🌐 API Endpoints
@@ -834,44 +806,37 @@ curl -X GET "http://localhost:8004/api/ami/users/status"
 curl -X GET "http://localhost:8004/api/redis/sessions/health"
 ```
 
-### **VM Testing with Redis**
+### **On-Prem Server Testing**
 
 ```bash
-# Test on VM (will return "Unauthorized" - expected)
-curl -X GET "http://65.1.149.92:8004/api/enhanced-transfers/health"
-curl -X GET "http://65.1.149.92:8004/api/ami/users/status"
-curl -X GET "http://65.1.149.92:8004/api/redis/sessions/health"
+# Test on on-prem server (once deployed)
+curl -X GET "http://192.168.1.14:8004/api/enhanced-transfers/health"
+curl -X GET "http://192.168.1.14:8004/api/users/status"
 ```
 
 ## 🚀 Development Workflow
 
-### **1. Local Development with Redis**
+### **1. Local Development**
 
 ```bash
 # Make changes locally
 git add .
 git commit -m "Description of changes"
-git push origin feature/ami-redis-integration
+git push origin development
 ```
 
-### **2. VM Deployment with Redis**
+### **2. On-Prem Server Deployment**
 
 ```bash
-# SSH to VM and pull changes
-ssh -i "MHU_Debian_Mumb.pem" admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com
-cd /home/admin/Mayday-CRM-Scracth
-git pull origin feature/ami-redis-integration || git pull
-cd /client && npm run build [if there were changes in the client]
-cd ../
-npm run deploy
-sudo -u mayday pm2 restart mayday
+# SSH to on-prem server
+ssh medhi@192.168.1.14
 
-# Ensure Redis is running
-sudo systemctl status redis-server
-sudo systemctl start redis-server
+# Navigate to project (once deployed)
+cd /path/to/Mayday_EC
+git pull origin development
 
 # Restart server
-sudo -u mayday pm2 restart mayday
+pm2 restart mayday
 ```
 
 ### **3. Testing and Validation**
@@ -951,31 +916,24 @@ save 60 10000
 ### Debug Commands
 
 ```bash
-# Check server status
-sudo -u mayday pm2 status mayday
+# Check local server (development)
+lsof -i :8004
 
-# View server logs
-sudo -u mayday pm2 logs mayday --lines 20
+# Check on-prem server status
+ssh medhi@192.168.1.14 "pm2 status mayday"
 
-# Check port binding
-netstat -tlnp | grep 8004
+# View on-prem server logs
+ssh medhi@192.168.1.14 "pm2 logs mayday --lines 20"
 
-# Check Redis status
-redis-cli ping
-redis-cli info
-redis-cli monitor
+# Check MariaDB on on-prem server
+ssh medhi@192.168.1.14 "sudo systemctl status mariadb"
 
 # Verify file changes
 git status
 git log --oneline -5
 
-# Check WebSocket connections
-curl -I "http://localhost:8004/socket.io/"
-
-# Test database connections
-mysql -u asterisk_user -p mayday_crm
-mongo mayday_crm
-redis-cli -a mayday_redis_password
+# Test database connection
+mysql -h 192.168.1.14 -u mayday_user -p asterisk
 ```
 
 ## 📊 Monitoring & Health Checks
@@ -1073,8 +1031,9 @@ For technical support and questions:
 
 ---
 
-**Last Updated**: January 2025  
-**Version**: 1.1.0  
-**Status**: Enhanced Transfer System ✅ Complete | AMI + Redis Integration 🚧 In Progress  
-**Next Phase**: Full AMI Call Lifecycle Management with Redis  
-**Architecture**: Multi-Component System with Redis Integration 🆕
+**Last Updated**: December 2025  
+**Version**: 2.0.0  
+**Status**: On-Prem Migration ✅ Complete  
+**Current Branch**: `development`  
+**On-Prem Server**: 192.168.1.14 (MariaDB configured, Asterisk pending)  
+**GitHub Repo**: https://github.com/Dlu6/Mayday_EC.git
