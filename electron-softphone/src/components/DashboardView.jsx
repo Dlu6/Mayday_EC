@@ -20,6 +20,8 @@ import {
   ListItemText,
   ListItemAvatar,
   Button,
+  Chip,
+  Badge,
 } from "@mui/material";
 import {
   CallMissed,
@@ -52,6 +54,7 @@ import callHistoryService from "../services/callHistoryService";
 import { canInitializeServices } from "../services/storageService";
 import { useNotification } from "../contexts/NotificationContext";
 import WebSocketStatus from "./WebSocketStatus";
+import { useWebSocket } from "../hooks/useWebSocket";
 
 // Format seconds to mm:ss
 const formatDuration = (seconds) => {
@@ -637,6 +640,9 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
 
   // Add notification hook
   const { showNotification } = useNotification();
+  
+  // Get WebSocket connection status for Live badge
+  const { isConnected, isReconnecting } = useWebSocket();
 
   // CRITICAL: Add loading timeout to prevent stuck loading state
   useEffect(() => {
@@ -738,6 +744,35 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
         setStats(newStats);
         setIsLoading(false);
       });
+
+      // Fetch all agents to seed the activeAgentsList (includes offline agents)
+      try {
+        const allAgents = await agentService.getAllAgents();
+        if (allAgents && allAgents.length > 0) {
+          setStats((prev) => {
+            const existingExtensions = new Set(
+              (prev.activeAgentsList || []).map((a) => String(a.extension))
+            );
+            // Add agents that aren't already in the list
+            const newAgents = allAgents
+              .filter((a) => !existingExtensions.has(String(a.extension)))
+              .map((a) => ({
+                extension: a.extension,
+                name: a.name,
+                status: a.status || "Offline",
+                isRegistered: a.isRegistered || false,
+                lastSeen: a.lastSeen,
+                typology: a.typology,
+              }));
+            return {
+              ...prev,
+              activeAgentsList: [...(prev.activeAgentsList || []), ...newAgents],
+            };
+          });
+        }
+      } catch (agentError) {
+        console.warn("[Dashboard] Could not fetch all agents:", agentError.message);
+      }
 
       // Also fetch agent performance data
       await fetchAgentPerformanceData();
@@ -1795,6 +1830,30 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
               )}
             </IconButton>
           </Tooltip>
+          <Badge
+            variant="dot"
+            sx={{ 
+              "& .MuiBadge-badge": { 
+                width: 12, 
+                height: 12, 
+                borderRadius: "50%",
+                backgroundColor: isConnected ? "#00ff04ff" : isReconnecting ? "#ff9800" : undefined
+              } 
+            }}
+            color={isConnected ? "success" : "error"}
+          >
+            <Chip
+              label={isConnected ? "Live" : isReconnecting ? "Reconnecting" : "Disconnected"}
+              size="small"
+              variant="filled"
+              sx={{
+                backgroundColor: isConnected ? "#00ff04ff" : isReconnecting ? "#ff9800" : undefined,
+                color: isConnected ? "#000" : isReconnecting ? "#000" : undefined,
+                fontWeight: 500
+              }}
+              color={isConnected ? undefined : isReconnecting ? undefined : "error"}
+            />
+          </Badge>
         </Box>
       }
       isCollapsed={isCollapsed}

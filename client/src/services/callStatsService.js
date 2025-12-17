@@ -98,6 +98,43 @@ const callStatsService = {
       return [];
     }
   },
+
+  /**
+   * Get abandon rate statistics with breakdown
+   * @returns {Promise<Object>} Abandon rate stats for today, week, month with hourly breakdown
+   */
+  getAbandonRateStats: async () => {
+    try {
+      const response = await API.get("/admin/abandon-rate-stats");
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching abandon rate stats:", error);
+      // Return fallback data in case of error
+      return {
+        today: { abandonRate: 0, abandonedCalls: 0, totalCalls: 0 },
+        week: { abandonRate: 0 },
+        month: { abandonRate: 0 },
+        hourlyBreakdown: [],
+      };
+    }
+  },
+
+  /**
+   * Get all agents with their real-time status (including offline)
+   * @returns {Promise<Array>} Array of all agents with status
+   */
+  getAllAgentsWithStatus: async () => {
+    try {
+      const response = await API.get("/admin/all-agents");
+      if (response.data.success) {
+        return response.data.data || [];
+      }
+      return [];
+    } catch (error) {
+      console.error("Error fetching all agents:", error);
+      return [];
+    }
+  },
 };
 
 export default callStatsService;

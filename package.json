@@ -9,9 +9,9 @@
   },
   "scripts": {
     "start": "NODE_NO_WARNINGS=1 craco start",
-    "server_client": "concurrently \"nodemon server/server.js\" \"cd client && npm start\"",
+    "server_client": "concurrently \"nodemon --watch server server/server.js\" \"cd client && npm start\"",
     "client": "cd client && npm start",
-    "server": "nodemon server/server.js",
+    "server": "nodemon --watch server server/server.js",
     "start:prod": "NODE_ENV=production PM2_HOME=/home/admin/.pm2 pm2 start server/server.js --name mayday --watch",
     "stop:prod": "PM2_HOME=/home/admin/.pm2 pm2 delete mayday || true",
     "postinstall": "if [ \"$NODE_ENV\" = \"production\" ]; then cd client && npm install && npm run build; fi",

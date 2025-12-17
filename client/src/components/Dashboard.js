@@ -7,245 +7,150 @@ import {
   alpha,
   Paper,
   LinearProgress,
-  CircularProgress,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
-  Avatar,
+  Stack,
   Chip,
+  IconButton,
+  Tooltip,
+  Badge,
 } from "@mui/material";
-import SupervisorAccountIcon from "@mui/icons-material/SupervisorAccount";
+import TalkIcon from "@mui/icons-material/Forum";
+import AnswerIcon from "@mui/icons-material/QuestionAnswer";
+import PhoneCallbackIcon from "@mui/icons-material/PhoneCallback";
+import PhoneMissedIcon from "@mui/icons-material/PhoneMissed";
+import PhoneForwardedIcon from "@mui/icons-material/PhoneForwarded";
+import TimerIcon from "@mui/icons-material/Timer";
+import DashboardIcon from "@mui/icons-material/Dashboard";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import TrendingDownIcon from "@mui/icons-material/TrendingDown";
+import TrendingFlatIcon from "@mui/icons-material/TrendingFlat";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import SpeedIcon from "@mui/icons-material/Speed";
+import ShowChartIcon from "@mui/icons-material/ShowChart";
 import { useState, useEffect } from "react";
 import callStatsService from "../services/callStatsService";
+import AgentAvailability from "./AgentAvailability";
 import { connectWebSocket } from "../services/websocketService";
-import cdrService from "../services/cdrService";
-import {
-  Phone,
-  PhoneInTalk,
-  PhoneMissed,
-  PhoneForwarded,
-  PhoneCallback,
-  Timer,
-  CallEnd,
-} from "@mui/icons-material";
-
-// Agent Status Component with pause reason support
-const AgentStatusChip = ({ status, pauseReason }) => {
-  const getStatusColor = (status) => {
-    const normalizedStatus = status?.toLowerCase();
-    switch (normalizedStatus) {
-      case "available":
-      case "ready":
-      case "registered":
-        return "success";
-      case "on call":
-      case "oncall":
-      case "busy":
-        return "error";
-      case "paused":
-      case "break":
-        return "warning";
-      default:
-        return "default";
-    }
-  };
-
-  const getStatusLabel = (status, pauseReason) => {
-    const normalizedStatus = status?.toLowerCase();
-    if (normalizedStatus === "paused" || normalizedStatus === "break") {
-      return pauseReason?.label || "Paused";
-    }
-    return status || "Offline";
-  };
-
-  return (
-    <Chip
-      label={getStatusLabel(status, pauseReason)}
-      color={getStatusColor(status)}
-      size="small"
-      variant="outlined"
-      sx={{
-        borderColor: pauseReason?.color || undefined,
-        color: pauseReason?.color || undefined,
-      }}
-    />
-  );
-};
-
-// Active Agents List Component
-const ActiveAgentsList = ({ agents, isLoading }) => {
-  if (isLoading) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
-        <CircularProgress size={24} />
-      </Box>
-    );
-  }
-
-  if (!agents || agents.length === 0) {
-    return (
-      <Box sx={{ p: 2, textAlign: "center", color: "text.secondary" }}>
-        <Typography variant="body2">No agents available</Typography>
-      </Box>
-    );
-  }
-
-  return (
-    <List sx={{ p: 0 }}>
-      {agents.map((agent, index) => (
-        <ListItem
-          key={agent.extension || index}
-          sx={{
-            borderBottom: index < agents.length - 1 ? "1px solid" : "none",
-            borderColor: "divider",
-            py: 1,
-          }}
-        >
-          <ListItemAvatar>
-            <Avatar sx={{ bgcolor: "primary.main", width: 32, height: 32 }}>
-              <SupervisorAccountIcon fontSize="small" />
-            </Avatar>
-          </ListItemAvatar>
-          <ListItemText
-            primary={
-              <Typography variant="body2" fontWeight="medium">
-                {agent.name || `Agent ${agent.extension}`}
-              </Typography>
-            }
-            secondary={
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                component="div"
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                    mt: 0.5,
-                  }}
-                >
-                  <AgentStatusChip status={agent.status} pauseReason={agent.pauseReason} />
-                  <span>Ext: {agent.extension}</span>
-                  {agent.callsDone > 0 && (
-                    <>
-                      <span>•</span>
-                      <span>{agent.callsDone} calls</span>
-                    </>
-                  )}
-                </Box>
-              </Typography>
-            }
-          />
-        </ListItem>
-      ))}
-    </List>
-  );
-};
 
 const StatCard = ({ title, value, icon, color, trend, isLoading }) => {
-  const theme = useTheme();
-
-  const getIcon = () => {
-    if (icon) return icon;
-
-    // Map titles to appropriate icons
-    if (title.toLowerCase().includes("total")) return <Phone />;
-    if (title.toLowerCase().includes("answered")) return <PhoneInTalk />;
-    if (title.toLowerCase().includes("missed")) return <PhoneMissed />;
-    if (title.toLowerCase().includes("outbound")) return <PhoneForwarded />;
-    if (title.toLowerCase().includes("inbound")) return <PhoneCallback />;
-    if (title.toLowerCase().includes("duration")) return <Timer />;
-    if (title.toLowerCase().includes("abandon")) return <CallEnd />;
-
-    return <Phone />;
+  const getTrendIcon = (trend) => {
+    if (trend > 0) return <TrendingUpIcon sx={{ fontSize: 16 }} />;
+    if (trend < 0) return <TrendingDownIcon sx={{ fontSize: 16 }} />;
+    return <TrendingFlatIcon sx={{ fontSize: 16 }} />;
   };
 
-  const getIconColor = () => {
-    if (color) return color;
-
-    // Map titles to appropriate colors
-    if (title.toLowerCase().includes("total")) return "#1976d2";
-    if (title.toLowerCase().includes("answered")) return "#2e7d32";
-    if (title.toLowerCase().includes("missed")) return "#d32f2f";
-    if (title.toLowerCase().includes("outbound")) return "#ed6c02";
-    if (title.toLowerCase().includes("inbound")) return "#9c27b0";
-    if (title.toLowerCase().includes("duration")) return "#1565c0";
-    if (title.toLowerCase().includes("abandon")) return "#f57c00";
-
-    return "#1976d2";
+  const getTrendColor = (trend) => {
+    if (trend > 0) return "success.main";
+    if (trend < 0) return "error.main";
+    return "text.secondary";
   };
 
   return (
     <Card
       sx={{
-        p: 2,
+        p: 0,
         height: "100%",
         display: "flex",
         flexDirection: "column",
         position: "relative",
         overflow: "hidden",
-        borderRadius: 2,
-        boxShadow: theme.shadows[2],
-        transition: "transform 0.2s, box-shadow 0.2s",
+        borderRadius: 3,
+        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.95)",
+        border: "1px solid rgba(0,0,0,0.06)",
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         "&:hover": {
           transform: "translateY(-4px)",
-          boxShadow: theme.shadows[8],
-        },
-        "&::before": {
-          content: '""',
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "4px",
-          backgroundColor: getIconColor(),
+          boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+          borderColor: alpha(color, 0.3),
         },
       }}
     >
-      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
-        <Box
-          sx={{
-            p: 1.5,
-            borderRadius: 2,
-            backgroundColor: alpha(getIconColor(), 0.1),
-            color: getIconColor(),
-          }}
+      {/* Header with colored background */}
+      <Box
+        sx={{
+          p: 2.5,
+          backgroundColor: alpha(color, 0.08),
+          borderBottom: `1px solid ${alpha(color, 0.1)}`,
+        }}
+      >
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
         >
-          {getIcon()}
-        </Box>
+          <Box
+            sx={{
+              p: 1.5,
+              borderRadius: 2.5,
+              backgroundColor: "white",
+              color: color,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {icon}
+          </Box>
+
+          {trend !== null && (
+            <Chip
+              icon={getTrendIcon(trend)}
+              label={`${Math.abs(trend)}%`}
+              size="small"
+              sx={{
+                backgroundColor: alpha(getTrendColor(trend), 0.1),
+                color: getTrendColor(trend),
+                fontWeight: 600,
+                fontSize: "0.75rem",
+                "& .MuiChip-icon": {
+                  color: getTrendColor(trend),
+                },
+              }}
+            />
+          )}
+        </Stack>
+      </Box>
+
+      {/* Content */}
+      <Box sx={{ p: 2.5, flex: 1, display: "flex", flexDirection: "column" }}>
         <Typography
-          variant="caption"
+          variant="h3"
           sx={{
-            color:
-              trend > 0
-                ? "success.main"
-                : trend < 0
-                ? "error.main"
-                : "text.secondary",
-            display: "flex",
-            alignItems: "center",
+            mb: 1,
+            fontWeight: 700,
+            color: "text.primary",
+            letterSpacing: "-0.02em",
+            transition: "all 0.3s ease",
+            opacity: isLoading ? 0.7 : 1,
           }}
         >
-          {trend !== null ? `${trend}% from last hour` : "No trend data"}
+          {value}
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{
+            color: "text.secondary",
+            textTransform: "uppercase",
+            fontWeight: 600,
+            letterSpacing: "0.5px",
+            fontSize: "0.75rem",
+            transition: "all 0.3s ease",
+            opacity: isLoading ? 0.7 : 1,
+          }}
+        >
+          {title}
         </Typography>
       </Box>
 
-      {isLoading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", my: 2 }}>
-          <CircularProgress size={24} />
-        </Box>
-      ) : (
-        <Typography variant="h4" sx={{ mb: 1, fontWeight: "bold" }}>
-          {value}
-        </Typography>
-      )}
-
-      <Typography variant="body2" color="text.secondary" sx={{ mt: "auto" }}>
-        {title}
-      </Typography>
+      {/* Bottom accent */}
+      <Box
+        sx={{
+          height: 4,
+          backgroundColor: color,
+          opacity: 0.8,
+        }}
+      />
     </Card>
   );
 };
@@ -260,71 +165,148 @@ const formatTime = (seconds) => {
     .padStart(2, "0")}`;
 };
 
+// Helper function to format wait time with better readability
+const formatWaitTime = (seconds) => {
+  if (!seconds && seconds !== 0) return "00:00";
+
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (mins >= 60) {
+    const hours = Math.floor(mins / 60);
+    const remainingMins = mins % 60;
+    return `${hours}h ${remainingMins}m ${secs}s`;
+  } else if (mins > 0) {
+    return `${mins}m ${secs}s`;
+  } else {
+    return `${secs}s`;
+  }
+};
+
+// Helper function to calculate trend percentage
+const calculateTrend = (current, previous) => {
+  if (!previous || previous === 0) return null;
+  const trend = ((current - previous) / previous) * 100;
+  return Math.round(trend);
+};
+
 const Dashboard = () => {
   const theme = useTheme();
   const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState([]);
   const [queueActivity, setQueueActivity] = useState({ serviceLevel: 0 });
-  const [activeAgents, setActiveAgents] = useState([]);
-  const [enrichedAgents, setEnrichedAgents] = useState([]);
-  const [agentsLoading, setAgentsLoading] = useState(true);
-
-  // WebSocket connection for real-time updates
-  const [socket, setSocket] = useState(null);
+  const [abandonRateStats, setAbandonRateStats] = useState(null);
+  const [previousStats, setPreviousStats] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isConnected, setIsConnected] = useState(false);
 
-  // Initialize WebSocket connection
+  // Initialize WebSocket connection for Live status
   useEffect(() => {
-    try {
-      const newSocket = connectWebSocket();
-      if (newSocket) {
-        setSocket(newSocket);
-        setIsConnected(true);
-      }
-    } catch (error) {
-      console.error("Failed to connect WebSocket:", error);
-    }
+    const socket = connectWebSocket();
+    if (!socket) return;
+
+    setIsConnected(socket.connected);
+
+    const onConnect = () => setIsConnected(true);
+    const onDisconnect = () => setIsConnected(false);
+
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+
+    return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+    };
   }, []);
 
   // Fetch call statistics
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true);
       try {
-        setIsLoading(true);
-        const [callStats, queueData, agentsData] = await Promise.all([
-          callStatsService.getCallStats(),
-          callStatsService.getQueueActivity(),
-          callStatsService.getActiveAgents(),
-        ]);
+        // Fetch current stats
+        const callStats = await callStatsService.getCallStats();
+        const queueData = await callStatsService.getQueueActivity();
+        const abandonStats = await callStatsService.getAbandonRateStats();
 
         if (callStats) {
-          const mappedStats = {
-            waiting: callStats.waiting || 0,
-            talking: callStats.talking || 0,
-            answered: callStats.answered || callStats.answeredCalls || 0,
-            abandoned: callStats.abandoned || callStats.missedCalls || 0,
-            totalOffered: callStats.totalOffered || callStats.totalCalls || 0,
-            avgHoldTime:
-              callStats.avgHoldTime || callStats.avgCallDuration || 0,
-          };
-          // Compute abandonRate if not provided
-          const computedAbandonRate = mappedStats.totalOffered
-            ? Math.round(
-                (mappedStats.abandoned / mappedStats.totalOffered) * 100
-              )
-            : 0;
-          mappedStats.abandonRate =
-            callStats.abandonRate ?? computedAbandonRate;
+          // Store previous stats for trend calculation
+          setPreviousStats(
+            stats.length > 0
+              ? {
+                  waiting: stats[0]?.value || 0,
+                  talking: stats[1]?.value || 0,
+                  answered: stats[2]?.value || 0,
+                  abandoned: stats[3]?.value || 0,
+                  totalOffered: stats[4]?.value || 0,
+                  avgHoldTime: stats[5]?.value || "00:00",
+                }
+              : null
+          );
 
-          setStats(mappedStats);
-          // Merge the computed abandon rate into queue activity
-          setQueueActivity({
-            ...queueData,
-            abandonRate: mappedStats.abandonRate,
-          });
-          setActiveAgents(agentsData || []);
-          setEnrichedAgents([]);
-          setAgentsLoading(false);
+          // Format the stats for display
+          const formattedStats = [
+            {
+              title: "WAITING",
+              value: callStats.waiting || 0,
+              icon: <PhoneCallbackIcon />,
+              color: theme.palette.info.main,
+              trend: previousStats
+                ? calculateTrend(callStats.waiting, previousStats.waiting)
+                : null,
+            },
+            {
+              title: "TALKING",
+              value: callStats.talking || 0,
+              icon: <TalkIcon />,
+              color: theme.palette.warning.main,
+              trend: previousStats
+                ? calculateTrend(callStats.talking, previousStats.talking)
+                : null,
+            },
+            {
+              title: "ANSWERED",
+              value: callStats.answered || 0,
+              icon: <AnswerIcon />,
+              color: theme.palette.success.main,
+              trend: previousStats
+                ? calculateTrend(callStats.answered, previousStats.answered)
+                : null,
+            },
+            {
+              title: "ABANDONED",
+              value: callStats.abandoned || 0,
+              icon: <PhoneMissedIcon />,
+              color: theme.palette.error.main,
+              trend: previousStats
+                ? calculateTrend(callStats.abandoned, previousStats.abandoned)
+                : null,
+            },
+            {
+              title: "TOTAL OFFERED",
+              value: callStats.totalOffered || 0,
+              icon: <PhoneForwardedIcon />,
+              color: theme.palette.primary.main,
+              trend: previousStats
+                ? calculateTrend(
+                    callStats.totalOffered,
+                    previousStats.totalOffered
+                  )
+                : null,
+            },
+            {
+              title: "AVERAGE HOLD TIME",
+              value: formatTime(callStats.avgHoldTime),
+              icon: <TimerIcon />,
+              color: "#6b7280",
+              trend: null, // No trend for time values
+            },
+          ];
+
+          setStats(formattedStats);
+          setQueueActivity(queueData);
+          setAbandonRateStats(abandonStats);
+          setLastUpdated(new Date());
         }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -334,329 +316,565 @@ const Dashboard = () => {
     };
 
     fetchData();
+
+    // Set up polling every 30 seconds
+    const intervalId = setInterval(fetchData, 30000);
+
+    // Clean up interval on component unmount
+    return () => clearInterval(intervalId);
   }, []);
 
-  // WebSocket event handlers for real-time updates
-  useEffect(() => {
-    if (!socket || !isConnected) return;
+  const handleRefresh = async () => {
+    setIsLoading(true);
+    try {
+      const callStats = await callStatsService.getCallStats();
+      const queueData = await callStatsService.getQueueActivity();
+      const abandonStats = await callStatsService.getAbandonRateStats();
 
-    // Listen for agent status updates
-    const handleAgentStatusUpdate = (data) => {
-      // Handle both formats: { type: "agent:status", ... } and direct { extension, status, ... }
-      const extension = data.extension;
-      const status = data.data?.status || data.status;
-      const pauseReason = data.data?.pauseReason || data.pauseReason;
-      const timestamp = data.data?.timestamp || data.timestamp;
+      if (callStats) {
+        const formattedStats = [
+          {
+            title: "WAITING",
+            value: callStats.waiting || 0,
+            icon: <PhoneCallbackIcon />,
+            color: theme.palette.info.main,
+            trend: previousStats
+              ? calculateTrend(callStats.waiting, previousStats.waiting)
+              : null,
+          },
+          {
+            title: "TALKING",
+            value: callStats.talking || 0,
+            icon: <TalkIcon />,
+            color: theme.palette.warning.main,
+            trend: previousStats
+              ? calculateTrend(callStats.talking, previousStats.talking)
+              : null,
+          },
+          {
+            title: "ANSWERED",
+            value: callStats.answered || 0,
+            icon: <AnswerIcon />,
+            color: theme.palette.success.main,
+            trend: previousStats
+              ? calculateTrend(callStats.answered, previousStats.answered)
+              : null,
+          },
+          {
+            title: "ABANDONED",
+            value: callStats.abandoned || 0,
+            icon: <PhoneMissedIcon />,
+            color: theme.palette.error.main,
+            trend: previousStats
+              ? calculateTrend(callStats.abandoned, previousStats.abandoned)
+              : null,
+          },
+          {
+            title: "TOTAL OFFERED",
+            value: callStats.totalOffered || 0,
+            icon: <PhoneForwardedIcon />,
+            color: theme.palette.primary.main,
+            trend: previousStats
+              ? calculateTrend(
+                  callStats.totalOffered,
+                  previousStats.totalOffered
+                )
+              : null,
+          },
+          {
+            title: "AVERAGE HOLD TIME",
+            value: formatTime(callStats.avgHoldTime),
+            icon: <TimerIcon />,
+            color: "#6b7280",
+            trend: null,
+          },
+        ];
 
-      if (extension && status) {
-        setActiveAgents((prevAgents) => {
-          const updatedAgents = [...prevAgents];
-          const agentIndex = updatedAgents.findIndex(
-            (agent) => agent.extension === extension
-          );
-
-          if (agentIndex !== -1) {
-            updatedAgents[agentIndex] = {
-              ...updatedAgents[agentIndex],
-              status: status,
-              pauseReason: pauseReason || null,
-              lastSeen: timestamp,
-            };
-          }
-
-          return updatedAgents;
-        });
+        setStats(formattedStats);
+        setQueueActivity(queueData);
+        setAbandonRateStats(abandonStats);
+        setLastUpdated(new Date());
       }
-    };
-
-    // Listen for agent paused events
-    const handleAgentPaused = (data) => {
-      console.log("Agent paused event received:", data);
-      setActiveAgents((prevAgents) => {
-        const updatedAgents = [...prevAgents];
-        const agentIndex = updatedAgents.findIndex(
-          (agent) => agent.extension === data.extension
-        );
-
-        if (agentIndex !== -1) {
-          updatedAgents[agentIndex] = {
-            ...updatedAgents[agentIndex],
-            status: "Paused",
-            pauseReason: data.pauseReason,
-            pauseStartTime: data.startTime,
-            lastSeen: data.timestamp,
-          };
-        }
-
-        return updatedAgents;
-      });
-    };
-
-    // Listen for agent unpaused events
-    const handleAgentUnpaused = (data) => {
-      console.log("Agent unpaused event received:", data);
-      setActiveAgents((prevAgents) => {
-        const updatedAgents = [...prevAgents];
-        const agentIndex = updatedAgents.findIndex(
-          (agent) => agent.extension === data.extension
-        );
-
-        if (agentIndex !== -1) {
-          updatedAgents[agentIndex] = {
-            ...updatedAgents[agentIndex],
-            status: "Available",
-            pauseReason: null,
-            pauseStartTime: null,
-            lastSeen: data.timestamp,
-          };
-        }
-
-        return updatedAgents;
-      });
-    };
-
-    // Listen for call stats updates
-    const handleCallStatsUpdate = (data) => {
-      if (data.type === "call:stats") {
-        const s = data.data || {};
-        const mappedStats = {
-          waiting: s.waiting || 0,
-          talking: s.talking || 0,
-          answered: s.answered || s.answeredCalls || 0,
-          abandoned: s.abandoned || s.missedCalls || 0,
-          totalOffered: s.totalOffered || s.totalCalls || 0,
-          avgHoldTime: s.avgHoldTime || s.avgCallDuration || 0,
-        };
-        const computedAbandonRate = mappedStats.totalOffered
-          ? Math.round((mappedStats.abandoned / mappedStats.totalOffered) * 100)
-          : 0;
-        mappedStats.abandonRate = s.abandonRate ?? computedAbandonRate;
-
-        setStats((prevStats) => ({ ...prevStats, ...mappedStats }));
-      }
-    };
-
-    // Listen for agent availability changes
-    const handleAgentAvailabilityChange = (data) => {
-      if (data.type === "extension:availability_changed") {
-        // Refresh agent list when availability changes
-        callStatsService.getActiveAgents().then((agentsData) => {
-          setActiveAgents(agentsData || []);
-        });
-      }
-    };
-
-    socket.on("agent:status", handleAgentStatusUpdate);
-    socket.on("agent:status_update", handleAgentStatusUpdate);
-    socket.on("agent:paused", handleAgentPaused);
-    socket.on("agent:unpaused", handleAgentUnpaused);
-    socket.on("call:stats", handleCallStatsUpdate);
-    socket.on("extension:availability_changed", handleAgentAvailabilityChange);
-
-    return () => {
-      socket.off("agent:status", handleAgentStatusUpdate);
-      socket.off("agent:status_update", handleAgentStatusUpdate);
-      socket.off("agent:paused", handleAgentPaused);
-      socket.off("agent:unpaused", handleAgentUnpaused);
-      socket.off("call:stats", handleCallStatsUpdate);
-      socket.off(
-        "extension:availability_changed",
-        handleAgentAvailabilityChange
-      );
-    };
-  }, [socket, isConnected]);
-
-  // Removed periodic polling to avoid duplicate loads; rely on sockets
-
-  // Enrich agents with per-extension CDR counts (answered today as callsDone),
-  // without mutating the source list to avoid update loops
-  useEffect(() => {
-    let cancelled = false;
-    const enrich = async () => {
-      if (!activeAgents || activeAgents.length === 0) return;
-      try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todayStr = today.toISOString().split("T")[0];
-
-        const results = await Promise.all(
-          activeAgents.map(async (agent) => {
-            if (!agent?.extension) return { agent, counts: null };
-            try {
-              const resp = await cdrService.getCallCountsByExtension(
-                agent.extension,
-                todayStr
-              );
-              return { agent, counts: resp?.data || null };
-            } catch (e) {
-              return { agent, counts: null };
-            }
-          })
-        );
-
-        if (cancelled) return;
-
-        const updated = results.map(({ agent, counts }) => ({
-          ...agent,
-          callsDone: counts?.answeredCalls || 0,
-          callStats: counts || undefined,
-        }));
-        setEnrichedAgents(updated);
-      } finally {
-        // no-op
-      }
-    };
-    enrich();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeAgents]);
+    } catch (error) {
+      console.error("Error refreshing dashboard data:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 1, pt: 0, backgroundColor: "#fafafa", minHeight: "100vh" }}>
+      {/* Enhanced Header */}
       <Paper
         elevation={0}
         sx={{
-          p: 3,
-          mb: 4,
+          p: 2,
+          mb: 2,
           borderRadius: 2,
-          background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+          backgroundColor: "white",
+          border: "1px solid rgba(0,0,0,0.06)",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
         }}
       >
-        <Typography variant="h4" sx={{ color: "white", mb: 1 }}>
-          Daily Stats Dashboard
-        </Typography>
-        <Typography variant="body1" sx={{ color: "white", opacity: 0.8 }}>
-          Real-time monitoring and analytics!
-        </Typography>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+        >
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                color: theme.palette.primary.main,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <DashboardIcon sx={{ fontSize: 28 }} />
+            </Box>
+            <Box>
+              <Typography variant="h5" fontWeight="700">
+                Daily Stats Dashboard
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Real-time monitoring and analytics for call center operations
+              </Typography>
+            </Box>
+          </Stack>
+
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Box sx={{ textAlign: "right" }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "flex", alignItems: "center" }}
+              >
+                <AccessTimeIcon sx={{ fontSize: 14, mr: 0.5 }} />
+                Last updated: {lastUpdated.toLocaleTimeString()}
+              </Typography>
+              <Badge
+                variant="dot"
+                sx={{ 
+                  mt: 0.5,
+                  "& .MuiBadge-badge": { 
+                    width: 12, 
+                    height: 12, 
+                    borderRadius: "50%",
+                    backgroundColor: isConnected ? "#00ff04ff" : undefined
+                  } 
+                }}
+                color={isConnected ? "success" : "error"}
+              >
+                <Chip
+                  label={isLoading ? "Updating..." : isConnected ? "Live" : "Disconnected"}
+                  size="small"
+                  variant="filled"
+                  sx={{
+                    backgroundColor: isLoading 
+                      ? alpha(theme.palette.warning.main, 0.1)
+                      : isConnected ? "#00ff04ff" : undefined,
+                    color: isLoading 
+                      ? theme.palette.warning.main
+                      : isConnected ? "#000" : undefined,
+                    fontWeight: 500
+                  }}
+                  color={isLoading ? undefined : isConnected ? undefined : "error"}
+                />
+              </Badge>
+            </Box>
+            <Tooltip title="Refresh Data">
+              <span>
+                <IconButton
+                  onClick={handleRefresh}
+                  disabled={isLoading}
+                  sx={{
+                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    color: theme.palette.primary.main,
+                    "&:hover": {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.2),
+                    },
+                  }}
+                >
+                  <RefreshIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Stack>
+        </Stack>
       </Paper>
 
-      <Grid container spacing={3}>
-        {stats &&
-          Object.entries(stats).map(([key, value]) => (
-            <Grid item xs={12} sm={6} md={4} key={key}>
-              <StatCard
-                title={key.replace(/([A-Z])/g, " $1").trim()}
-                value={value}
-                icon={null}
-                color={null}
-                trend={null}
-                isLoading={isLoading}
-              />
-            </Grid>
-          ))}
-      </Grid>
-
-      {/* Activity Overview */}
-      <Paper sx={{ mt: 4, p: 3, borderRadius: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Queue Activity
+      {/* Stats Grid */}
+      <Box sx={{ mb: 2 }}>
+        <Typography
+          variant="subtitle1"
+          fontWeight="600"
+          sx={{ mb: 1.5, color: "text.secondary" }}
+        >
+          Key Performance Indicators
         </Typography>
         <Grid container spacing={2}>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                Service Level
-              </Typography>
-              {isLoading ? (
-                <Box
-                  sx={{ display: "flex", alignItems: "center", gap: 1, my: 1 }}
-                >
-                  <CircularProgress size={20} />
-                  <Typography variant="body2">Loading...</Typography>
-                </Box>
-              ) : (
-                <>
-                  <Typography variant="h6">
-                    {queueActivity.serviceLevel}%
-                  </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={queueActivity.serviceLevel}
-                    sx={{
-                      mt: 1,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                      "& .MuiLinearProgress-bar": {
-                        borderRadius: 4,
-                        backgroundColor: theme.palette.primary.main,
-                      },
-                    }}
-                  />
-                </>
-              )}
-            </Box>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                Average Wait Time
-              </Typography>
-              {isLoading ? (
-                <Box
-                  sx={{ display: "flex", alignItems: "center", gap: 1, my: 1 }}
-                >
-                  <CircularProgress size={20} />
-                  <Typography variant="body2">Loading...</Typography>
-                </Box>
-              ) : (
-                <Typography variant="h6">
-                  {formatTime(queueActivity.waitTime)}
-                </Typography>
-              )}
-            </Box>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                Abandon Rate
-              </Typography>
-              {isLoading ? (
-                <Box
-                  sx={{ display: "flex", alignItems: "center", gap: 1, my: 1 }}
-                >
-                  <CircularProgress size={20} />
-                  <Typography variant="body2">Loading...</Typography>
-                </Box>
-              ) : (
-                <>
-                  <Typography variant="h6">
-                    {queueActivity.abandonRate}%
-                  </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={queueActivity.abandonRate}
-                    sx={{
-                      mt: 1,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: alpha(theme.palette.error.main, 0.1),
-                      "& .MuiLinearProgress-bar": {
-                        borderRadius: 4,
-                        backgroundColor: theme.palette.error.main,
-                      },
-                    }}
-                  />
-                </>
-              )}
-            </Box>
-          </Grid>
+          {stats.map((stat, index) => (
+            <Grid item xs={12} sm={6} lg={4} key={index}>
+              <StatCard {...stat} isLoading={isLoading} />
+            </Grid>
+          ))}
         </Grid>
+      </Box>
+
+      {/* Enhanced Queue Activity */}
+      <Paper
+        sx={{
+          mt: 4,
+          p: 0,
+          borderRadius: 3,
+          backgroundColor: "white",
+          border: "1px solid rgba(0,0,0,0.06)",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
+          overflow: "hidden",
+        }}
+      >
+        {/* Header */}
+        <Box
+          sx={{
+            p: 3,
+            backgroundColor: alpha(theme.palette.primary.main, 0.05),
+            borderBottom: "1px solid rgba(0,0,0,0.06)",
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={2}>
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                color: theme.palette.primary.main,
+              }}
+            >
+              <ShowChartIcon />
+            </Box>
+            <Box>
+              <Typography variant="h6" fontWeight="600">
+                Queue Activity Overview
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Real-time performance metrics and service levels
+              </Typography>
+            </Box>
+          </Stack>
+        </Box>
+
+        {/* Content */}
+        <Box sx={{ p: 3 }}>
+          <Grid container spacing={4}>
+            <Grid item xs={12} md={4}>
+              <Paper
+                sx={{
+                  p: 3,
+                  borderRadius: 2,
+                  backgroundColor: alpha(theme.palette.success.main, 0.05),
+                  border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`,
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 12px 30px rgba(0,0,0,0.5)",
+                  },
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={2} mb={2}>
+                  <Box
+                    sx={{
+                      p: 1,
+                      borderRadius: 2,
+                      backgroundColor: alpha(theme.palette.success.main, 0.1),
+                      color: theme.palette.success.main,
+                    }}
+                  >
+                    <SpeedIcon />
+                  </Box>
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight="600"
+                    color="text.secondary"
+                  >
+                    SERVICE LEVEL
+                  </Typography>
+                </Stack>
+
+                <Typography
+                  variant="h4"
+                  fontWeight="700"
+                  sx={{
+                    mb: 2,
+                    color: theme.palette.success.main,
+                    transition: "all 0.3s ease",
+                    opacity: isLoading ? 0.7 : 1,
+                  }}
+                >
+                  {queueActivity.serviceLevel}%
+                </Typography>
+                <LinearProgress
+                  variant="determinate"
+                  value={queueActivity.serviceLevel}
+                  sx={{
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: alpha(theme.palette.success.main, 0.1),
+                    transition: "all 0.3s ease",
+                    opacity: isLoading ? 0.7 : 1,
+                    "& .MuiLinearProgress-bar": {
+                      borderRadius: 5,
+                      backgroundColor: theme.palette.success.main,
+                    },
+                  }}
+                />
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <Paper
+                sx={{
+                  p: 3,
+                  borderRadius: 2,
+                  backgroundColor: alpha(theme.palette.info.main, 0.05),
+                  border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 12px 30px rgba(0,0,0,0.5)",
+                  },
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={2} mb={2}>
+                  <Box
+                    sx={{
+                      p: 1,
+                      borderRadius: 2,
+                      backgroundColor: alpha(theme.palette.info.main, 0.1),
+                      color: theme.palette.info.main,
+                    }}
+                  >
+                    <AccessTimeIcon />
+                  </Box>
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight="600"
+                    color="text.secondary"
+                  >
+                    AVERAGE WAIT TIME
+                  </Typography>
+                </Stack>
+
+                <Typography
+                  variant="h4"
+                  fontWeight="700"
+                  sx={{
+                    mb: 1,
+                    color: theme.palette.info.main,
+                    transition: "all 0.3s ease",
+                    opacity: isLoading ? 0.7 : 1,
+                  }}
+                >
+                  {formatWaitTime(queueActivity.waitTime)}
+                </Typography>
+
+                {/* Show additional wait time info */}
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2, fontSize: "0.875rem" }}
+                >
+                  Average time to answer calls today
+                </Typography>
+
+                <LinearProgress
+                  variant="determinate"
+                  value={Math.min((queueActivity.waitTime / 180) * 100, 100)} // Scale to 3 minutes max for better visualization
+                  sx={{
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: alpha(theme.palette.info.main, 0.1),
+                    transition: "all 0.3s ease",
+                    opacity: isLoading ? 0.7 : 1,
+                    "& .MuiLinearProgress-bar": {
+                      borderRadius: 5,
+                      backgroundColor: theme.palette.info.main,
+                    },
+                  }}
+                />
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} md={4}>
+              <Paper
+                sx={{
+                  p: 3,
+                  borderRadius: 2,
+                  backgroundColor: alpha(theme.palette.error.main, 0.05),
+                  border: `1px solid ${alpha(theme.palette.error.main, 0.1)}`,
+                  transition: "all 0.2s ease",
+                  "&:hover": {
+                    transform: "translateY(-2px)",
+                    boxShadow: "0 12px 30px rgba(0,0,0,0.5)",
+                  },
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={2} mb={2}>
+                  <Box
+                    sx={{
+                      p: 1,
+                      borderRadius: 2,
+                      backgroundColor: alpha(theme.palette.error.main, 0.1),
+                      color: theme.palette.error.main,
+                    }}
+                  >
+                    <TrendingDownIcon />
+                  </Box>
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight="600"
+                    color="text.secondary"
+                  >
+                    ABANDON RATE
+                  </Typography>
+                </Stack>
+
+                <Typography
+                  variant="h4"
+                  fontWeight="700"
+                  sx={{
+                    mb: 1,
+                    color: theme.palette.error.main,
+                    transition: "all 0.3s ease",
+                    opacity: isLoading ? 0.7 : 1,
+                  }}
+                >
+                  {abandonRateStats?.today?.abandonRate ||
+                    queueActivity.abandonRate ||
+                    0}
+                  %
+                </Typography>
+
+                {/* Show call counts */}
+                {abandonRateStats?.today && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 2, fontSize: "0.875rem" }}
+                  >
+                    {abandonRateStats.today.abandonedCalls} of{" "}
+                    {abandonRateStats.today.totalCalls} calls abandoned today
+                  </Typography>
+                )}
+
+                <LinearProgress
+                  variant="determinate"
+                  value={
+                    abandonRateStats?.today?.abandonRate ||
+                    queueActivity.abandonRate ||
+                    0
+                  }
+                  sx={{
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: alpha(theme.palette.error.main, 0.1),
+                    transition: "all 0.3s ease",
+                    opacity: isLoading ? 0.7 : 1,
+                    "& .MuiLinearProgress-bar": {
+                      borderRadius: 5,
+                      backgroundColor: theme.palette.error.main,
+                    },
+                  }}
+                />
+
+                {/* Show additional stats if available */}
+                {abandonRateStats && (
+                  <Stack direction="row" spacing={2} mt={2}>
+                    <Box sx={{ textAlign: "center", flex: 1 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        This Week
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        fontWeight="600"
+                        color="text.primary"
+                      >
+                        {abandonRateStats.week?.abandonRate || 0}%
+                      </Typography>
+                    </Box>
+                    <Box sx={{ textAlign: "center", flex: 1 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        This Month
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        fontWeight="600"
+                        color="text.primary"
+                      >
+                        {abandonRateStats.month?.abandonRate || 0}%
+                      </Typography>
+                    </Box>
+                  </Stack>
+                )}
+              </Paper>
+            </Grid>
+          </Grid>
+
+          {/* Hourly Abandon Rate Trend */}
+          {abandonRateStats?.hourlyBreakdown &&
+            abandonRateStats.hourlyBreakdown.length > 0 && (
+              <Paper
+                sx={{
+                  mt: 3,
+                  p: 3,
+                  borderRadius: 2,
+                  backgroundColor: alpha(theme.palette.warning.main, 0.05),
+                  border: `1px solid ${alpha(theme.palette.warning.main, 0.1)}`,
+                }}
+              >
+                <Typography variant="h6" fontWeight="600" mb={2}>
+                  Hourly Abandon Rate Trend (Today)
+                </Typography>
+                <Grid container spacing={2}>
+                  {abandonRateStats.hourlyBreakdown.map((hourData, index) => (
+                    <Grid item xs={6} sm={4} md={3} lg={2} key={index}>
+                      <Box
+                        sx={{
+                          p: 2,
+                          borderRadius: 1,
+                          backgroundColor: "white",
+                          border: "1px solid rgba(0,0,0,0.1)",
+                          textAlign: "center",
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          {hourData.hour}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          fontWeight="600"
+                          color="text.primary"
+                        >
+                          {hourData.abandonRate}%
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {hourData.abandonedCalls}/{hourData.totalCalls}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Paper>
+            )}
+        </Box>
       </Paper>
 
-      {/* Active Agents */}
-      <Paper sx={{ mt: 4, p: 3, borderRadius: 2 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Active Agents
-        </Typography>
-        <ActiveAgentsList
-          agents={enrichedAgents.length > 0 ? enrichedAgents : activeAgents}
-          isLoading={agentsLoading}
-        />
-      </Paper>
+      {/* Agent Availability Section */}
+      <Box sx={{ mt: 4 }}>
+        <AgentAvailability />
+      </Box>
     </Box>
   );
 };

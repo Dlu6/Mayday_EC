@@ -411,7 +411,6 @@ const Layout = () => {
             </Typography>
           </Box>
         </Paper>
-        <Toolbar /> {/* This ensures content starts below the AppBar */}
         <Outlet />
       </Box>
     </Box>

@@ -359,8 +359,267 @@ async function getPreviousHourStats(previousHourStart, todayStart) {
   }
 }
 
+/**
+ * Get abandon rate statistics with breakdown by period
+ */
+export const getAbandonRateStats = async (req, res) => {
+  try {
+    // Today's start
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    
+    // Week start (Monday)
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
+    weekStart.setHours(0, 0, 0, 0);
+    
+    // Month start
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    // Get today's stats
+    const [todayTotal, todayAbandoned] = await Promise.all([
+      CDR.count({
+        col: "uniqueid",
+        distinct: true,
+        where: {
+          dcontext: "from-voip-provider",
+          start: { [Op.gte]: todayStart },
+        },
+      }),
+      CDR.count({
+        col: "uniqueid",
+        distinct: true,
+        where: {
+          dcontext: "from-voip-provider",
+          disposition: "NO ANSWER",
+          start: { [Op.gte]: todayStart },
+        },
+      }),
+    ]);
+
+    // Get week's stats
+    const [weekTotal, weekAbandoned] = await Promise.all([
+      CDR.count({
+        col: "uniqueid",
+        distinct: true,
+        where: {
+          dcontext: "from-voip-provider",
+          start: { [Op.gte]: weekStart },
+        },
+      }),
+      CDR.count({
+        col: "uniqueid",
+        distinct: true,
+        where: {
+          dcontext: "from-voip-provider",
+          disposition: "NO ANSWER",
+          start: { [Op.gte]: weekStart },
+        },
+      }),
+    ]);
+
+    // Get month's stats
+    const [monthTotal, monthAbandoned] = await Promise.all([
+      CDR.count({
+        col: "uniqueid",
+        distinct: true,
+        where: {
+          dcontext: "from-voip-provider",
+          start: { [Op.gte]: monthStart },
+        },
+      }),
+      CDR.count({
+        col: "uniqueid",
+        distinct: true,
+        where: {
+          dcontext: "from-voip-provider",
+          disposition: "NO ANSWER",
+          start: { [Op.gte]: monthStart },
+        },
+      }),
+    ]);
+
+    // Get hourly breakdown for today
+    const hourlyData = await CDR.findAll({
+      attributes: [
+        [sequelize.fn("HOUR", sequelize.col("start")), "hour"],
+        [sequelize.fn("COUNT", sequelize.fn("DISTINCT", sequelize.col("uniqueid"))), "total"],
+        [
+          sequelize.fn(
+            "SUM",
+            sequelize.literal("CASE WHEN disposition = 'NO ANSWER' THEN 1 ELSE 0 END")
+          ),
+          "abandoned",
+        ],
+      ],
+      where: {
+        dcontext: "from-voip-provider",
+        start: { [Op.gte]: todayStart },
+      },
+      group: [sequelize.fn("HOUR", sequelize.col("start"))],
+      order: [[sequelize.fn("HOUR", sequelize.col("start")), "ASC"]],
+      raw: true,
+    });
+
+    // Format hourly breakdown
+    const hourlyBreakdown = hourlyData.map((row) => {
+      const hour = parseInt(row.hour);
+      const total = parseInt(row.total) || 0;
+      const abandoned = parseInt(row.abandoned) || 0;
+      const abandonRate = total > 0 ? Math.round((abandoned / total) * 100) : 0;
+      
+      return {
+        hour: `${hour.toString().padStart(2, "0")}:00`,
+        totalCalls: total,
+        abandonedCalls: abandoned,
+        abandonRate,
+      };
+    });
+
+    res.json({
+      today: {
+        totalCalls: todayTotal,
+        abandonedCalls: todayAbandoned,
+        abandonRate: todayTotal > 0 ? Math.round((todayAbandoned / todayTotal) * 100) : 0,
+      },
+      week: {
+        totalCalls: weekTotal,
+        abandonedCalls: weekAbandoned,
+        abandonRate: weekTotal > 0 ? Math.round((weekAbandoned / weekTotal) * 100) : 0,
+      },
+      month: {
+        totalCalls: monthTotal,
+        abandonedCalls: monthAbandoned,
+        abandonRate: monthTotal > 0 ? Math.round((monthAbandoned / monthTotal) * 100) : 0,
+      },
+      hourlyBreakdown,
+    });
+  } catch (error) {
+    console.error("Error getting abandon rate stats:", error);
+    res.status(500).json({ error: "Failed to fetch abandon rate statistics" });
+  }
+};
+
+/**
+ * Get all agents with their real-time status (including offline)
+ */
+export const getAllAgentsWithStatus = async (req, res) => {
+  try {
+    // Import models dynamically to avoid circular dependencies
+    const { default: UserModel } = await import("../models/UsersModel.js");
+    const { default: amiService } = await import("../services/amiService.js");
+
+    // Get all users with extensions from database
+    const users = await UserModel.findAll({
+      where: {
+        extension: {
+          [Op.not]: null,
+        },
+        role: {
+          [Op.in]: ["agent", "user", "manager"],
+        },
+      },
+      attributes: [
+        "id",
+        "extension",
+        "fullName",
+        "name",
+        "username",
+        "email",
+        "typology",
+        "online",
+        "lastLoginAt",
+      ],
+    });
+
+    // Get real-time status from AMI
+    let allExtensionStatuses = {};
+    try {
+      allExtensionStatuses = await amiService.getAllExtensionStatuses();
+    } catch (amiError) {
+      console.warn("Could not get AMI statuses:", amiError.message);
+    }
+
+    // Map users to agents with status
+    const agents = users.map((user) => {
+      // Get AMI status for this extension
+      let amiStatus = null;
+      if (Array.isArray(allExtensionStatuses)) {
+        amiStatus = allExtensionStatuses.find(
+          (agent) => agent.extension === user.extension
+        );
+      } else if (allExtensionStatuses && typeof allExtensionStatuses === "object") {
+        amiStatus = allExtensionStatuses[user.extension];
+      }
+
+      // Determine status
+      let status = "Offline";
+      let isRegistered = false;
+      let lastSeen = user.lastLoginAt;
+
+      if (amiStatus) {
+        isRegistered = amiStatus.isRegistered || false;
+        if (isRegistered) {
+          status = amiStatus.status || "Registered";
+          lastSeen = amiStatus.lastSeen || user.lastLoginAt;
+        }
+      }
+
+      // Check if user is marked as online in database
+      if (user.online && !isRegistered) {
+        status = "Online (Web)";
+      }
+
+      return {
+        extension: user.extension,
+        name: user.fullName || user.name || user.username || `Agent ${user.extension}`,
+        email: user.email,
+        typology: user.typology,
+        status,
+        isRegistered,
+        lastSeen,
+        online: user.online,
+      };
+    });
+
+    // Sort: Online/Available first, then by name
+    agents.sort((a, b) => {
+      const statusPriority = {
+        "Available": 0,
+        "Registered": 1,
+        "On Call": 2,
+        "Paused": 3,
+        "Online (Web)": 4,
+        "Offline": 5,
+      };
+      const aPriority = statusPriority[a.status] ?? 5;
+      const bPriority = statusPriority[b.status] ?? 5;
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      return (a.name || "").localeCompare(b.name || "");
+    });
+
+    res.json({
+      success: true,
+      data: agents,
+      total: agents.length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error getting all agents with status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get agents",
+      error: error.message,
+    });
+  }
+};
+
 export default {
   getCallStats,
   getQueueActivity,
   getHistoricalStats,
+  getAbandonRateStats,
+  getAllAgentsWithStatus,
 };

@@ -344,7 +344,9 @@ const Reports = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {performance.map((agent, index) => (
+              {performance
+                .filter((agent) => agent.name !== "System Administrator")
+                .map((agent, index) => (
                 <TableRow
                   key={index}
                   sx={{

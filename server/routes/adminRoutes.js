@@ -11,5 +11,7 @@ router.use(authMiddleware);
 router.get("/call-stats", adminStatsController.getCallStats);
 router.get("/queue-activity", adminStatsController.getQueueActivity);
 router.get("/historical-stats", adminStatsController.getHistoricalStats);
+router.get("/abandon-rate-stats", adminStatsController.getAbandonRateStats);
+router.get("/all-agents", adminStatsController.getAllAgentsWithStatus);
 
 export default router;

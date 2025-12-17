@@ -450,18 +450,37 @@ export const agentService = {
     const token = storageService.getAuthToken();
     if (!token) return [];
     try {
-      const res = await fetch(`${baseUrl}/users/agents`, {
+      // Try the new all-agents endpoint first (includes status)
+      const res = await fetch(`${baseUrl}/admin/all-agents`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return [];
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : data?.data || [];
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          return data.data.map((a) => ({
+            extension: String(a.extension || ""),
+            name: a.name || `Agent ${a.extension}`,
+            status: a.status || "Offline",
+            isRegistered: a.isRegistered || false,
+            lastSeen: a.lastSeen,
+            typology: a.typology,
+          })).filter((a) => a.extension);
+        }
+      }
+      // Fallback to old endpoint
+      const fallbackRes = await fetch(`${baseUrl}/users/agents`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!fallbackRes.ok) return [];
+      const fallbackData = await fallbackRes.json();
+      const list = Array.isArray(fallbackData) ? fallbackData : fallbackData?.data || [];
       return list
         .map((u) => ({
           extension: String(
             u.extension || u.pjsipExtension || u.username || ""
           ),
           name: u.fullName || u.username || String(u.extension || ""),
+          status: "Offline",
         }))
         .filter((a) => a.extension);
     } catch (_) {
