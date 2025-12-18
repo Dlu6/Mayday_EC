@@ -120,6 +120,59 @@ The Electron softphone also supports runtime configuration via localStorage:
 - After changing IPs, rebuild the client: `cd client && npm run build`
 - Restart PM2 after server changes: `pm2 restart all`
 
+## SSL/HTTPS Configuration
+
+The on-prem server uses a self-signed SSL certificate for HTTPS.
+
+### Certificate Location
+
+| File | Path |
+|------|------|
+| Certificate | `/etc/nginx/ssl/nginx.crt` |
+| Private Key | `/etc/nginx/ssl/nginx.key` |
+
+### Nginx Configuration
+
+The nginx config is at `/etc/nginx/sites-available/mayday` (symlinked to `sites-enabled`).
+
+Key features:
+- HTTP (port 80) redirects to HTTPS (port 443)
+- SSL with TLSv1.2 and TLSv1.3
+- Proxies `/api` to Node.js backend (port 8004)
+- Proxies `/socket.io/` for WebSocket connections
+- Proxies `/ws` to Asterisk WebSocket (port 8088)
+- Proxies `/ari` to Asterisk REST Interface
+
+### Regenerating SSL Certificate
+
+If you need to regenerate the self-signed certificate (e.g., expired or IP change):
+
+```bash
+# SSH to server
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14
+
+# Generate new certificate (valid for 365 days)
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout /etc/nginx/ssl/nginx.key \
+  -out /etc/nginx/ssl/nginx.crt \
+  -subj "/C=UG/ST=Kampala/L=Kampala/O=Mayday/OU=IT/CN=192.168.1.14"
+
+# Restart nginx
+sudo systemctl restart nginx
+```
+
+### Browser Certificate Warning
+
+Since it's a self-signed certificate, browsers will show a warning on first visit:
+1. Click **"Advanced"**
+2. Click **"Proceed to 192.168.1.14 (unsafe)"**
+
+The warning won't appear again for that browser after accepting.
+
+### Reference Config
+
+A copy of the nginx SSL config is stored at `scripts/nginx-mayday-ssl.conf` for reference.
+
 ## Environment Setup
 
 ### 1. Local Development Environment
@@ -935,16 +988,17 @@ Users can manually check for updates via:
 **Development Status**: On-Prem Deployment ✅ Complete  
 **Current Branch**: `development`  
 **On-Prem Server**: 192.168.1.14 (Node.js v18.20.8, PM2 v6.0.14, nginx, MariaDB configured)  
-**Web Access**: http://192.168.1.14  
+**Web Access**: https://192.168.1.14 (HTTPS with self-signed certificate)  
 **Local Dev Server**: http://localhost:8004  
 **GitHub Repo**: https://github.com/Dlu6/Mayday_EC.git  
 
 **Recent Updates (Dec 18, 2025)**:
+- ✅ **HTTPS/SSL Configuration**: Self-signed certificate configured for secure access
 - ✅ **Centralized Server Configuration**: Created `serverConfig.js` as single source of truth for IP/domain
 - ✅ Removed all hardcoded domain references from codebase
 - ✅ Updated CORS configuration to use `PUBLIC_IP` env variable dynamically
 - ✅ All electron-softphone services now import from centralized config
-- ✅ Fixed WebRTC certificate paths to use local Asterisk certificates
-- ✅ Client and server rebuilt and deployed successfully
-- ✅ Login API working correctly with admin credentials
-- ✅ See "Server IP/Domain Configuration" section above for how to change server IP
+- ✅ Nginx configured with SSL (HTTP redirects to HTTPS)
+- ✅ Certificate stored at `/etc/nginx/ssl/nginx.crt`
+- ✅ See "SSL/HTTPS Configuration" section for certificate management
+- ✅ See "Server IP/Domain Configuration" section for how to change server IP
