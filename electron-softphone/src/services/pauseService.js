@@ -2,33 +2,15 @@
 import { EventEmitter } from "events";
 import { storageService } from "./storageService";
 import logoutManager from "./logoutManager";
+import serverConfig from "../config/serverConfig";
 
 /**
  * Pause Service - Manages agent pause/break functionality
  * Integrates with backend AMI QueuePause for queue management
  */
 
-// Determine API host dynamically
-function resolvePreferredOrigin() {
-  try {
-    const useRemote = localStorage.getItem("useRemoteUrl") === "true";
-    if (useRemote) return "https://mhuhelpline.com";
-  } catch (_) {}
-
-  if (
-    typeof window !== "undefined" &&
-    window.location?.origin &&
-    !window.location.origin.startsWith("file://")
-  ) {
-    if (process.env.NODE_ENV !== "development") return window.location.origin;
-  }
-
-  return process.env.NODE_ENV === "development"
-    ? "http://localhost:8004"
-    : "https://mhuhelpline.com";
-}
-
-const baseUrl = `${resolvePreferredOrigin()}/api/pause`;
+// Use centralized server configuration
+const baseUrl = `${serverConfig.apiUrl}/api/pause`;
 
 const eventEmitter = new EventEmitter();
 

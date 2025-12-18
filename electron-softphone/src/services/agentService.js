@@ -2,35 +2,11 @@ import { EventEmitter } from "events";
 import { storageService } from "./storageService";
 import { io } from "socket.io-client";
 import logoutManager from "./logoutManager";
+import serverConfig from "../config/serverConfig";
 
-// Determine API/WS host dynamically so dev can target remote VM
-function resolvePreferredOrigin() {
-  try {
-    const useRemote = localStorage.getItem("useRemoteUrl") === "true";
-    if (useRemote) return "https://mhuhelpline.com";
-  } catch (_) {}
-
-  // In Electron, window.location.origin might be file://
-  // So we need to check for that and use the correct URL
-  if (
-    typeof window !== "undefined" &&
-    window.location?.origin &&
-    !window.location.origin.startsWith("file://")
-  ) {
-    // In production builds this will be the served origin
-    if (process.env.NODE_ENV !== "development") return window.location.origin;
-  }
-
-  // Default per NODE_ENV when no preference stored
-  return process.env.NODE_ENV === "development"
-    ? "http://localhost:8004"
-    : "https://mhuhelpline.com";
-}
-
-const preferredOrigin = resolvePreferredOrigin();
-
+// Use centralized server configuration
+const preferredOrigin = serverConfig.apiUrl;
 const baseUrl = `${preferredOrigin}/api`;
-
 const wsBaseUrl = preferredOrigin.replace(/^http/, "ws");
 
 let wsClient = null; // deprecated raw WS (kept for safety)
@@ -85,7 +61,7 @@ const connect = async () => {
   return new Promise((resolve, reject) => {
     try {
       // Use Socket.IO – matches backend expectations in server/services/socketService.js
-      const url = wsBaseUrl; // e.g., ws://localhost:8004 or wss://mhuhelpline.com
+      const url = wsBaseUrl; // Uses centralized serverConfig
       console.log("Connecting to agent Socket.IO with URL:", url);
 
       // Clean up previous socket if any

@@ -243,13 +243,12 @@ async function runCapabilityCheck() {
   });
 
   // Check 5: Server Health
+  // Note: This test file runs in browser context, uses serverConfig if available
   try {
-    const apiHost = window.location.hostname === "localhost" 
-      ? "localhost:8004" 
-      : "mhuhelpline.com";
-    const apiProtocol = window.location.protocol === "https:" ? "https" : "http";
+    const apiUrl = window.serverConfig?.apiUrl || 
+      (window.location.hostname === "localhost" ? "http://localhost:8004" : `http://${window.location.hostname}`);
     
-    const response = await fetch(`${apiProtocol}://${apiHost}/api/transfers/health`, {
+    const response = await fetch(`${apiUrl}/api/transfers/health`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("authToken") || ""}`,
       },

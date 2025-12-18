@@ -1,10 +1,9 @@
 import axios from "axios";
 import logoutManager from "./logoutManager";
+import serverConfig from "../config/serverConfig";
 
-const API_BASE_URL =
-  process.env.NODE_ENV === "production"
-    ? "https://mhuhelpline.com/api/whatsapp"
-    : "http://localhost:8004/api/whatsapp";
+// Use centralized server configuration
+const API_BASE_URL = `${serverConfig.apiUrl}/api/whatsapp`;
 
 // Register this service with the logout manager for automatic cleanup
 logoutManager.registerService("WhatsAppService", async () => {

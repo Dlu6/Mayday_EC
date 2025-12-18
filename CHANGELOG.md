@@ -62,7 +62,7 @@ All notable changes to the MHU Mayday CRM project.
 
 #### Auto-Update Server Setup
 - Configured nginx `/downloads/` location on production server
-- Update files hosted at `https://mhuhelpline.com/downloads/`
+- Update files hosted at on-prem server `/downloads/` endpoint
 - Supports delta updates via blockmap files
 
 #### Documentation Updates

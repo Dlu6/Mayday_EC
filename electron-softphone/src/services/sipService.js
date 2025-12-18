@@ -2,6 +2,7 @@
 import { Inviter, Registerer, SessionState, UserAgent, Web } from "sip.js";
 import { storageService } from "./storageService";
 import { EventEmitter } from "events";
+import serverConfig from "../config/serverConfig";
 
 const state = {
   userAgent: null,
@@ -107,13 +108,7 @@ async function connect(config) {
       60,
       Math.min(3600, Number(config?.registerExpires || 300) || 300)
     );
-    const apiHost =
-      process.env.NODE_ENV === "development"
-        ? "localhost:8004"
-        : "mhuhelpline.com";
-    const apiProtocol =
-      process.env.NODE_ENV === "development" ? "http" : "https";
-    const stunConfigUrl = `${apiProtocol}://${apiHost}/api/users/network-config/stun`;
+    const stunConfigUrl = `${serverConfig.apiUrl}/api/users/network-config/stun`;
 
     const stunServers = await fetchStunConfigWithRetry(stunConfigUrl);
 
@@ -2492,15 +2487,8 @@ export const sipCallService = {
   // Register call with AMI for monitoring and management
   registerCallWithAMI: async (callData) => {
     try {
-      const apiHost =
-        process.env.NODE_ENV === "development"
-          ? "localhost:8004"
-          : "mhuhelpline.com";
-      const apiProtocol =
-        process.env.NODE_ENV === "development" ? "http" : "https";
-
       const response = await fetch(
-        `${apiProtocol}://${apiHost}/api/ami/call-events`,
+        `${serverConfig.apiUrl}/api/ami/call-events`,
         {
           method: "POST",
           headers: {
@@ -2534,15 +2522,9 @@ export const sipCallService = {
   getAvailableAgents: async () => {
     try {
       const currentExtension = state.lastConfig?.extension;
-      const apiHost =
-        process.env.NODE_ENV === "development"
-          ? "localhost:8004"
-          : "mhuhelpline.com";
-      const apiProtocol =
-        process.env.NODE_ENV === "development" ? "http" : "https";
 
       const response = await fetch(
-        `${apiProtocol}://${apiHost}/api/transfers/available-agents?currentExtension=${currentExtension}`,
+        `${serverConfig.apiUrl}/api/transfers/available-agents?currentExtension=${currentExtension}`,
         {
           headers: {
             Authorization: `Bearer ${storageService.getAuthToken() || ""}`,

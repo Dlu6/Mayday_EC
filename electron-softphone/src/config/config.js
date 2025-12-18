@@ -1,17 +1,6 @@
-const config = {
-  development: {
-    apiUrl: "http://localhost:8004",
-    wsUrl: "ws://localhost:8004",
-    baseUrl: "http://localhost:5173",
-    sipWsUrl: "ws://65.1.149.92:8088/ws",
-  },
-  production: {
-    apiUrl: "https://mhuhelpline.com",
-    wsUrl: "ws://mhuhelpline.com",
-    baseUrl: "https://mhuhelpline.com",
-    sipWsUrl: "ws://65.1.149.92:8088/ws",
-  },
-};
+// Legacy config file - now uses centralized serverConfig
+// All URL configuration is centralized in serverConfig.js
+import serverConfig from "./serverConfig.js";
 
-const environment = process.env.NODE_ENV || "development";
-export default config[environment];
+// Re-export serverConfig for backward compatibility
+export default serverConfig;

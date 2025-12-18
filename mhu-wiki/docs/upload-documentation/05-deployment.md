@@ -44,7 +44,7 @@ http {
 
     server {
         listen 80;
-        server_name mhuhelpline.com;
+        server_name your-server-ip-or-domain;
 
 	# This Returns Redirect all HTTP traffic to HTTPS (Best practice)
     	return 301 https://$host$request_uri;
@@ -121,7 +121,7 @@ http {
 
     server {
         listen 443 ssl;
-        server_name mhuhelpline.com;
+        server_name your-server-ip-or-domain;
 
         ssl_certificate      /etc/asterisk/keys/asterisk.pem;
         ssl_certificate_key  /etc/asterisk/keys/asterisk.key;
@@ -216,7 +216,7 @@ sudo systemctl reload nginx
 After deployment, your documentation will be available at:
 
 ```
-https://mhuhelpline.com/docs/
+http://your-server-ip/docs/
 ```
 
 ## Troubleshooting Deployment Issues

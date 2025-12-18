@@ -1,19 +1,9 @@
 import io from "socket.io-client";
 import { storageService } from "./storageService";
+import serverConfig from "../config/serverConfig";
 
-// Determine the Socket.IO URL based on environment
-const getSocketUrl = () => {
-  if (process.env.SOCKET_URL) {
-    return process.env.SOCKET_URL;
-  }
-
-  if (process.env.NODE_ENV === "development") {
-    return "http://localhost:8004";
-  }
-
-  // In production or Electron, use the production URL
-  return "https://mhuhelpline.com";
-};
+// Use centralized server configuration
+const getSocketUrl = () => serverConfig.apiUrl;
 
 const socket = io(getSocketUrl(), {
   auth: {

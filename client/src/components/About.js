@@ -71,18 +71,12 @@ const About = () => {
 
   const fetchAppbarInfo = async () => {
     try {
-      const response = await fetch('https://mhuhelpline.com/downloads/latest.yml');
-      const text = await response.text();
-      // Parse YAML manually for simple structure
-      const versionMatch = text.match(/version:\s*([\d.]+)/);
-      const pathMatch = text.match(/path:\s*(.+)/);
-      if (versionMatch && pathMatch) {
-        setAppbarInfo({
-          version: versionMatch[1],
-          downloadUrl: `https://mhuhelpline.com/downloads/${encodeURIComponent(pathMatch[1].trim())}`,
-          loading: false,
-        });
-      }
+      // Appbar download info - disabled for on-prem deployment
+      setAppbarInfo({
+        version: 'N/A',
+        downloadUrl: null,
+        loading: false,
+      });
     } catch (err) {
       console.error('Failed to fetch appbar info:', err);
       setAppbarInfo(prev => ({ ...prev, loading: false }));
@@ -446,7 +440,7 @@ const About = () => {
                   <Button
                     variant="contained"
                     startIcon={<DownloadIcon />}
-                    href={appbarInfo.downloadUrl || "https://mhuhelpline.com/downloads/"}
+                    href={appbarInfo.downloadUrl || "#"}
                     target="_blank"
                     disabled={appbarInfo.loading || !appbarInfo.downloadUrl}
                     sx={{

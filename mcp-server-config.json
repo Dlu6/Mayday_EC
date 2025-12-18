@@ -1,4 +1,13 @@
 {
+  "_comment": "Mayday EC MCP Server Configuration - Updated Dec 18, 2025",
+  "_notes": {
+    "sshUser": "medhi (SSH key auth via ~/.ssh/id_ed25519)",
+    "sudoPassword": "Pasword@1759 (for medhi user)",
+    "rootPassword": "Lotuskm@1759 (root user - not used for SSH)",
+    "nodeLocation": "Node.js installed via NVM at /root/.nvm/versions/node/v18.20.8",
+    "pm2Note": "PM2 runs as root, requires sudo and NVM source to access",
+    "projectPath": "/home/medhi/Mayday_EC"
+  },
   "mcpServers": {
     "mayday-asterisk-server": {
       "command": "ssh",
@@ -10,6 +19,7 @@
       "env": {
         "TERM": "xterm-256color"
       },
+      "cwd": "/home/medhi/Mayday_EC",
       "description": "On-prem Asterisk server (192.168.1.14) - SSH key authentication"
     },
     "mayday-local-dev": {
@@ -55,7 +65,7 @@
         "-i",
         "~/.ssh/id_ed25519",
         "medhi@192.168.1.14",
-        "pm2 status mayday | cat"
+        "echo 'Pasword@1759' | sudo -S bash -c 'export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && pm2 status mayday'"
       ],
       "cwd": ".",
       "description": "Check PM2 status for mayday app on on-prem server"
@@ -66,7 +76,7 @@
         "-i",
         "~/.ssh/id_ed25519",
         "medhi@192.168.1.14",
-        "pm2 restart mayday"
+        "echo 'Pasword@1759' | sudo -S bash -c 'export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && pm2 restart mayday'"
       ],
       "cwd": ".",
       "description": "Restart mayday app via PM2 on on-prem server"
@@ -77,10 +87,43 @@
         "-i",
         "~/.ssh/id_ed25519",
         "medhi@192.168.1.14",
-        "pm2 logs mayday --lines 200 | tail -n 200"
+        "echo 'Pasword@1759' | sudo -S bash -c 'export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && pm2 logs mayday --lines 200 --nostream'"
       ],
       "cwd": ".",
       "description": "Tail PM2 logs for mayday app on on-prem server"
+    },
+    "mayday-deploy": {
+      "command": "ssh",
+      "args": [
+        "-i",
+        "~/.ssh/id_ed25519",
+        "medhi@192.168.1.14",
+        "echo 'Pasword@1759' | sudo -S bash -c 'export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && cd /home/medhi/Mayday_EC && git pull origin development && npm install && cd client && npm install && npm run build && cd .. && pm2 restart mayday'"
+      ],
+      "cwd": ".",
+      "description": "Full deployment: git pull, npm install, build client, restart PM2"
+    },
+    "mayday-nginx-status": {
+      "command": "ssh",
+      "args": [
+        "-i",
+        "~/.ssh/id_ed25519",
+        "medhi@192.168.1.14",
+        "echo 'Pasword@1759' | sudo -S systemctl status nginx"
+      ],
+      "cwd": ".",
+      "description": "Check nginx status on on-prem server"
+    },
+    "mayday-nginx-restart": {
+      "command": "ssh",
+      "args": [
+        "-i",
+        "~/.ssh/id_ed25519",
+        "medhi@192.168.1.14",
+        "echo 'Pasword@1759' | sudo -S systemctl restart nginx"
+      ],
+      "cwd": ".",
+      "description": "Restart nginx on on-prem server"
     }
   },
   "context7": {

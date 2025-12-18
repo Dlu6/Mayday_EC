@@ -103,7 +103,7 @@ scp -i "path\to\MHU_Debian_Mumb.pem" ^
 ### Step 6: Verify Deployment
 
 ```powershell
-curl https://mhuhelpline.com/downloads/latest.yml
+curl http://192.168.1.14/downloads/latest.yml
 ```
 
 ## Troubleshooting
@@ -177,7 +177,7 @@ Since SSH/SCP may not work reliably from Windows IDEs, use this workflow:
 
 4. **Verify deployment**:
    ```bash
-   curl -s https://mhuhelpline.com/downloads/latest.yml
+   curl -s http://192.168.1.14/downloads/latest.yml
    ```
 
 ### Quick Deploy from macOS (One-liner)
@@ -191,7 +191,7 @@ scp -i ~/Downloads/MHU_Debian_Mumb.pem \
   "electron-softphone/release/5.1.5/latest.yml" \
   "electron-softphone/release/5.1.5/MHU Appbar Setup 5.1.5.exe" \
   admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com:/var/www/html/downloads/ && \
-curl -s https://mhuhelpline.com/downloads/latest.yml
+curl -s http://192.168.1.14/downloads/latest.yml
 ```
 
 ## Current Version

@@ -63,6 +63,63 @@ Mayday_EC/
 └── config/                 # Configuration files
 ```
 
+## Server IP/Domain Configuration
+
+### Centralized Configuration Files
+
+To change the server IP or domain, update the following files:
+
+| Component | File | Variable/Constant |
+|-----------|------|-------------------|
+| **Electron Softphone** | `electron-softphone/src/config/serverConfig.js` | `DEFAULT_SERVER_HOST` |
+| **Electron Vite Build** | `electron-softphone/vite.config.js` | `DEFAULT_SERVER_HOST` |
+| **Electron Main Process** | `electron-softphone/electron/main.js` | `DEFAULT_SERVER_HOST` |
+| **Electron Env** | `electron-softphone/.env.production` | `VITE_SERVER_HOST` |
+| **Server Backend** | `server/.env` | `PUBLIC_IP` |
+| **Wiki Documentation** | `mhu-wiki/docusaurus.config.js` | `url` field |
+
+### How to Change Server IP
+
+1. **For Electron Softphone** (client app):
+   ```javascript
+   // electron-softphone/src/config/serverConfig.js
+   const DEFAULT_SERVER_HOST = "192.168.1.14";  // Change this
+   ```
+
+2. **For Server Backend** (CORS and API):
+   ```bash
+   # server/.env
+   PUBLIC_IP=192.168.1.14  # Change this
+   ```
+
+3. **For Electron Build** (vite.config.js):
+   ```javascript
+   // electron-softphone/vite.config.js
+   const DEFAULT_SERVER_HOST = "192.168.1.14";  // Change this
+   ```
+
+4. **For Electron Main Process**:
+   ```javascript
+   // electron-softphone/electron/main.js
+   const DEFAULT_SERVER_HOST = "192.168.1.14";  // Change this
+   ```
+
+### Runtime Configuration
+
+The Electron softphone also supports runtime configuration via localStorage:
+- `serverHost` - Override the default server host
+- `useHttps` - Enable/disable HTTPS (default: false for on-prem)
+- `apiPort` - Override API port (default: empty for nginx on port 80)
+- `sipPort` - Override SIP WebSocket port (default: 8088)
+
+### Important Notes
+
+- All hardcoded domain references (`domain.com`) have been removed
+- Server CORS configuration dynamically uses `PUBLIC_IP` from `.env`
+- Electron services import from `serverConfig.js` for consistent URL resolution
+- After changing IPs, rebuild the client: `cd client && npm run build`
+- Restart PM2 after server changes: `pm2 restart all`
+
 ## Environment Setup
 
 ### 1. Local Development Environment
@@ -376,6 +433,289 @@ git status
 git log --oneline -5
 ```
 
+## On-Prem Server Deployment Guide
+
+### System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        On-Prem Server (192.168.1.14)                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────┐     ┌──────────────────────────────────────────────────┐  │
+│  │   Browser   │     │                    nginx (port 80)               │  │
+│  │  (Client)   │────▶│  Reverse Proxy - Routes requests to services     │  │
+│  └─────────────┘     └──────────────────────────────────────────────────┘  │
+│                                      │                                      │
+│         ┌────────────────────────────┼────────────────────────────┐        │
+│         │                            │                            │        │
+│         ▼                            ▼                            ▼        │
+│  ┌─────────────────┐   ┌─────────────────────────┐   ┌─────────────────┐  │
+│  │  Static Files   │   │   Node.js Backend       │   │   Asterisk PBX  │  │
+│  │  /client/build  │   │   (PM2 - port 8004)     │   │   (port 8088)   │  │
+│  │                 │   │                         │   │                 │  │
+│  │  React App      │   │  /api/* → proxy_pass    │   │  /ws  → WebRTC  │  │
+│  │  Dashboard UI   │   │  /socket.io/* → WS      │   │  /ari → REST    │  │
+│  └─────────────────┘   └─────────────────────────┘   └─────────────────┘  │
+│                                      │                                      │
+│                                      ▼                                      │
+│                        ┌─────────────────────────┐                         │
+│                        │      MariaDB            │                         │
+│                        │    (port 3306)          │                         │
+│                        │   Database: asterisk    │                         │
+│                        └─────────────────────────┘                         │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Request Flow
+
+| Request Path | nginx Routes To | Description |
+|--------------|-----------------|-------------|
+| `/` | `/home/medhi/Mayday_EC/client/build` | React dashboard (static files) |
+| `/api/*` | `http://127.0.0.1:8004` | Node.js backend API |
+| `/socket.io/*` | `http://127.0.0.1:8004` | WebSocket for real-time updates |
+| `/ws` | `http://127.0.0.1:8088/ws` | Asterisk WebSocket (SIP over WS) |
+| `/ari` | `http://127.0.0.1:8088/ari` | Asterisk REST Interface |
+
+### PM2 Process Management
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         PM2 (root user)                         │
+├─────────────────────────────────────────────────────────────────┤
+│  Process: mayday                                                │
+│  Script:  /home/medhi/Mayday_EC/server/server.js               │
+│  Mode:    fork                                                  │
+│  Status:  online ✅                                             │
+│  Port:    8004                                                  │
+│                                                                 │
+│  Logs:    /root/.pm2/logs/mayday-out.log                       │
+│           /root/.pm2/logs/mayday-error.log                     │
+│                                                                 │
+│  Startup: systemd (auto-start on boot)                         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Accessing the Dashboard
+
+**URL**: http://192.168.1.14
+
+Open your browser and navigate to `http://192.168.1.14` to access the Mayday CRM Dashboard.
+
+**Default Login Credentials** (from .env):
+- **Username**: admin
+- **Password**: Pasword@256
+- **Role**: superuser
+
+### Server Information
+
+| Setting | Value |
+|---------|-------|
+| **Server IP** | 192.168.1.14 |
+| **Hostname** | mayday |
+| **OS** | Debian 12 (bookworm) |
+| **SSH User** | medhi |
+| **SSH Key** | `~/.ssh/id_ed25519` |
+| **Sudo Password** | Pasword@1759 |
+| **Root Password** | Lotuskm@1759 |
+| **Project Path** | `/home/medhi/Mayday_EC` |
+| **Web URL** | http://192.168.1.14 |
+
+### Installed Components
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| **Node.js** | v18.20.8 | Installed via NVM at `/root/.nvm/versions/node/v18.20.8` |
+| **PM2** | v6.0.14 | Process manager, runs as root |
+| **nginx** | v1.22.1 | Reverse proxy on port 80 |
+| **MariaDB** | 10.11+ | Database server |
+
+### Important: Node.js via NVM
+
+Node.js is installed via NVM for the root user. When running commands via SSH with sudo, you **must** source NVM first:
+
+```bash
+# Correct way to run node/npm/pm2 commands via SSH:
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
+  "echo 'Pasword@1759' | sudo -S bash -c 'export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && pm2 status'"
+
+# This will NOT work (node not found):
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 "sudo pm2 status"
+```
+
+### Fresh Server Deployment
+
+To deploy Mayday EC on a fresh Debian 12 server:
+
+```bash
+# 1. SSH to server
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14
+
+# 2. Install Node.js 18.x (as root)
+sudo su -
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+source ~/.bashrc
+nvm install 18
+nvm use 18
+
+# 3. Install PM2 globally
+npm install -g pm2
+
+# 4. Install nginx
+apt-get update && apt-get install -y nginx
+
+# 5. Clone repository (as medhi user)
+exit  # back to medhi
+cd /home/medhi
+git clone https://github.com/Dlu6/Mayday_EC.git
+cd Mayday_EC
+git checkout development
+
+# 6. Install dependencies (as root for NVM access)
+sudo su -
+export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh
+cd /home/medhi/Mayday_EC
+npm install
+cd client && npm install && npm run build && cd ..
+
+# 7. Copy .env file from local machine (run from local)
+scp -i ~/.ssh/id_ed25519 server/.env medhi@192.168.1.14:/home/medhi/Mayday_EC/server/.env
+
+# 8. Update .env for production
+sed -i 's/NODE_ENV=development/NODE_ENV=production/' /home/medhi/Mayday_EC/server/.env
+
+# 9. Configure nginx
+cat > /etc/nginx/sites-available/mayday << 'EOF'
+server {
+    listen 80;
+    server_name 192.168.1.14;
+
+    location / {
+        root /home/medhi/Mayday_EC/client/build;
+        index index.html;
+        try_files $uri /index.html;
+    }
+
+    location /api {
+        proxy_pass http://127.0.0.1:8004;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /socket.io/ {
+        proxy_pass http://127.0.0.1:8004;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 86400;
+    }
+
+    location /ws {
+        proxy_pass http://127.0.0.1:8088/ws;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_set_header Host $host;
+        proxy_buffering off;
+        proxy_read_timeout 86400s;
+    }
+
+    location /ari {
+        proxy_pass http://127.0.0.1:8088/ari;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_buffering off;
+    }
+}
+EOF
+
+ln -sf /etc/nginx/sites-available/mayday /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl restart nginx && systemctl enable nginx
+
+# 10. Start PM2
+pm2 start ecosystem.config.cjs
+pm2 save
+pm2 startup systemd -u root --hp /root
+```
+
+### Quick Deployment Commands
+
+From your local machine, use these commands:
+
+```bash
+# Check PM2 status
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
+  "echo 'Pasword@1759' | sudo -S bash -c 'export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && pm2 status'"
+
+# View PM2 logs
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
+  "echo 'Pasword@1759' | sudo -S bash -c 'export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && pm2 logs mayday --lines 50 --nostream'"
+
+# Restart application
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
+  "echo 'Pasword@1759' | sudo -S bash -c 'export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && pm2 restart mayday'"
+
+# Full deployment (git pull + build + restart)
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
+  "echo 'Pasword@1759' | sudo -S bash -c 'export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && cd /home/medhi/Mayday_EC && git pull origin development && npm install && cd client && npm install && npm run build && cd .. && pm2 restart mayday'"
+
+# Check nginx status
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
+  "echo 'Pasword@1759' | sudo -S systemctl status nginx"
+
+# Restart nginx
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
+  "echo 'Pasword@1759' | sudo -S systemctl restart nginx"
+```
+
+### Troubleshooting
+
+#### Node/PM2 Command Not Found
+
+If you get "command not found" for node, npm, or pm2:
+
+```bash
+# Always source NVM before running node commands:
+export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh
+```
+
+#### Permission Denied
+
+If you get permission errors:
+
+```bash
+# Use sudo with password piped in:
+echo 'Pasword@1759' | sudo -S <command>
+```
+
+#### nginx Configuration Test
+
+```bash
+sudo nginx -t  # Test configuration
+sudo systemctl reload nginx  # Reload without restart
+```
+
+#### Check What's Running
+
+```bash
+# Check if backend is listening
+netstat -tlnp | grep 8004
+
+# Check nginx
+systemctl status nginx
+
+# Check PM2 processes
+pm2 list
+```
+
 ## Next Steps
 
 ### Immediate Tasks
@@ -390,7 +730,7 @@ git log --oneline -5
 1. **Transfer Analytics**: Advanced reporting and metrics
 2. **Queue Management**: Enhanced queue transfer capabilities
 3. **Call Recording**: Integration with call recording system
-4. **Production Deployment**: Deploy to on-prem server with PM2
+4. **SSL/HTTPS**: Configure SSL certificates for secure access
 
 ## Electron Softphone Auto-Update System
 
@@ -443,7 +783,7 @@ scp -i ~/Downloads/MHU_Debian_Mumb.pem \
   admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com:/var/www/html/downloads/
 
 # Verify
-curl -s https://mhuhelpline.com/downloads/latest.yml
+curl -s http://192.168.1.14/downloads/latest.yml
 ```
 
 **Quick Deploy from macOS (One-liner)**:
@@ -456,7 +796,7 @@ scp -i ~/Downloads/MHU_Debian_Mumb.pem \
   "electron-softphone/release/5.1.5/latest.yml" \
   "electron-softphone/release/5.1.5/MHU Appbar Setup 5.1.5.exe" \
   admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com:/var/www/html/downloads/ && \
-curl -s https://mhuhelpline.com/downloads/latest.yml
+curl -s http://192.168.1.14/downloads/latest.yml
 ```
 
 #### Option B: Full Build and Deploy from macOS (No Native Module)
@@ -469,14 +809,14 @@ scp -i ~/Downloads/MHU_Debian_Mumb.pem \
   "release/X.X.X/latest.yml" \
   "release/X.X.X/MHU Appbar Setup X.X.X.exe" \
   admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com:/var/www/html/downloads/ && \
-curl -s https://mhuhelpline.com/downloads/latest.yml
+curl -s http://192.168.1.14/downloads/latest.yml
 ```
 
 ⚠️ **Note**: Option B builds work but won't have the native appbar module - docked mode won't reserve screen space.
 
 ### Update Server Configuration
 
-**Server URL**: `https://mhuhelpline.com/downloads/`
+**Server URL**: `http://192.168.1.14/downloads/`
 
 **Nginx location block** (in `/usr/local/nginx/conf/nginx.conf`):
 ```nginx
@@ -495,7 +835,7 @@ location /downloads/ {
 
 **Verify deployment**:
 ```bash
-curl https://mhuhelpline.com/downloads/latest.yml
+curl http://192.168.1.14/downloads/latest.yml
 ```
 
 ### Delete Old Versions from Server
@@ -540,8 +880,8 @@ Users can manually check for updates via:
 - **Version**: 5.1.5 ✅ Deployed
 - **Build Date**: December 15, 2025
 - **Build Location**: `electron-softphone/release/5.1.5/` (committed to GitHub)
-- **Files**: https://mhuhelpline.com/downloads/latest.yml
-- **Direct Download**: https://mhuhelpline.com/downloads/MHU%20Appbar%20Setup%205.1.5.exe
+- **Files**: http://192.168.1.14/downloads/latest.yml
+- **Direct Download**: http://192.168.1.14/downloads/MHU%20Appbar%20Setup%205.1.5.exe
 - **Changes in v5.1.5**: 
   - **Native AppBar Module**: Properly reserves screen space when docked (Windows Shell API)
   - **Restored Native Title Bar**: Uses native Windows title bar when NOT docked
@@ -591,9 +931,20 @@ Users can manually check for updates via:
 
 ---
 
-**Last Updated**: December 16, 2025  
-**Development Status**: On-Prem Migration ✅ Complete  
+**Last Updated**: December 18, 2025  
+**Development Status**: On-Prem Deployment ✅ Complete  
 **Current Branch**: `development`  
-**On-Prem Server**: 192.168.1.14 (MariaDB configured, Asterisk pending)  
+**On-Prem Server**: 192.168.1.14 (Node.js v18.20.8, PM2 v6.0.14, nginx, MariaDB configured)  
+**Web Access**: http://192.168.1.14  
 **Local Dev Server**: http://localhost:8004  
-**GitHub Repo**: https://github.com/Dlu6/Mayday_EC.git
+**GitHub Repo**: https://github.com/Dlu6/Mayday_EC.git  
+
+**Recent Updates (Dec 18, 2025)**:
+- ✅ **Centralized Server Configuration**: Created `serverConfig.js` as single source of truth for IP/domain
+- ✅ Removed all hardcoded domain references from codebase
+- ✅ Updated CORS configuration to use `PUBLIC_IP` env variable dynamically
+- ✅ All electron-softphone services now import from centralized config
+- ✅ Fixed WebRTC certificate paths to use local Asterisk certificates
+- ✅ Client and server rebuilt and deployed successfully
+- ✅ Login API working correctly with admin credentials
+- ✅ See "Server IP/Domain Configuration" section above for how to change server IP

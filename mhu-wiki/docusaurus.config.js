@@ -16,7 +16,8 @@ const config = {
   favicon: "img/favicon.ico",
 
   // Set the production url of your site here
-  url: "https://mhuhelpline.com",
+  // Configure this to your server IP/domain
+  url: "http://192.168.1.14",
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: "/docs/",
@@ -88,7 +89,7 @@ const config = {
           },
           { to: "/blog", label: "Updates", position: "left" },
           {
-            href: "https://mhuhelpline.com",
+            href: "http://192.168.1.14",
             label: "Main Site",
             position: "right",
           },
@@ -110,7 +111,7 @@ const config = {
               },
               {
                 label: "Administrator Guide",
-                href: "https://mhuhelpline.com",
+                href: "http://192.168.1.14",
               },
             ],
           },
@@ -140,7 +141,7 @@ const config = {
               },
               {
                 label: "Main Application",
-                href: "https://mhuhelpline.com",
+                href: "http://192.168.1.14",
               },
             ],
           },

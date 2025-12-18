@@ -56,8 +56,8 @@ You can override defaults with environment variables:
 
 ### Production URLs
 
-- API/Socket.IO: `https://mhuhelpline.com`
-- SIP WebSocket: `wss://mhuhelpline.com/ws`
+- API/Socket.IO: `http://192.168.1.14`
+- SIP WebSocket: `ws://192.168.1.14:8088/ws`
 
 ## Testing
 

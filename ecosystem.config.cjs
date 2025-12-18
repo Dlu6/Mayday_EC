@@ -5,11 +5,11 @@ module.exports = {
       script: "server/server.js",
       exec_mode: "fork",
       instances: 1,
-      watch: true,
+      watch: false,
       env: {
         NODE_ENV: "production",
         PORT: 8004,
-        PUBLIC_IP: "65.1.149.92",
+        PUBLIC_IP: "192.168.1.14",
         ASTERISK_CONFIG_PATH: "/etc/asterisk",
       },
     },

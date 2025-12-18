@@ -1,12 +1,10 @@
 import axios from "axios";
 import { storageService } from "../services/storageService";
+import serverConfig from "../config/serverConfig";
 
-// Create API instance with base URL
+// Create API instance with base URL from centralized config
 const API = axios.create({
-  baseURL:
-    process.env.NODE_ENV === "development"
-      ? "http://localhost:8004"
-      : "https://mhuhelpline.com",
+  baseURL: serverConfig.apiUrl,
 });
 
 // Add auth token to all requests
