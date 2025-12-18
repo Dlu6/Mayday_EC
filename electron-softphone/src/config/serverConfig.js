@@ -64,8 +64,9 @@ const useHttps = () => {
     if (saved !== null) return saved === "true";
   }
   
-  // Default: use HTTP for local/on-prem, HTTPS would require SSL certs
-  return false;
+  // Default: use HTTPS for production (self-signed cert configured on server)
+  // Development uses HTTP (localhost)
+  return !isDevelopment;
 };
 
 /**
