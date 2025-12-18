@@ -769,21 +769,303 @@ systemctl status nginx
 pm2 list
 ```
 
+## Asterisk PJSIP Configuration
+
+### Overview
+
+Asterisk 20.12.0 is compiled from source at `/usr/src` and configured with PJSIP for WebRTC softphone support.
+
+### Key Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `/etc/asterisk/pjsip.conf` | PJSIP transports, trunks, endpoints |
+| `/etc/asterisk/http.conf` | HTTP/HTTPS server for WebSocket |
+| `/etc/asterisk/extconfig.conf` | Realtime database mappings |
+| `/etc/asterisk/sorcery.conf` | Sorcery wizard configuration |
+| `/etc/asterisk/manager.conf` | AMI user configuration |
+| `/etc/asterisk/extensions_mayday_context.conf` | Dialplan contexts |
+
+### PJSIP Transport Configuration
+
+```ini
+# /etc/asterisk/pjsip.conf
+
+[global]
+type=global
+user_agent=SIMI
+
+[transport-udp]
+type=transport
+protocol=udp
+bind=0.0.0.0:5060
+local_net=192.168.1.0/24
+external_media_address=102.214.151.191
+external_signaling_address=102.214.151.191
+
+[transport-ws]
+type=transport
+protocol=ws
+bind=0.0.0.0
+
+[transport-wss]
+type=transport
+protocol=wss
+bind=0.0.0.0
+```
+
+### SIP Trunk Configuration (Cyber Innovative)
+
+```ini
+# /etc/asterisk/pjsip.conf (continued)
+
+[Simi_Trunk_auth]
+type=auth
+auth_type=userpass
+username=0320000010
+password=Medhi#2025
+
+[Simi_Trunk_aor]
+type=aor
+contact=sip:siptrunk.cyber-innovative.com:5060
+qualify_frequency=60
+max_contacts=1
+remove_existing=yes
+
+[Simi_Trunk]
+type=endpoint
+context=from-voip-provider
+disallow=all
+allow=ulaw,alaw
+transport=transport-udp
+auth=Simi_Trunk_auth
+aors=Simi_Trunk_aor
+send_pai=yes
+send_rpid=yes
+direct_media=no
+rtp_symmetric=yes
+force_rport=yes
+rewrite_contact=yes
+identify_by=username,ip
+
+[Simi_Trunk_reg]
+type=registration
+outbound_auth=Simi_Trunk_auth
+server_uri=sip:siptrunk.cyber-innovative.com
+client_uri=sip:0320000010@siptrunk.cyber-innovative.com
+contact_user=323300212
+transport=transport-udp
+retry_interval=60
+expiration=3600
+max_retries=10000
+auth_rejection_permanent=no
+line=yes
+endpoint=Simi_Trunk
+
+[Simi_Trunk_identify]
+type=identify
+endpoint=Simi_Trunk
+match=41.77.78.155/29
+match_header=To: .*<sip:.*@siptrunk.cyber-innovative.com>.*
+```
+
+### HTTP/WebSocket Configuration
+
+```ini
+# /etc/asterisk/http.conf
+
+[general]
+enabled=yes
+servername=Asterisk
+bindaddr=0.0.0.0
+bindport=8088
+
+tlsenable=yes
+tlsbindaddr=0.0.0.0:8089
+tlscertfile=/etc/asterisk/keys/asterisk.pem
+tlsprivatekey=/etc/asterisk/keys/asterisk.key
+tlscipher=ECDHE-RSA-AES128-GCM-SHA256
+sessionlimit=250
+session_inactivity=120
+```
+
+### Extconfig (Realtime Database Mappings)
+
+```ini
+# /etc/asterisk/extconfig.conf
+
+[settings]
+ps_endpoints => odbc,asterisk,ps_endpoints
+ps_auths => odbc,asterisk,ps_auths
+ps_aors => odbc,asterisk,ps_aors
+ps_contacts => odbc,asterisk,ps_contacts
+ps_domain_aliases => odbc,asterisk,ps_domain_aliases
+voice_extensions => odbc,asterisk,voice_extensions
+queues => odbc,asterisk,voice_queues
+queue_members => odbc,asterisk,queue_members
+cdr => odbc,asterisk,cdr
+```
+
+**Important**: Only ONE `[settings]` section should exist. Duplicate sections cause the second to be ignored.
+
+### AMI Configuration
+
+```ini
+# /etc/asterisk/manager.conf
+
+[general]
+enabled = yes
+webenabled = yes
+port = 5038
+bindaddr = 0.0.0.0
+
+[mayday_ami_user]
+secret = mayday_ami_password
+deny = 0.0.0.0/0
+permit = 127.0.0.1/255.255.255.255
+permit = 192.168.1.0/255.255.255.0
+permit = 192.168.1.14/255.255.255.255
+read = system,call,log,verbose,agent,user,config,dtmf,reporting,cdr,dialplan,queue
+write = system,call,queue,agent,originate
+```
+
+### Database Schema Fixes
+
+The following schema changes are required for Asterisk 20 PJSIP realtime to work correctly:
+
+```sql
+-- ============================================
+-- ps_aors table fixes
+-- ============================================
+-- Add missing columns for registration expiration control
+ALTER TABLE ps_aors ADD COLUMN IF NOT EXISTS type VARCHAR(255) NOT NULL DEFAULT 'aor';
+ALTER TABLE ps_aors ADD COLUMN IF NOT EXISTS minimum_expiration INT DEFAULT 60;
+ALTER TABLE ps_aors ADD COLUMN IF NOT EXISTS maximum_expiration INT DEFAULT 7200;
+
+-- ============================================
+-- ps_contacts table fixes (CRITICAL)
+-- ============================================
+-- Asterisk sends 'true'/'false' for boolean fields, but ENUM only accepts 'yes'/'no'
+-- This causes "Unable to bind contact to AOR" errors during registration
+-- Change ENUM columns to VARCHAR to accept both formats:
+
+ALTER TABLE ps_contacts MODIFY COLUMN qualify_2xx_only VARCHAR(10) DEFAULT 'no';
+ALTER TABLE ps_contacts MODIFY COLUMN prune_on_boot VARCHAR(10) DEFAULT 'no';
+ALTER TABLE ps_contacts MODIFY COLUMN authenticate_qualify VARCHAR(10) DEFAULT 'no';
+
+-- Fix column name: Asterisk expects 'aor' not 'aors'
+ALTER TABLE ps_contacts CHANGE COLUMN aors aor VARCHAR(255);
+
+-- ============================================
+-- ps_endpoints transport fix
+-- ============================================
+-- For on-prem non-NAT setups, use 'transport-ws' (plain WebSocket on port 8088)
+-- NOT 'transport-wss' (secure WebSocket) which requires TLS certificates
+UPDATE ps_endpoints SET transport='transport-ws' WHERE transport='transport-wss';
+```
+
+### Common PJSIP Registration Errors
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `Unable to bind contact to AOR` | ps_contacts ENUM columns reject 'true'/'false' values | Change ENUM to VARCHAR(10) |
+| `Unable to retrieve PJSIP transport 'transport-wss'` | Endpoint uses transport-wss but it's not configured | Update endpoint to use transport-ws |
+| `Unknown column 'minimum_expiration'` | Missing column in ps_aors | Add the column with ALTER TABLE |
+
+### PM2 Auto-Restart After Asterisk Restart
+
+A systemd drop-in is configured to restart PM2 when Asterisk restarts:
+
+```ini
+# /etc/systemd/system/asterisk.service.d/restart-pm2.conf
+
+[Service]
+ExecStartPost=/bin/bash -c "sleep 5 && pm2 restart mayday"
+```
+
+This ensures the AMI connection is re-established after Asterisk restarts.
+
+### Static IP Configuration
+
+The server is configured with a static IP in `/etc/network/interfaces`:
+
+```ini
+auto enp0s31f6
+iface enp0s31f6 inet static
+    address 192.168.1.14
+    netmask 255.255.255.0
+    gateway 192.168.1.1
+    dns-nameservers 8.8.8.8 8.8.4.4
+```
+
+### Useful Asterisk CLI Commands
+
+```bash
+# Check PJSIP registration status
+asterisk -rx 'pjsip show registrations'
+
+# Check endpoints
+asterisk -rx 'pjsip show endpoints'
+
+# Check contacts
+asterisk -rx 'pjsip show contacts'
+
+# Force re-registration
+asterisk -rx 'pjsip send register Simi_Trunk_reg'
+
+# Check AMI connected users
+asterisk -rx 'manager show connected'
+
+# Check HTTP/WebSocket status
+asterisk -rx 'http show status'
+
+# Enable SIP debugging
+asterisk -rx 'pjsip set logger on'
+
+# Reload PJSIP configuration
+asterisk -rx 'pjsip reload'
+```
+
+### SIP Debugging with sngrep
+
+sngrep is installed for SIP packet analysis:
+
+```bash
+# Capture all SIP traffic
+sudo sngrep
+
+# Capture traffic to/from specific host
+sudo sngrep host siptrunk.cyber-innovative.com
+```
+
+### Trunk Provider Details
+
+| Setting | Value |
+|---------|-------|
+| **Provider** | Cyber Innovative |
+| **Server** | siptrunk.cyber-innovative.com |
+| **Server IP** | 41.77.78.155 |
+| **Account Username** | 0320000010 |
+| **DID Number** | +256323300212 |
+| **User Agent** | SIMI (required by provider) |
+| **External IP** | 102.214.151.191 |
+
 ## Next Steps
 
 ### Immediate Tasks
 
-1. **Asterisk Configuration**: Configure AMI/ARI on on-prem server (192.168.1.14)
+1. ~~**Asterisk Configuration**: Configure AMI/ARI on on-prem server (192.168.1.14)~~ ✅ Complete
 2. **Frontend Integration**: Connect SIP.js softphone to enhanced transfer API
 3. **Transfer Testing**: Test blind and managed transfer scenarios
 4. **User Interface**: Create transfer management UI components
+5. **Test Softphone Login**: Register endpoint 1001 via WebSocket
 
 ### Future Enhancements
 
 1. **Transfer Analytics**: Advanced reporting and metrics
 2. **Queue Management**: Enhanced queue transfer capabilities
 3. **Call Recording**: Integration with call recording system
-4. **SSL/HTTPS**: Configure SSL certificates for secure access
+4. ~~**SSL/HTTPS**: Configure SSL certificates for secure access~~ ✅ Complete
 
 ## Electron Softphone Auto-Update System
 
@@ -987,10 +1269,11 @@ Users can manually check for updates via:
 **Last Updated**: December 18, 2025  
 **Development Status**: On-Prem Deployment ✅ Complete  
 **Current Branch**: `development`  
-**On-Prem Server**: 192.168.1.14 (Node.js v18.20.8, PM2 v6.0.14, nginx, MariaDB configured)  
+**On-Prem Server**: 192.168.1.14 (Static IP, Node.js v18.20.8, PM2 v6.0.14, nginx, MariaDB, Asterisk 20.12.0)  
 **Web Access**: https://192.168.1.14 (HTTPS with self-signed certificate)  
 **Local Dev Server**: http://localhost:8004  
 **GitHub Repo**: https://github.com/Dlu6/Mayday_EC.git  
+**SIP Trunk**: Registered with siptrunk.cyber-innovative.com (+256323300212)
 
 **Recent Updates (Dec 18, 2025)**:
 - ✅ **HTTPS/SSL Configuration**: Self-signed certificate configured for secure access
@@ -1002,3 +1285,10 @@ Users can manually check for updates via:
 - ✅ Certificate stored at `/etc/nginx/ssl/nginx.crt`
 - ✅ See "SSL/HTTPS Configuration" section for certificate management
 - ✅ See "Server IP/Domain Configuration" section for how to change server IP
+- ✅ **Asterisk WebSocket Configuration**: Configured PJSIP transports for WS/WSS
+- ✅ **SIP Trunk Registration**: Configured and registered with Cyber Innovative
+- ✅ **Database Schema Fixes**: Added missing columns to ps_aors and ps_contacts tables
+- ✅ **AMI Configuration**: Fixed authentication and permissions
+- ✅ **PM2 Auto-Restart**: Configured to restart after Asterisk restarts
+- ✅ **Static IP**: Configured server with static IP 192.168.1.14
+- ✅ **Removed MongoDB**: Removed all MongoDB dependencies from usersController.js

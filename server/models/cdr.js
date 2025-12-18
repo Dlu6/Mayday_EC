@@ -96,6 +96,10 @@ const CDR = sequelize.define(
       type: DataTypes.STRING(255),
       allowNull: true,
     },
+    type: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+    },
   },
   {
     tableName: "cdr",

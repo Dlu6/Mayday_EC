@@ -490,7 +490,7 @@ Each agent's edit page includes a Dialplan tab showing:
 - Context, priority, and application for each entry
 - Real-time view of how calls are routed to the agent
 
-## �🗄️ Database Architecture
+## 🗄️ Database Architecture
 
 ### **MariaDB (On-Prem Server: 192.168.1.14)**
 
@@ -500,6 +500,24 @@ Each agent's edit page includes a Dialplan tab showing:
 - **Connection Pool**: max=20, min=2, acquire=60s (optimized for concurrent queries)
 - **User**: `mayday_user`
 - **Database**: `asterisk`
+
+### **PJSIP Realtime Database Requirements** ⚠️
+
+The following schema requirements are **critical** for PJSIP registration to work:
+
+| Table | Column | Type | Notes |
+|-------|--------|------|-------|
+| `ps_aors` | `minimum_expiration` | INT | Default 60, required for registration |
+| `ps_aors` | `maximum_expiration` | INT | Default 7200, required for registration |
+| `ps_contacts` | `aor` | VARCHAR(255) | Must be `aor` NOT `aors` |
+| `ps_contacts` | `qualify_2xx_only` | VARCHAR(10) | Must be VARCHAR, not ENUM (Asterisk sends 'true'/'false') |
+| `ps_contacts` | `prune_on_boot` | VARCHAR(10) | Must be VARCHAR, not ENUM |
+| `ps_contacts` | `authenticate_qualify` | VARCHAR(10) | Must be VARCHAR, not ENUM |
+| `ps_endpoints` | `transport` | VARCHAR(40) | Use `transport-ws` for on-prem WebSocket |
+
+**Common Error**: `Unable to bind contact to AOR` - This occurs when `ps_contacts` has ENUM columns that reject Asterisk's 'true'/'false' values. Fix by changing to VARCHAR(10).
+
+See `PROJECT_SETUP.md` → "Database Schema Fixes" for complete SQL commands.
 
 ### **Redis (Session Store & Cache)** 🆕
 

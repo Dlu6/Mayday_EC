@@ -3,7 +3,7 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
-import mongoose from "mongoose";
+// mongoose import removed - MongoDB not used in this project
 
 // import amiClient from '../config/amiClient.js';
 // import SipPeerModel from '../models/SipPeerModel.js';
@@ -75,7 +75,7 @@ export const createPJSIPUser = async (req, res) => {
         isWebRTC: true,
         maxContacts: req.body.maxContacts || 1,
         endpoint: {
-          transport: "transport-wss",
+          transport: "transport-ws",
           webrtc: "yes",
           dtls_auto_generate_cert: "no",
           //   dtls_cert_file: "/etc/asterisk/keys/asterisk.pem",
@@ -748,8 +748,6 @@ export const registerAgent = async (req, res) => {
   const { email, password, isSoftphone, name } = req.body;
 
   const sqlTransaction = await sequelize.transaction();
-  const mongoSession = await mongoose.startSession();
-  mongoSession.startTransaction();
 
   try {
     // Fetch user once from SQL
@@ -772,36 +770,12 @@ export const registerAgent = async (req, res) => {
       await user.save({ transaction: sqlTransaction });
     }
 
-    // Fetch existing MongoDB user first
-    let mongoUser = await User.findOne({ email }).session(mongoSession);
-
-    // Determine the correct name to use
-    const finalName = mongoUser?.name || name || "Unnamed User";
-
-    // Upsert MongoDB user with ensured name
-    mongoUser = await User.findOneAndUpdate(
-      { email },
-      {
-        $setOnInsert: {
-          name: finalName,
-          email,
-          password: await bcrypt.hash(password, 12),
-          user_role: user.role === "agent" ? "CREATOR" : "ADMIN",
-          firstName: finalName.split(" ")[0],
-          lastName: finalName.split(" ")[1] || "",
-        },
-      },
-      { upsert: true, new: true, session: mongoSession }
-    );
-
-    // console.log(user, "USER TRANSPORT 🌶️🌶️🌶️🌶️🌶️");
-
     // Upsert PJSIP configurations concurrently
     await Promise.all([
       PJSIPEndpoint.upsert(
         {
           id: user.extension,
-          transport: user.transport || "transport-wss",
+          transport: user.transport || "transport-ws",
           webrtc: user.typology === "webRTC" ? "yes" : "no",
           auth: user.extension,
           aors: user.extension,
@@ -850,36 +824,20 @@ export const registerAgent = async (req, res) => {
       ),
     ]);
 
-    // Removed: application-level writes to ps_contacts (Asterisk is source of truth)
+    // Generate SIP token
+    const sipToken = jwt.sign(
+      {
+        userId: user.id,
+        username: user.username,
+        role: user.role,
+        extension: user.extension,
+        sipEnabled: true,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "24h" }
+    );
 
-    // Generate tokens concurrently
-    const [sipToken, mongoToken] = await Promise.all([
-      jwt.sign(
-        {
-          userId: user.id,
-          username: user.username,
-          role: user.role,
-          extension: user.extension,
-          sipEnabled: true,
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: "24h" }
-      ),
-      jwt.sign(
-        {
-          email: mongoUser.email,
-          id: mongoUser._id,
-          role: mongoUser.user_role,
-        },
-        "testhjzvdbnfvADHG878HM5@#$",
-        { expiresIn: "24h" }
-      ),
-    ]);
-
-    await Promise.all([
-      mongoSession.commitTransaction(),
-      sqlTransaction.commit(),
-    ]);
+    await sqlTransaction.commit();
 
     return res.json({
       success: true,
@@ -898,7 +856,6 @@ export const registerAgent = async (req, res) => {
             password: user.ps_auth?.password,
             server: process.env.ASTERISK_HOST,
             transport: user.transport,
-            // Include all WebRTC-related configurations from both user and ps_endpoint
             rtp_symmetric: user.ps_endpoint?.rtp_symmetric === "yes" || true,
             media_use_received_transport:
               user.ps_endpoint?.mediaUseReceivedTransport === "yes" ||
@@ -931,12 +888,12 @@ export const registerAgent = async (req, res) => {
               user.force_avp === "yes" ||
               user.ps_endpoint?.forceAvp === "yes" ||
               false,
-            webrtc: user.typology === "webRTC", // Use typology to determine if WebRTC is enabled
+            webrtc: user.typology === "webRTC",
             ws_servers: [
               {
                 uri: process.env.WS_SERVERS || `ws://${process.env.PUBLIC_IP}:8088/ws`,
                 sip_transport:
-                  user.transport?.replace("transport-", "") || "wss",
+                  user.transport?.replace("transport-", "") || "ws",
                 protocols: ["sip"],
               },
             ],
@@ -945,30 +902,18 @@ export const registerAgent = async (req, res) => {
             ],
           },
         },
-        mongoUser: {
-          id: mongoUser._id,
-          name: mongoUser.name,
-          email: mongoUser.email,
-          role: mongoUser.user_role,
-        },
         tokens: {
           sip: `Bearer ${sipToken}`,
-          mongo: `Bearer ${mongoToken}`,
         },
       },
     });
   } catch (error) {
-    await Promise.all([
-      mongoSession.abortTransaction(),
-      sqlTransaction.rollback(),
-    ]);
+    await sqlTransaction.rollback();
     console.error("❌ Register Agent Error:", error);
     return res.status(error.status || 500).json({
       success: false,
       message: error.message || "Registration failed",
     });
-  } finally {
-    mongoSession.endSession();
   }
 };
 // Agent Online Notification
@@ -1031,11 +976,8 @@ export const agentOnline = async (req, res) => {
 export const agentLogout = async (req, res) => {
   const { id: userId, extension } = req.user.dataValues;
   const sqlTransaction = await sequelize.transaction();
-  const mongoSession = await mongoose.startSession();
 
   try {
-    mongoSession.startTransaction();
-
     // Find user with their PJSIP configurations
     const user = await UserModel.findOne({
       where: { id: userId, disabled: false },
@@ -1064,20 +1006,8 @@ export const agentLogout = async (req, res) => {
       }
     );
 
-    // Update MongoDB user status
-    await User.findOneAndUpdate(
-      { email: user.email },
-      {
-        lastLogoutAt: new Date(),
-        online: false,
-      },
-      { session: mongoSession }
-    );
-
     // Handle SIP cleanup
     await cleanupSIPRegistration(extension, sqlTransaction);
-
-    // Removed: application-level writes to ps_contacts (Asterisk is source of truth)
 
     // Emit status events
     EventBusService.emit("agent:status", {
@@ -1089,7 +1019,6 @@ export const agentLogout = async (req, res) => {
       },
     });
 
-    await mongoSession.commitTransaction();
     await sqlTransaction.commit();
 
     return res.json({
@@ -1102,15 +1031,12 @@ export const agentLogout = async (req, res) => {
       },
     });
   } catch (error) {
-    await mongoSession.abortTransaction();
     await sqlTransaction.rollback();
     console.error("❌ Agent Logout Error:", error);
     return res.status(error.status || 500).json({
       success: false,
       message: error.message || "Failed to logout",
     });
-  } finally {
-    mongoSession.endSession();
   }
 };
 

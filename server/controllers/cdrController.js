@@ -113,24 +113,23 @@ export const formatCdrRecord = (record, extension) => {
     return null;
   };
 
-  // Determine call type based on dcontext and src/dst
-  // Check if this is an inbound call from external source (trunk call coming in)
-  const isFromExternalContext = record.dcontext === 'from-voip-provider';
+  // Determine call type
+  // Priority 1: Use the type field from database if available (set by callMonitoringService)
+  // Priority 2: Fallback to channel-based detection
+  let type = record.type; // Use database value if present
   
-  // Determine call direction:
-  // INBOUND: dcontext is 'from-voip-provider' (external call coming in via trunk)
-  // OUTBOUND: src matches extension (agent initiated the call)
-  //
-  // Key insight: 
-  // - Inbound calls have dcontext = 'from-voip-provider'
-  // - Outbound calls have src = extension (agent's extension is the source)
-  
-  const srcMatchesExtension = record.src === extension;
-  
-  // It's outbound if the source IS the extension (they initiated the call)
-  // It's inbound if it came from external context OR if dst matches extension and src doesn't
-  const isOutbound = srcMatchesExtension && !isFromExternalContext;
-  const type = isOutbound ? "outbound" : "inbound";
+  if (!type) {
+    // Fallback: determine from channel and context
+    const srcMatchesExtension = record.src === extension;
+    const dstMatchesExtension = record.dst === extension;
+    const channelMatchesExtension = record.channel && record.channel.startsWith(`PJSIP/${extension}-`);
+    
+    // Determine if outbound:
+    // - Channel starts with PJSIP/{extension} (agent's channel initiated the call), OR
+    // - src matches extension AND dst doesn't (agent called someone else)
+    const isOutbound = channelMatchesExtension || (srcMatchesExtension && !dstMatchesExtension);
+    type = isOutbound ? "outbound" : "inbound";
+  }
 
   let status = "completed";
   if (record.disposition === "NO ANSWER") {
@@ -147,7 +146,7 @@ export const formatCdrRecord = (record, extension) => {
   // For outbound: we want the destination number (dst)
   let phoneNumber;
   
-  if (isOutbound) {
+  if (type === "outbound") {
     phoneNumber = record.dst;
   } else {
     // For inbound calls, the caller's number could be in multiple places:
@@ -179,7 +178,7 @@ export const formatCdrRecord = (record, extension) => {
   
   if (isPlaceholder) {
     // For inbound calls, try multiple sources to find the caller's number
-    if (!isOutbound) {
+    if (type !== "outbound") {
       // Try clid first
       if (record.clid) {
         const clidNumber = extractPhoneFromClid(record.clid);
@@ -207,7 +206,7 @@ export const formatCdrRecord = (record, extension) => {
     }
     
     // For outbound calls with placeholder dst, try multiple sources
-    if (isOutbound) {
+    if (type === "outbound") {
       // Try dstchannel first - extract number from channel like PJSIP/256700123456-00000001 or SIP/trunk/256700123456
       if (record.dstchannel) {
         // Try various patterns: PJSIP/number, SIP/trunk/number, or just extract any 7+ digit sequence

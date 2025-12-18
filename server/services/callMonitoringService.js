@@ -769,6 +769,11 @@ const handleHangup = async (event) => {
         actualCaller = connectedLineNum;
       }
 
+      // Determine call type based on channel and context
+      const channel = callData.channel || event.Channel || event.channel || "";
+      const isOutbound = channel.match(/^PJSIP\/\d{4}-/) && context === "from-internal";
+      const callType = isOutbound ? "outbound" : "inbound";
+
       await CDR.create({
         uniqueid: uniqueid,
         calldate: new Date(),
@@ -777,7 +782,7 @@ const handleHangup = async (event) => {
         src: actualCaller,
         dst: callData.dst || event.Exten || event.exten || "unknown",
         dcontext: context,
-        channel: callData.channel || event.Channel || event.channel || "",
+        channel: channel,
         lastapp: "Queue",
         lastdata: callData.queue || "",
         duration: durationSeconds,
@@ -787,6 +792,7 @@ const handleHangup = async (event) => {
         amaflags: 0,
         accountcode: "",
         userfield: connectedLineNum || "", // Store ConnectedLineNum in userfield as backup
+        type: callType,
       });
 
       log.success(`CDR record created for ${disposition} call: ${uniqueid}, caller: ${actualCaller}`);
@@ -1221,6 +1227,11 @@ const handleCdr = async (event) => {
 
     // Also save to database for persistence
     try {
+      // Determine call type based on channel
+      const channel = event.channel || "";
+      const isOutbound = channel.match(/^PJSIP\/\d{4}-/);
+      const callType = isOutbound ? "outbound" : "inbound";
+
       await CDR.create({
         uniqueid: event.uniqueid,
         calldate: new Date(),
@@ -1232,6 +1243,7 @@ const handleCdr = async (event) => {
         recordingfile: event.recordingfile || "",
         userfield: event.userfield || "",
         cdr_json: JSON.stringify(event),
+        type: callType,
       });
 
       // Emit socket event

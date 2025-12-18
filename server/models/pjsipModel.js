@@ -270,6 +270,14 @@ export const PJSIPAor = sequelize.define(
       type: DataTypes.INTEGER,
       defaultValue: 3600, // 1 hour Default expiration time for the registration.
     },
+    minimum_expiration: {
+      type: DataTypes.INTEGER,
+      defaultValue: 60, // Minimum registration expiration time in seconds
+    },
+    maximum_expiration: {
+      type: DataTypes.INTEGER,
+      defaultValue: 7200, // Maximum registration expiration time in seconds
+    },
     remove_existing: {
       type: DataTypes.ENUM("yes", "no"),
       defaultValue: "yes",
@@ -313,7 +321,15 @@ export const PJSIPContact = sequelize.define(
       defaultValue: 3.0,
     },
     authenticate_qualify: {
-      type: DataTypes.ENUM("yes", "no"),
+      type: DataTypes.STRING(10),
+      defaultValue: "no",
+    },
+    prune_on_boot: {
+      type: DataTypes.STRING(10),
+      defaultValue: "no",
+    },
+    qualify_2xx_only: {
+      type: DataTypes.STRING(10),
       defaultValue: "no",
     },
     outbound_proxy: {
@@ -628,8 +644,9 @@ export const generatePJSIPConfig = (
       qualify_frequency: 60,
       qualify_timeout: 3,
       authenticate_qualify: "no",
-      maximum_expiration: 3600,
+      maximum_expiration: 7200,
       minimum_expiration: 60,
+      default_expiration: 3600,
       support_path: "yes", // Keep yes for WebSocket
     },
     endpoint_identifier: {

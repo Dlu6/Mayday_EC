@@ -76,7 +76,7 @@ const AgentEdit = () => {
   useEffect(() => {
     if (agentDetails) {
       const endpointTransport =
-        agentDetails.ps_endpoint?.transport || "transport-wss";
+        agentDetails.ps_endpoint?.transport || "transport-ws";
       const transportArray = endpointTransport
         .split(",")
         .map((t) => t.trim())
@@ -524,8 +524,8 @@ const VoiceTabContent = ({
   handleNatChange,
 }) => {
   const transportOptions = [
-    { value: "transport-wss", label: "WebSocket Secure" },
     { value: "transport-ws", label: "WebSocket" },
+    { value: "transport-wss", label: "WebSocket Secure" },
     { value: "transport-tls", label: "TLS" },
     { value: "transport-tcp", label: "TCP" },
     { value: "transport-udp", label: "UDP" },
@@ -572,7 +572,7 @@ const VoiceTabContent = ({
 
   // Function to normalize transport values
   const normalizeTransportValue = (value) => {
-    if (!value || value.length === 0) return ["transport-wss"]; // Default to WebSocket Secure
+    if (!value || value.length === 0) return ["transport-ws"]; // Default to WebSocket (on-prem)
     if (Array.isArray(value)) {
       return value.map((v) =>
         v.startsWith("transport-") ? v : `transport-${v}`

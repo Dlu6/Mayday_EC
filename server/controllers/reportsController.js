@@ -806,6 +806,7 @@ export const getCallVolume = async (req, res) => {
         "channel",
         "dstchannel",
         "lastapp",
+        "type",
       ],
     });
 
@@ -850,22 +851,28 @@ export const getCallVolume = async (req, res) => {
       // Skip if date is not in our range (shouldn't happen but just in case)
       if (!dailyData[formattedDate]) return;
 
-      // Determine if inbound or outbound based on dcontext
-      // from-voip-provider = inbound trunk call
-      // from-internal with short src = outbound call from extension
-      const isInbound = record.dcontext === "from-voip-provider";
-      const isOutbound = record.dcontext === "from-internal" && 
-        record.src && record.src.length <= 4 && /^\d+$/.test(record.src);
+      // Determine if inbound or outbound
+      // Priority 1: Use type field from database if available
+      // Priority 2: Fallback to context-based detection
+      let callType = record.type;
+      
+      if (!callType) {
+        // Fallback logic for records without type field
+        const isInbound = record.dcontext === "from-voip-provider";
+        const isOutbound = record.dcontext === "from-internal" && 
+          record.src && record.src.length <= 4 && /^\d+$/.test(record.src);
+        callType = isOutbound ? "outbound" : (isInbound ? "inbound" : null);
+      }
 
-      // Count by call type - only count trunk channels for inbound
-      if (isInbound) {
+      // Count by call type
+      if (callType === "inbound") {
         dailyData[formattedDate].inbound++;
 
-        // Check if abandoned (NO ANSWER disposition on trunk channel)
+        // Check if abandoned (NO ANSWER disposition)
         if (record.disposition === "NO ANSWER") {
           dailyData[formattedDate].abandoned++;
         }
-      } else if (isOutbound) {
+      } else if (callType === "outbound") {
         dailyData[formattedDate].outbound++;
       }
       // Skip extension rings (from-internal where src is not a short extension)
@@ -1675,6 +1682,7 @@ async function getCallVolumeData(startDate, endDate) {
         "channel",
         "dstchannel",
         "lastapp",
+        "type",
       ],
     });
 
@@ -1719,22 +1727,28 @@ async function getCallVolumeData(startDate, endDate) {
       // Skip if date is not in our range (shouldn't happen but just in case)
       if (!dailyData[formattedDate]) return;
 
-      // Determine if inbound or outbound based on dcontext
-      // from-voip-provider = inbound trunk call
-      // from-internal with short src = outbound call from extension
-      const isInbound = record.dcontext === "from-voip-provider";
-      const isOutbound = record.dcontext === "from-internal" && 
-        record.src && record.src.length <= 4 && /^\d+$/.test(record.src);
+      // Determine if inbound or outbound
+      // Priority 1: Use type field from database if available
+      // Priority 2: Fallback to context-based detection
+      let callType = record.type;
+      
+      if (!callType) {
+        // Fallback logic for records without type field
+        const isInbound = record.dcontext === "from-voip-provider";
+        const isOutbound = record.dcontext === "from-internal" && 
+          record.src && record.src.length <= 4 && /^\d+$/.test(record.src);
+        callType = isOutbound ? "outbound" : (isInbound ? "inbound" : null);
+      }
 
-      // Count by call type - only count trunk channels for inbound
-      if (isInbound) {
+      // Count by call type
+      if (callType === "inbound") {
         dailyData[formattedDate].inbound++;
 
-        // Check if abandoned (NO ANSWER disposition on trunk channel)
+        // Check if abandoned (NO ANSWER disposition)
         if (record.disposition === "NO ANSWER") {
           dailyData[formattedDate].abandoned++;
         }
-      } else if (isOutbound) {
+      } else if (callType === "outbound") {
         dailyData[formattedDate].outbound++;
       }
       // Skip extension rings (from-internal where src is not a short extension)

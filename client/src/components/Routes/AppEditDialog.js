@@ -197,7 +197,9 @@ const AppEditDialog = ({
               options = ivrOptions;
             } else if (field.name === "hangupCause") {
               options = field.options;
-              console.log("Hangup cause options:", options);
+              console.log("Hangup cause options:", 
+                // options
+              );
             }
 
             acc[field.name] = fieldValue || "";

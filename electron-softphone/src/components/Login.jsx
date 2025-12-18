@@ -9,7 +9,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { useNotification } from "../contexts/NotificationContext";
 import { storageService, clearLogoutFlag } from "../services/storageService";
-import mhulogo from "../../src/assets/mhu_logo.jpg";
+import maydaylogo from "../../../client/src/assets/images/mayday_logo.png";
 import {
   CircularProgress,
   Switch,
@@ -705,8 +705,8 @@ const Login = ({ onLoginSuccess }) => {
   return (
     <div className="login-container">
       <div className="login-box">
-        <h1 className="title">MENTAL HEALTH UGANDA</h1>
-        <img src={mhulogo} alt="Mental Health Uganda" className="logo" />
+        <h1 className="title">SIMI VALLEY</h1>
+        <img src={maydaylogo} alt="Mayday Logo" className="logo" />
         <h2 className="subtitle">Sign In</h2>
 
         <form onSubmit={handleSubmit}>

@@ -222,7 +222,7 @@ const OutboundRouteEdit = () => {
 
       // Handle generated extensions if needed
       const generatedExts = currentRoute.generatedExtensions || [];
-      console.log("Generated Extensions:", generatedExts);
+      // console.log("Generated Extensions:", generatedExts);
 
       // Transform database apps to match UI expected format
       if (currentRoute.applications && currentRoute.applications.length > 0) {

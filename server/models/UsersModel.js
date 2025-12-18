@@ -94,7 +94,7 @@ const UserModel = sequelize.define(
     transport: {
       type: DataTypes.STRING,
       allowNull: true,
-      defaultValue: "transport-wss",
+      defaultValue: "transport-ws",
     },
     websocket_protocol: {
       type: DataTypes.VIRTUAL,
