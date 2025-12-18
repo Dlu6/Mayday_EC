@@ -78,8 +78,8 @@ export const createPJSIPUser = async (req, res) => {
           transport: "transport-wss",
           webrtc: "yes",
           dtls_auto_generate_cert: "no",
-          //   dtls_cert_file: "/etc/letsencrypt/live/mhuhelpline.com/fullchain.pem",
-          //   dtls_private_key: "/etc/letsencrypt/live/mhuhelpline.com/privkey.pem",
+          //   dtls_cert_file: "/etc/asterisk/keys/asterisk.pem",
+          //   dtls_private_key: "/etc/asterisk/keys/asterisk.key",
           direct_media: "no",
           force_rport: "yes",
           ice_support: "yes",
@@ -934,25 +934,14 @@ export const registerAgent = async (req, res) => {
             webrtc: user.typology === "webRTC", // Use typology to determine if WebRTC is enabled
             ws_servers: [
               {
-                // uri:
-                //   process.env.NODE_ENV === "development"
-                //     ? "ws://65.1.149.92:8088/ws"
-                //     : `wss://mhuhelpline.com:${user.wss_port || 8089}/ws`,
-                // uri: `wss://mhuhelpline.com:${user.wss_port || 8089}/ws`,
-                uri: `wss://mhuhelpline.com/ws`,
+                uri: process.env.WS_SERVERS || `ws://${process.env.PUBLIC_IP}:8088/ws`,
                 sip_transport:
                   user.transport?.replace("transport-", "") || "wss",
                 protocols: ["sip"],
               },
             ],
             ice_servers: [
-              { urls: "stun:stun.l.google.com:19302" },
-              // {
-              //   urls:
-              //     process.env.TURN_SERVER || "turn:turn.mhuhelpline.com:3478",
-              //   username: process.env.TURN_USERNAME || "mayday",
-              //   credential: process.env.TURN_PASSWORD || "mayday123",
-              // },
+              { urls: process.env.STUN_SERVER || "stun:stun.l.google.com:19302" },
             ],
           },
         },

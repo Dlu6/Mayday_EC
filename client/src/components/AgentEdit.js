@@ -117,10 +117,10 @@ const AgentEdit = () => {
         dtls_auto_generate_cert: "no",
         dtls_cert_file:
           agentDetails.dtls_cert_file ||
-          "/etc/letsencrypt/live/mhuhelpline.com/fullchain.pem",
+          "/etc/asterisk/keys/asterisk.pem",
         dtls_private_key:
           agentDetails.dtls_private_key ||
-          "/etc/letsencrypt/live/mhuhelpline.com/privkey.pem",
+          "/etc/asterisk/keys/asterisk.key",
         dtls_verify: agentDetails.dtls_verify || "fingerprint",
         media_encryption: agentDetails.media_encryption || "dtls",
         wss_port: agentDetails.wss_port || 8089,
@@ -222,8 +222,8 @@ const AgentEdit = () => {
           dtls_auto_generate_cert:
             formAgentDetails.dtls_auto_generate_cert || "no",
           // Certificate paths when not auto-generating
-          dtls_cert_file: "/etc/letsencrypt/live/mhuhelpline.com/fullchain.pem",
-          dtls_private_key: "/etc/letsencrypt/live/mhuhelpline.com/privkey.pem",
+          dtls_cert_file: "/etc/asterisk/keys/asterisk.pem",
+          dtls_private_key: "/etc/asterisk/keys/asterisk.key",
           ice_support: formAgentDetails.ice_support || "yes",
           rewrite_contact: "yes",
           rtcp_mux: formAgentDetails.rtcp_mux || "yes",
@@ -708,7 +708,7 @@ const VoiceTabContent = ({
                   name="dtls_cert_file"
                   value={
                     formAgentDetails.dtls_cert_file ||
-                    "/etc/letsencrypt/live/mhuhelpline.com/fullchain.pem"
+                    "/etc/asterisk/keys/asterisk.pem"
                   }
                   onChange={handleInputChange}
                   variant="standard"
@@ -728,7 +728,7 @@ const VoiceTabContent = ({
                   name="dtls_private_key"
                   value={
                     formAgentDetails.dtls_private_key ||
-                    "/etc/letsencrypt/live/mhuhelpline.com/privkey.pem"
+                    "/etc/asterisk/keys/asterisk.key"
                   }
                   onChange={handleInputChange}
                   variant="standard"

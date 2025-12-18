@@ -34,6 +34,6 @@
   ],
   "publish": {
     "provider": "generic",
-    "url": "https://mhuhelpline.com/downloads/"
+    "url": "http://192.168.1.14/downloads/"
   }
 }

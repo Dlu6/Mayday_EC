@@ -82,14 +82,12 @@ const io = socketService.initialize(httpServer);
 const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = [
-      `https://mhuhelpline.com`,
-      `wss://mhuhelpline.com`,
-      `ws://mhuhelpline.com`,
       `http://${process.env.PUBLIC_IP}:${process.env.PORT}`,
       `https://${process.env.PUBLIC_IP}:${process.env.PORT}`,
       `http://${process.env.PUBLIC_IP}:8088`,
       `https://${process.env.PUBLIC_IP}:8088`,
       `http://${process.env.PUBLIC_IP}`,
+      `https://${process.env.PUBLIC_IP}`,
       `ws://${process.env.PUBLIC_IP}:${process.env.PORT}`,
       `wss://${process.env.PUBLIC_IP}:${process.env.PORT}`,
       "http://localhost:3000",
@@ -97,8 +95,11 @@ const corsOptions = {
       "http://localhost:8004", // Electron app
       "ws://localhost:8004",
       "http://localhost:8004",
-      `http://65.1.149.92:8004`,
-      `ws://65.1.149.92:8004`,
+      // On-prem server access (nginx serves on port 80)
+      "http://192.168.1.14",
+      "https://192.168.1.14",
+      "ws://192.168.1.14",
+      "wss://192.168.1.14",
     ];
 
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -267,13 +268,14 @@ let redisStore = new RedisStore({
 // 3. Added middleware before routes:
 app.use((req, res, next) => {
   const allowedOrigins = [
-    "https://mhuhelpline.com",
-    "https://mhuhelpline.com",
     "http://localhost:8088", // For ARI Server
     "http://localhost:3000", // To Accept Dashboard Client Cors
     "http://localhost:5173", // For Electron Dev Server
-    "http://43.205.229.152:8004",
     `http://localhost:${process.env.PORT}`,
+    `http://${process.env.PUBLIC_IP}`,
+    `https://${process.env.PUBLIC_IP}`,
+    "http://192.168.1.14",
+    "https://192.168.1.14",
   ];
 
   const origin = req.headers.origin;

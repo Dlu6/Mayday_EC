@@ -28,7 +28,7 @@ let mainWindow = null;
 let appbarWindow = null;
 let isLoadingUrl = false;
 
-const PROD_URL = "https://mhuhelpline.com";
+const PROD_URL = "http://192.168.1.14";
 // VERY IMPORTANT TO GET CONSOLE LOGS IN THE TERMINAL
 // Forward renderer console messages to main process stdout so they appear in the terminal
 function forwardRendererConsole(win, label = "window") {

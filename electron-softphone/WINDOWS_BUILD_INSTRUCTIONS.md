@@ -103,7 +103,7 @@ scp -i "path\to\MHU_Debian_Mumb.pem" ^
 ### Step 6: Verify Deployment
 
 ```powershell
-curl https://mhuhelpline.com/downloads/latest.yml
+curl http://192.168.1.14/downloads/latest.yml
 ```
 
 ## Troubleshooting

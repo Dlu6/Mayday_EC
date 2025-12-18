@@ -246,7 +246,7 @@ async function runCapabilityCheck() {
   try {
     const apiHost = window.location.hostname === "localhost" 
       ? "localhost:8004" 
-      : "mhuhelpline.com";
+      : "192.168.1.14";
     const apiProtocol = window.location.protocol === "https:" ? "https" : "http";
     
     const response = await fetch(`${apiProtocol}://${apiHost}/api/transfers/health`, {

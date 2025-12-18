@@ -13,17 +13,17 @@ const config = {
   // API Base URL
   apiUrl: isDevelopment
     ? "http://localhost:8004"
-    : import.meta?.env?.VITE_API_URL || "https://mhuhelpline.com",
+    : import.meta?.env?.VITE_API_URL || "http://192.168.1.14",
 
   // Socket.IO URL
   socketUrl: isDevelopment
     ? "http://localhost:8004"
-    : import.meta?.env?.VITE_SOCKET_URL || "https://mhuhelpline.com",
+    : import.meta?.env?.VITE_SOCKET_URL || "http://192.168.1.14",
 
   // WebSocket URL for SIP
   wsUrl: isDevelopment
     ? "ws://localhost:8088/ws"
-    : import.meta?.env?.VITE_WS_URL || "wss://mhuhelpline.com/ws",
+    : import.meta?.env?.VITE_WS_URL || "ws://192.168.1.14:8088/ws",
 
   // Environment flags
   isDevelopment,

@@ -6,10 +6,10 @@ const config = {
     sipWsUrl: "ws://65.1.149.92:8088/ws",
   },
   production: {
-    apiUrl: "https://mhuhelpline.com",
-    wsUrl: "ws://mhuhelpline.com",
-    baseUrl: "https://mhuhelpline.com",
-    sipWsUrl: "ws://65.1.149.92:8088/ws",
+    apiUrl: "http://192.168.1.14",
+    wsUrl: "ws://192.168.1.14",
+    baseUrl: "http://192.168.1.14",
+    sipWsUrl: "ws://192.168.1.14:8088/ws",
   },
 };
 
