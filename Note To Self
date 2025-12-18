@@ -1160,7 +1160,7 @@ Automatic Update (Github Actions)
 
 -------->>>>
 To start the server:
-~ cd /home/admin/Mayday-CRM-Scracth
+~ cd /Users/Mydhe Files/Mayday_EC
 ~ npm run server_client [This will start the server and the client]
 
 To start the electron softphone:
