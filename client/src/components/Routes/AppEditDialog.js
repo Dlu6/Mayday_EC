@@ -195,11 +195,6 @@ const AppEditDialog = ({
               options = queueOptions;
             } else if (field.name === "flowId") {
               options = ivrOptions;
-            } else if (field.name === "hangupCause") {
-              options = field.options;
-              console.log("Hangup cause options:", 
-                // options
-              );
             }
 
             acc[field.name] = fieldValue || "";
