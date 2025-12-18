@@ -29,7 +29,7 @@
     "db:main": "./scripts/db-manager.sh main",
     "db:datatool": "./scripts/db-manager.sh datatool",
     "verify:transfer": "node scripts/verify-transfer-capability.js",
-    "verify:transfer:prod": "node scripts/verify-transfer-capability.js --server https://mhuhelpline.com"
+    "verify:transfer:prod": "node scripts/verify-transfer-capability.js --server http://192.168.1.14"
   },
   "keywords": [],
   "author": "Mayday",

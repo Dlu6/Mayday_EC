@@ -22,6 +22,7 @@ import CryptoJS from "crypto-js";
 import appPkg from "../../package.json";
 import AppUpdater from "./AppUpdater";
 import { stickyAppbarService } from "../services/stickyAppbarService";
+import serverConfig from "../config/serverConfig";
 
 const { ipcRenderer } = window.require("electron");
 
@@ -118,10 +119,7 @@ const Login = ({ onLoginSuccess }) => {
   const navigate = useNavigate();
   const initialLoadRef = React.useRef(true);
   const [state, setState] = useState({
-    host:
-      process.env.NODE_ENV === "development"
-        ? "http://localhost:8004"
-        : "https://mhuhelpline.com",
+    host: serverConfig.apiUrl,
     email: "",
     password: "",
     rememberMe: false,
@@ -332,10 +330,9 @@ const Login = ({ onLoginSuccess }) => {
       console.log("🚀 Starting SIP service initialization...");
 
       // Use the same server for WebSocket as the SIP registrar
-      const wsUrl =
-        process.env.NODE_ENV === "development"
-          ? `ws://${user.pjsip.server}:8088/ws`
-          : "wss://mhuhelpline.com/ws";
+      const wsUrl = serverConfig.isDevelopment
+        ? `ws://${user.pjsip.server}:8088/ws`
+        : serverConfig.sipWsUrl;
 
       console.log("SIP config:", {
         extension: user.extension,
@@ -387,11 +384,7 @@ const Login = ({ onLoginSuccess }) => {
       // Notify backend that agent is online
       try {
         const response = await fetch(
-          `${
-            process.env.NODE_ENV === "development"
-              ? "http://localhost:8004"
-              : "https://mhuhelpline.com"
-          }/api/users/agent-online`,
+          `${serverConfig.apiUrl}/api/users/agent-online`,
           {
             method: "POST",
             headers: {

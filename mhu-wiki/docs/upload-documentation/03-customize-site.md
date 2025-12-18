@@ -121,7 +121,7 @@ const config = {
           items: [
             {
               label: "Support",
-              href: "https://mhuhelpline.com/support",
+              href: "http://192.168.1.14/support",
             },
             // ... other links
           ],

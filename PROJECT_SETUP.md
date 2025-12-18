@@ -63,6 +63,63 @@ Mayday_EC/
 └── config/                 # Configuration files
 ```
 
+## Server IP/Domain Configuration
+
+### Centralized Configuration Files
+
+To change the server IP or domain, update the following files:
+
+| Component | File | Variable/Constant |
+|-----------|------|-------------------|
+| **Electron Softphone** | `electron-softphone/src/config/serverConfig.js` | `DEFAULT_SERVER_HOST` |
+| **Electron Vite Build** | `electron-softphone/vite.config.js` | `DEFAULT_SERVER_HOST` |
+| **Electron Main Process** | `electron-softphone/electron/main.js` | `DEFAULT_SERVER_HOST` |
+| **Electron Env** | `electron-softphone/.env.production` | `VITE_SERVER_HOST` |
+| **Server Backend** | `server/.env` | `PUBLIC_IP` |
+| **Wiki Documentation** | `mhu-wiki/docusaurus.config.js` | `url` field |
+
+### How to Change Server IP
+
+1. **For Electron Softphone** (client app):
+   ```javascript
+   // electron-softphone/src/config/serverConfig.js
+   const DEFAULT_SERVER_HOST = "192.168.1.14";  // Change this
+   ```
+
+2. **For Server Backend** (CORS and API):
+   ```bash
+   # server/.env
+   PUBLIC_IP=192.168.1.14  # Change this
+   ```
+
+3. **For Electron Build** (vite.config.js):
+   ```javascript
+   // electron-softphone/vite.config.js
+   const DEFAULT_SERVER_HOST = "192.168.1.14";  // Change this
+   ```
+
+4. **For Electron Main Process**:
+   ```javascript
+   // electron-softphone/electron/main.js
+   const DEFAULT_SERVER_HOST = "192.168.1.14";  // Change this
+   ```
+
+### Runtime Configuration
+
+The Electron softphone also supports runtime configuration via localStorage:
+- `serverHost` - Override the default server host
+- `useHttps` - Enable/disable HTTPS (default: false for on-prem)
+- `apiPort` - Override API port (default: empty for nginx on port 80)
+- `sipPort` - Override SIP WebSocket port (default: 8088)
+
+### Important Notes
+
+- All hardcoded domain references (`domain.com`) have been removed
+- Server CORS configuration dynamically uses `PUBLIC_IP` from `.env`
+- Electron services import from `serverConfig.js` for consistent URL resolution
+- After changing IPs, rebuild the client: `cd client && npm run build`
+- Restart PM2 after server changes: `pm2 restart all`
+
 ## Environment Setup
 
 ### 1. Local Development Environment
@@ -883,9 +940,11 @@ Users can manually check for updates via:
 **GitHub Repo**: https://github.com/Dlu6/Mayday_EC.git  
 
 **Recent Updates (Dec 18, 2025)**:
-- ✅ Removed all mhuhelpline.com references from codebase
-- ✅ Updated CORS configuration for on-prem deployment
+- ✅ **Centralized Server Configuration**: Created `serverConfig.js` as single source of truth for IP/domain
+- ✅ Removed all hardcoded domain references from codebase
+- ✅ Updated CORS configuration to use `PUBLIC_IP` env variable dynamically
+- ✅ All electron-softphone services now import from centralized config
 - ✅ Fixed WebRTC certificate paths to use local Asterisk certificates
 - ✅ Client and server rebuilt and deployed successfully
 - ✅ Login API working correctly with admin credentials
-- ✅ Dashboard accessible via Safari (Chrome requires DNS cache clear)
+- ✅ See "Server IP/Domain Configuration" section above for how to change server IP

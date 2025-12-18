@@ -70,7 +70,7 @@ This documentation is organized into several sections:
 
 If you can't find what you're looking for in this documentation:
 
-- Contact our support team at support@mhuhelpline.com
+- Contact our support team at medhi.matovu@gmail.com
 - Submit a support ticket through the system
 - Check our [FAQ section](./intro.md) for quick answers
 

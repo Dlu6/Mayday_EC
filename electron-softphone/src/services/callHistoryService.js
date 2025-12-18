@@ -6,11 +6,10 @@ import {
   getUserData,
   canInitializeServices,
 } from "./storageService";
+import serverConfig from "../config/serverConfig";
 
-const API_URL =
-  process.env.NODE_ENV === "development"
-    ? "http://localhost:8004"
-    : "https://mhuhelpline.com";
+// Use centralized server configuration
+const API_URL = serverConfig.apiUrl;
 
 console.log("API_URL in callHistoryService.js>>>>>:", API_URL);
 

@@ -42,7 +42,7 @@ For server-to-server integrations:
 
 ```http
 GET /api/v1/resource HTTP/1.1
-Host: api.mhuhelpline.com
+Host: api.your-server-ip
 X-API-Key: your_api_key_here
 ```
 
@@ -54,7 +54,7 @@ For user-context operations:
 
 ```http
 POST /api/v1/auth/token HTTP/1.1
-Host: api.mhuhelpline.com
+Host: api.your-server-ip
 Content-Type: application/json
 
 {
@@ -67,7 +67,7 @@ Content-Type: application/json
 
 ```http
 GET /api/v1/resource HTTP/1.1
-Host: api.mhuhelpline.com
+Host: api.your-server-ip
 Authorization: Bearer your_jwt_token_here
 ```
 
@@ -369,7 +369,7 @@ Response:
 {
   "report_id": "report123456",
   "status": "completed",
-  "download_url": "https://api.mhuhelpline.com/reports/download/report123456.json",
+  "download_url": "https://api.your-server-ip/reports/download/report123456.json",
   "expires_at": "2023-03-14T14:00:00Z"
 }
 ```
@@ -381,7 +381,7 @@ Response:
 To receive real-time events:
 
 ```javascript
-const socket = new WebSocket("wss://api.mhuhelpline.com/ws");
+const socket = new WebSocket("wss://api.your-server-ip/ws");
 
 socket.onopen = function (event) {
   // Authenticate with the WebSocket
@@ -452,7 +452,7 @@ The WebSocket API emits various event types:
   "wait_time": 75,
   "agent_id": "agent001",
   "queue_id": "support",
-  "recording_url": "https://recordings.mhuhelpline.com/call123456.mp3",
+  "recording_url": "https://recordings.your-server-ip/call123456.mp3",
   "tags": ["priority", "returning-caller"],
   "variables": {
     "case_id": "case12345",
@@ -468,7 +468,7 @@ The WebSocket API emits various event types:
   "id": "agent001",
   "username": "jsmith",
   "name": "Jane Smith",
-  "email": "jane.smith@mhuhelpline.com",
+  "email": "jane.smith@your-server-ip",
   "extension": "1001",
   "status": "available",
   "status_timestamp": "2023-03-07T09:30:00Z",
@@ -629,7 +629,7 @@ const axios = require("axios");
 
 // Configure API client
 const apiClient = axios.create({
-  baseURL: "https://api.mhuhelpline.com/api/v1",
+  baseURL: "https://api.your-server-ip/api/v1",
   headers: {
     "X-API-Key": "your_api_key_here",
     "Content-Type": "application/json",
@@ -674,7 +674,7 @@ async function updateAgentStatus(agentId, status, reasonCode) {
 import requests
 
 # API configuration
-API_BASE_URL = 'https://api.mhuhelpline.com/api/v1'
+API_BASE_URL = 'https://api.your-server-ip/api/v1'
 API_KEY = 'your_api_key_here'
 
 headers = {
@@ -763,8 +763,8 @@ def create_client_session(client_id, agent_id, call_id, session_data):
 
 ## Support and Resources
 
-- **API Documentation**: Full documentation available at https://api.mhuhelpline.com/docs
-- **Support Email**: api-support@mhuhelpline.com
+- **API Documentation**: Full documentation available at https://api.your-server-ip/docs
+- **Support Email**: api-support@your-server-ip
 - **Issue Reporting**: Submit issues through the developer portal
 - **Rate Limit Increases**: Contact your account manager for custom rate limits
 - **Sample Code**: Additional examples available in the developer portal

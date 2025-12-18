@@ -115,6 +115,7 @@ import AppUpdater from "./AppUpdater";
 // datatoolApi removed - not used in this project
 import { useStickyAppbar } from "../hooks/useStickyAppbar";
 import APPBAR_CONFIG from "../config/appbarConfig";
+import serverConfig from "../config/serverConfig";
 
 // Debug connection manager import - removed excessive logging
 
@@ -462,11 +463,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
 
         if (userData?.user?.extension && token) {
           const logoutPromise = fetch(
-            `${
-              process.env.NODE_ENV === "development"
-                ? "http://localhost:8004"
-                : "https://mhuhelpline.com"
-            }/api/users/agent-logout`,
+            `${serverConfig.apiUrl}/api/users/agent-logout`,
             {
               method: "POST",
               headers: {
@@ -2785,11 +2782,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
       try {
         const token = storageService.getAuthToken();
         if (!token) return false;
-        const base =
-          process.env.NODE_ENV === "development"
-            ? "http://localhost:8004"
-            : "https://mhuhelpline.com";
-        const resp = await fetch(`${base}/api/ami/extensions`, {
+        const resp = await fetch(`${serverConfig.apiUrl}/api/ami/extensions`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

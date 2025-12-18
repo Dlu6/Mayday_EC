@@ -4,6 +4,7 @@
 
 import { sipService, sipCallService } from "./sipService";
 import { storageService } from "./storageService";
+import serverConfig from "../config/serverConfig";
 
 class TransferMonitorService {
   constructor() {
@@ -378,13 +379,9 @@ class TransferMonitorService {
    */
   async checkServerHealth() {
     try {
-      const apiHost = process.env.NODE_ENV === "development"
-        ? "localhost:8004"
-        : "mhuhelpline.com";
-      const apiProtocol = process.env.NODE_ENV === "development" ? "http" : "https";
       const token = storageService.getAuthToken();
 
-      const response = await fetch(`${apiProtocol}://${apiHost}/api/transfers/health`, {
+      const response = await fetch(`${serverConfig.apiUrl}/api/transfers/health`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

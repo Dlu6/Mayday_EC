@@ -28,7 +28,12 @@ let mainWindow = null;
 let appbarWindow = null;
 let isLoadingUrl = false;
 
-const PROD_URL = "http://192.168.1.14";
+// ============================================================================
+// SERVER HOST CONFIGURATION - Change this value to update the production URL
+// This should match the DEFAULT_SERVER_HOST in src/config/serverConfig.js
+// ============================================================================
+const DEFAULT_SERVER_HOST = "192.168.1.14";
+const PROD_URL = `http://${DEFAULT_SERVER_HOST}`;
 // VERY IMPORTANT TO GET CONSOLE LOGS IN THE TERMINAL
 // Forward renderer console messages to main process stdout so they appear in the terminal
 function forwardRendererConsole(win, label = "window") {

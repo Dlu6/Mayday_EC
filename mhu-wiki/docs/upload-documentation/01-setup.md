@@ -59,7 +59,7 @@ Edit the `docusaurus.config.js` file to customize your site settings:
 const config = {
   title: "Mayday Wiki",
   tagline: "Comprehensive documentation for the Mayday CRM",
-  url: "https://mhuhelpline.com",
+  url: "http://192.168.1.14",
   baseUrl: "/docs/",
   // ... other configuration options
 };
@@ -69,8 +69,8 @@ Key configuration options:
 
 - `title`: The name of your documentation site
 - `tagline`: A brief description
-- `url`: https://mhuhelpline.com/docs/
-- `baseUrl`: https://mhuhelpline.com
+- `url`: Your server URL (e.g., http://192.168.1.14)
+- `baseUrl`: The base path for docs (e.g., /docs/)
 
 ## Next Steps
 

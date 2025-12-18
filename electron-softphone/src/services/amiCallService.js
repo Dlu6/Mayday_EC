@@ -1,12 +1,8 @@
 import { storageService } from "./storageService";
+import serverConfig from "../config/serverConfig";
 
-const getBase = () => {
-  const host =
-    process.env.NODE_ENV === "development"
-      ? "http://localhost:8004"
-      : "https://mhuhelpline.com";
-  return host;
-};
+// Use centralized server configuration
+const getBase = () => serverConfig.apiUrl;
 
 const apiFetch = async (path, options = {}) => {
   const token =

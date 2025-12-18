@@ -143,13 +143,10 @@ const dummyChats = [
   },
 ];
 
-const API_BASE_URL =
-  process.env.REACT_APP_API_URL || "http://localhost:8004/api";
+import serverConfig from "../config/serverConfig";
 
-const socketUrl =
-  process.env.NODE_ENV === "development"
-    ? "http://localhost:8004"
-    : "https://mhuhelpline.com";
+const API_BASE_URL = `${serverConfig.apiUrl}/api`;
+const socketUrl = serverConfig.apiUrl;
 
 const sendWhatsAppMessage = async (messageData) => {
   try {

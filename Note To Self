@@ -25,7 +25,7 @@ Notes:
 Quick checks:
 - Port check on VM:  ss -ltnp | grep :8004            # backend
 - Test API (from VM):  curl -s http://127.0.0.1:8004/api/ami/status
-- Test via domain:      curl -s https://mhuhelpline.com/api/ami/status
+- Test via server:      curl -s http://192.168.1.14/api/ami/status
   If you get index.html instead of JSON, re-check the /api location block.
 
 WebSocket tips:

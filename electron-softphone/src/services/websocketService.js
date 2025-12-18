@@ -1,6 +1,7 @@
 import { EventEmitter } from "events";
 import { io } from "socket.io-client";
 import logoutManager from "./logoutManager";
+import serverConfig from "../config/serverConfig";
 
 class WebSocketService extends EventEmitter {
   constructor() {
@@ -78,7 +79,7 @@ class WebSocketService extends EventEmitter {
     }
 
     // Default to production URL for Electron or when window is not available
-    return import.meta.env?.VITE_API_URL || "https://mhuhelpline.com";
+    return serverConfig.apiUrl;
   }
 
   // Get authentication token

@@ -79,27 +79,29 @@ const httpServer = createServer(app);
 const io = socketService.initialize(httpServer);
 
 // Set up CORS options
+// All origins are derived from PUBLIC_IP environment variable - no hardcoded IPs
 const corsOptions = {
   origin: function (origin, callback) {
+    const publicIp = process.env.PUBLIC_IP || "localhost";
+    const port = process.env.PORT || "8004";
+    
     const allowedOrigins = [
-      `http://${process.env.PUBLIC_IP}:${process.env.PORT}`,
-      `https://${process.env.PUBLIC_IP}:${process.env.PORT}`,
-      `http://${process.env.PUBLIC_IP}:8088`,
-      `https://${process.env.PUBLIC_IP}:8088`,
-      `http://${process.env.PUBLIC_IP}`,
-      `https://${process.env.PUBLIC_IP}`,
-      `ws://${process.env.PUBLIC_IP}:${process.env.PORT}`,
-      `wss://${process.env.PUBLIC_IP}:${process.env.PORT}`,
+      // Dynamic origins from PUBLIC_IP env variable
+      `http://${publicIp}:${port}`,
+      `https://${publicIp}:${port}`,
+      `http://${publicIp}:8088`,
+      `https://${publicIp}:8088`,
+      `http://${publicIp}`,
+      `https://${publicIp}`,
+      `ws://${publicIp}:${port}`,
+      `wss://${publicIp}:${port}`,
+      `ws://${publicIp}`,
+      `wss://${publicIp}`,
+      // Localhost for development
       "http://localhost:3000",
-      "http://localhost:5173", // Electron dev server
-      "http://localhost:8004", // Electron app
-      "ws://localhost:8004",
+      "http://localhost:5173",
       "http://localhost:8004",
-      // On-prem server access (nginx serves on port 80)
-      "http://192.168.1.14",
-      "https://192.168.1.14",
-      "ws://192.168.1.14",
-      "wss://192.168.1.14",
+      "ws://localhost:8004",
     ];
 
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -266,16 +268,16 @@ let redisStore = new RedisStore({
 });
 
 // 3. Added middleware before routes:
+// All origins derived from PUBLIC_IP env variable - no hardcoded IPs
 app.use((req, res, next) => {
+  const publicIp = process.env.PUBLIC_IP || "localhost";
   const allowedOrigins = [
     "http://localhost:8088", // For ARI Server
     "http://localhost:3000", // To Accept Dashboard Client Cors
     "http://localhost:5173", // For Electron Dev Server
     `http://localhost:${process.env.PORT}`,
-    `http://${process.env.PUBLIC_IP}`,
-    `https://${process.env.PUBLIC_IP}`,
-    "http://192.168.1.14",
-    "https://192.168.1.14",
+    `http://${publicIp}`,
+    `https://${publicIp}`,
   ];
 
   const origin = req.headers.origin;
