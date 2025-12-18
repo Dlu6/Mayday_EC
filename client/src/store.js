@@ -14,6 +14,7 @@ import reportsReducer from "./features/reports/reportsSlice.js";
 import ivrReducer from "./features/ivr/ivrSlice.js";
 import intervalReducer from "./features/intervals/intervalSlice.js";
 import recordingsReducer from "./features/recordings/recordingsSlice.js";
+import licensesReducer from "./features/licenses/licenseSlice.js";
 
 export const store = configureStore({
   reducer: {
@@ -29,6 +30,7 @@ export const store = configureStore({
     ivr: ivrReducer,
     intervals: intervalReducer,
     recordings: recordingsReducer,
+    licenses: licensesReducer,
 
     // [apiService.reducerPath]: apiService.reducer,
     // other reducers...

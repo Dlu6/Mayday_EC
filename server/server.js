@@ -61,6 +61,7 @@ import callsRoutes from "./routes/callsRoutes.js";
 import amiRoutes from "./routes/amiRoutes.js";
 import pauseRoutes from "./routes/pauseRoutes.js";
 import { seedPauseReasons } from "./models/pauseReasonModel.js";
+import licenseRoutes from "./routes/licenseRoutes.js";
 import setupDefaultIntervals from "./utils/setupDefaultIntervals.js";
 // Increase EventEmitter limit
 EventEmitter.defaultMaxListeners = 15;
@@ -417,6 +418,7 @@ app.use("/api/recordings", recordingRoutes);
 app.use("/api/calls", callsRoutes);
 app.use("/api/ami", amiRoutes);
 app.use("/api/pause", pauseRoutes);
+app.use("/api/license", licenseRoutes);
 
 // app.use("/api/sip", sipRoutes);
 

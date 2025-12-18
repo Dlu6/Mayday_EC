@@ -45,6 +45,7 @@ import OutboundRouteEdit from "./components/Routes/OutboundRouteEdit.js";
 import store from "./store.js";
 import IntervalsComponent from "./components/intervalsComponent.js";
 import Recordings from "./components/Routes/Recordings.js";
+import LicenseManagement from "./components/LicenseManagement.jsx";
 const App = () => {
   useWebSocket();
 
@@ -112,6 +113,7 @@ const App = () => {
                 />
                 <Route path="settings" element={<Settings />} />
                 <Route path="settings/networks" element={<Networks />} />
+                <Route path="settings/license" element={<LicenseManagement />} />
                 <Route path="integrations" element={<Integrations />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="support/about" element={<About />} />
