@@ -182,21 +182,6 @@ const AppEditDialog = ({
         } else if (field.type === "select") {
           // Skip audioFiles as it's handled separately
           if (field.name !== "audioFiles") {
-            let options = field.options;
-            if (field.name === "internalExtension") {
-              options = Array.isArray(agents)
-                ? agents.map((agent) => ({
-                    value: agent.extension,
-                    label: `${agent.username} (${agent.extension})`,
-                    name: agent.username,
-                  }))
-                : [];
-            } else if (field.name === "queue") {
-              options = queueOptions;
-            } else if (field.name === "flowId") {
-              options = ivrOptions;
-            }
-
             acc[field.name] = fieldValue || "";
           }
         } else {
