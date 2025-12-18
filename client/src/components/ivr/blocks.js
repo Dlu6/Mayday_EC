@@ -77,7 +77,7 @@ export const BLOCK_TYPES = [
     app: "Menu",
     connections: {
       inputs: 1,
-      outputs: 1,
+      outputs: 3, // Success, Timeout, Invalid - DTMF routing handled via config
     },
     appConfig: {
       fields: [

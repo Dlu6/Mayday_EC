@@ -19,14 +19,15 @@ router.get("/list/:year/:month/:day", async (req, res) => {
     const { year, month, day } = req.params;
     const recordingDir = path.join(RECORDING_BASE_DIR, year, month, day);
 
-    // Check if directory exists
+    // Check if directory exists - return empty array if not (no recordings for this date)
     try {
       await stat(recordingDir);
     } catch (error) {
-      return res.status(404).json({
-        success: false,
+      // Directory doesn't exist - this is normal, just means no recordings for this date
+      return res.json({
+        success: true,
+        recordings: [],
         message: "No recordings found for this date",
-        error: error.message,
       });
     }
 
@@ -308,6 +309,18 @@ router.post("/rate/:year/:month/:day/:filename", async (req, res) => {
 // Get available dates with recordings
 router.get("/dates", async (req, res) => {
   try {
+    // Check if base directory exists first
+    try {
+      await stat(RECORDING_BASE_DIR);
+    } catch (error) {
+      // Base directory doesn't exist - return empty dates array
+      return res.json({
+        success: true,
+        dates: [],
+        message: "Recording directory not found",
+      });
+    }
+
     const years = await readdir(RECORDING_BASE_DIR);
 
     const dates = [];

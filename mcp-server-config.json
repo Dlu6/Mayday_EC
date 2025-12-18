@@ -1,16 +1,16 @@
 {
   "mcpServers": {
-    "mayday-asterisk-vm": {
+    "mayday-asterisk-server": {
       "command": "ssh",
       "args": [
         "-i",
-        "/Users/matovumedhi/Downloads/MHU_Debian_Mumb.pem",
-        "admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com"
+        "~/.ssh/id_ed25519",
+        "medhi@192.168.1.14"
       ],
       "env": {
         "TERM": "xterm-256color"
       },
-      "cwd": "/home/admin/Mayday-CRM-Scracth"
+      "description": "On-prem Asterisk server (192.168.1.14) - SSH key authentication"
     },
     "mayday-local-dev": {
       "command": "node",
@@ -19,13 +19,14 @@
         "NODE_ENV": "development",
         "PORT": "8004"
       },
-      "cwd": "/Users/matovumedhi/Downloads/Mayday-CRM-Scracth"
+      "cwd": ".",
+      "description": "Local development server"
     },
-    "mayday-main-database": {
+    "mayday-database": {
       "command": "mysql",
       "args": [
         "-h",
-        "65.1.149.92",
+        "192.168.1.14",
         "-P",
         "3306",
         "-u",
@@ -34,16 +35,10 @@
         "asterisk"
       ],
       "env": {
-        "MYSQL_PWD": "Pasword@256"
+        "MYSQL_PWD": "${DB_PASSWORD}"
       },
-      "cwd": "/Users/matovumedhi/Downloads/Mayday-CRM-Scracth",
-      "description": "Main CRM database (VM public IP)"
-    },
-    "mayday-datatool-database": {
-      "command": "mysql",
-      "args": ["-h", "localhost", "-P", "3306", "-u", "root", "-p"],
-      "cwd": "/Users/matovumedhi/Downloads/Mayday-CRM-Scracth",
-      "description": "DataTool analytics database"
+      "cwd": ".",
+      "description": "Main CRM database on local Asterisk server"
     },
     "mayday-database-monitor": {
       "command": "node",
@@ -51,47 +46,41 @@
       "env": {
         "NODE_ENV": "development"
       },
-      "cwd": "/Users/matovumedhi/Downloads/Mayday-CRM-Scracth",
+      "cwd": ".",
       "description": "Database connection monitoring service"
     },
     "mayday-pm2-status": {
       "command": "ssh",
       "args": [
         "-i",
-        "/Users/matovumedhi/Downloads/MHU_Debian_Mumb.pem",
-        "admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com",
-        "bash",
-        "-lc",
-        "cd /home/admin/Mayday-CRM-Scracth && sudo -u mayday pm2 status mayday | cat"
+        "~/.ssh/id_ed25519",
+        "medhi@192.168.1.14",
+        "pm2 status mayday | cat"
       ],
-      "cwd": "/home/admin/Mayday-CRM-Scracth",
-      "description": "Check PM2 status for mayday app on VM"
+      "cwd": ".",
+      "description": "Check PM2 status for mayday app on on-prem server"
     },
     "mayday-pm2-restart": {
       "command": "ssh",
       "args": [
         "-i",
-        "/Users/matovumedhi/Downloads/MHU_Debian_Mumb.pem",
-        "admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com",
-        "bash",
-        "-lc",
-        "cd /home/admin/Mayday-CRM-Scracth && sudo -u mayday pm2 restart mayday"
+        "~/.ssh/id_ed25519",
+        "medhi@192.168.1.14",
+        "pm2 restart mayday"
       ],
-      "cwd": "/home/admin/Mayday-CRM-Scracth",
-      "description": "Restart mayday app via PM2 on VM"
+      "cwd": ".",
+      "description": "Restart mayday app via PM2 on on-prem server"
     },
     "mayday-pm2-logs": {
       "command": "ssh",
       "args": [
         "-i",
-        "/Users/matovumedhi/Downloads/MHU_Debian_Mumb.pem",
-        "admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com",
-        "bash",
-        "-lc",
-        "cd /home/admin/Mayday-CRM-Scracth && sudo -u mayday pm2 logs mayday --lines 200 | tail -n 200"
+        "~/.ssh/id_ed25519",
+        "medhi@192.168.1.14",
+        "pm2 logs mayday --lines 200 | tail -n 200"
       ],
-      "cwd": "/home/admin/Mayday-CRM-Scracth",
-      "description": "Tail PM2 logs for mayday app on VM"
+      "cwd": ".",
+      "description": "Tail PM2 logs for mayday app on on-prem server"
     }
   },
   "context7": {
@@ -115,32 +104,25 @@
   },
   "asterisk": {
     "ami": {
-      "host": "localhost",
+      "host": "192.168.1.14",
       "port": 5038,
-      "username": "admin",
-      "password": "admin"
+      "username": "${AMI_USERNAME}",
+      "password": "${AMI_PASSWORD}"
     },
     "ari": {
-      "host": "localhost",
+      "host": "192.168.1.14",
       "port": 8088,
-      "username": "asterisk",
-      "password": "asterisk"
+      "username": "${ARI_USERNAME}",
+      "password": "${ARI_PASSWORD}"
     }
   },
   "databases": {
     "main": {
-      "host": "65.1.149.92",
+      "host": "192.168.1.14",
       "port": 3306,
       "name": "asterisk",
       "user": "mayday_user",
-      "description": "Main CRM database with call records, users, and voice extensions (VM public IP)"
-    },
-    "datatool": {
-      "host": "localhost",
-      "port": 3306,
-      "name": "mayday_crm_db",
-      "user": "mayday_user",
-      "description": "DataTool analytics database with posts, sessions, and reporting data"
+      "description": "Main CRM database with call records, users, and voice extensions"
     }
   },
   "monitoring": {

@@ -10,7 +10,7 @@ export const createOutboundRoute = createAsyncThunk(
         "/users/outbound_routes/create",
         outboundRouteData
       );
-      console.log(response.data.route, "response is ? >>>>");
+      // console.log(response.data.route, "response is ? >>>>");
       return {
         createOutboundRouteData: response.data.route,
         message: response.data.message,
@@ -29,7 +29,7 @@ export const fetchAllOutboundRoutes = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await apiClient.get("/users/outbound_routes/read");
-      console.log(response.data, "response is ? >>>>");
+      // console.log(response.data, "response is ? >>>>");
       return response.data;
     } catch (error) {
       return rejectWithValue(

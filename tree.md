@@ -3,11 +3,14 @@
 > Last updated: December 16, 2025
 > 
 > **Note:** Excludes `node_modules`, `build`, `release`, `dist`, and `.docusaurus` directories
+>
+> **Changes:** Removed `datatool_server/` and related components (Clients, SessionAnalytics, datatoolApi)
 
 ```
 .
 |-- client
 |   |-- public
+|   |   |-- apple-touch-icon.png
 |   |   |-- favicon.ico
 |   |   |-- index.html
 |   |   |-- logo192.png
@@ -150,15 +153,6 @@
 |   `-- config.json
 |-- context7
 |   `-- ami-documentation.md
-|-- datatool_server
-|   |-- controllers
-|   |   |-- datatool_posts_controller.js
-|   |   `-- datatool_users_controller.js
-|   |-- models
-|   |   |-- datatoolPostsModel.js
-|   |   `-- datatoolUsersModel.js
-|   `-- routes
-|       `-- dataToolRoute.js
 |-- electron-softphone
 |   |-- assets
 |   |   `-- sounds
@@ -190,7 +184,6 @@
 |   |   `-- nginx-downloads.conf
 |   |-- src
 |   |   |-- api
-|   |   |   |-- datatoolApi.js
 |   |   |   `-- reportsApi.js
 |   |   |-- assets
 |   |   |   |-- sounds
@@ -208,9 +201,6 @@
 |   |   |   |-- CallHistory.jsx
 |   |   |   |-- CallPopup.jsx
 |   |   |   |-- Campaigns.jsx
-|   |   |   |-- ClientDetailView.jsx
-|   |   |   |-- ClientFormFields.jsx
-|   |   |   |-- Clients.jsx
 |   |   |   |-- ConfirmDialog.jsx
 |   |   |   |-- Contacts.jsx
 |   |   |   |-- ContentFrame.jsx
@@ -224,7 +214,6 @@
 |   |   |   |-- PhonebarInfo.jsx
 |   |   |   |-- QueueStatus.jsx
 |   |   |   |-- ReportsElectron.jsx
-|   |   |   |-- SessionAnalytics.jsx
 |   |   |   |-- TransferHistory.jsx
 |   |   |   |-- WebSocketStatus.jsx
 |   |   |   |-- WhatsAppElectronComponent.jsx
@@ -413,7 +402,6 @@
 |   |   |-- asteriskController.mjs
 |   |   |-- callsController.js
 |   |   |-- cdrController.js
-|   |   |-- enhancedDataToolController.js
 |   |   |-- enhancedTransferController.js
 |   |   |-- inboundRouteController.js
 |   |   |-- intervalController.js
@@ -472,7 +460,6 @@
 |   |   |-- amiRoutes.js
 |   |   |-- asteriskRoute.mjs
 |   |   |-- callsRoutes.js
-|   |   |-- enhancedDataToolRoutes.js
 |   |   |-- enhancedTransferRoutes.js
 |   |   |-- inboundRoute.mjs
 |   |   |-- intervalRoutes.js

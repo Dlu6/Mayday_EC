@@ -344,7 +344,7 @@ const Realtime = () => {
       setIsLoading(true);
       const [callStats, agentsData] = await Promise.all([
         callStatsService.getCallStats(),
-        callStatsService.getActiveAgents(),
+        callStatsService.getAllAgentsWithStatus(),
       ]);
 
       if (callStats) {
@@ -439,45 +439,38 @@ const Realtime = () => {
 
   // Initialize WebSocket connection
   useEffect(() => {
-    let cleanup = undefined;
+    const newSocket = connectWebSocket();
+    if (!newSocket) return undefined;
 
-    try {
-      const newSocket = connectWebSocket();
-      if (!newSocket) return undefined;
+    setSocket(newSocket);
+    setIsConnected(newSocket.connected);
 
-      setSocket(newSocket);
-      setIsConnected(newSocket.connected);
+    const onConnect = () => {
+      console.log("[Realtime] Socket connected");
+      setIsConnected(true);
+    };
+    
+    const onDisconnect = (reason) => {
+      console.log("[Realtime] Socket disconnected:", reason);
+      setIsConnected(false);
+    };
 
-      const onConnect = async () => {
-        setIsConnected(true);
-        await syncPausedAgentsSnapshot();
-      };
-      const onDisconnect = () => setIsConnected(false);
-      const onReconnect = async () => {
-        setIsConnected(true);
-        await syncPausedAgentsSnapshot();
-      };
+    newSocket.on("connect", onConnect);
+    newSocket.on("disconnect", onDisconnect);
 
-      newSocket.on("connect", onConnect);
-      newSocket.on("disconnect", onDisconnect);
-      newSocket.io?.on?.("reconnect", onReconnect);
+    // Cleanup only removes listeners, does NOT disconnect the shared socket
+    return () => {
+      newSocket.off("connect", onConnect);
+      newSocket.off("disconnect", onDisconnect);
+    };
+  }, []);
 
-      cleanup = () => {
-        try {
-          newSocket.off("connect", onConnect);
-          newSocket.off("disconnect", onDisconnect);
-          newSocket.io?.off?.("reconnect", onReconnect);
-          newSocket.disconnect();
-        } catch (_) {
-          void 0;
-        }
-      };
-    } catch (error) {
-      console.error("Failed to connect WebSocket:", error);
+  // Sync paused agents when connection state changes to connected
+  useEffect(() => {
+    if (isConnected) {
+      syncPausedAgentsSnapshot();
     }
-
-    return cleanup;
-  }, [syncPausedAgentsSnapshot]);
+  }, [isConnected, syncPausedAgentsSnapshot]);
 
   // Fetch initial data
   useEffect(() => {
@@ -623,15 +616,27 @@ const Realtime = () => {
             </IconButton>
           </Tooltip>
           <Badge
-            color={isConnected ? "success" : "error"}
             variant="dot"
-            sx={{ "& .MuiBadge-badge": { width: 12, height: 12, borderRadius: "50%" } }}
+            sx={{ 
+              "& .MuiBadge-badge": { 
+                width: 12, 
+                height: 12, 
+                borderRadius: "50%",
+                backgroundColor: isConnected ? "#00ff04ff" : undefined
+              } 
+            }}
+            color={isConnected ? "success" : "error"}
           >
             <Chip
               label={isConnected ? "Live" : "Disconnected"}
-              color={isConnected ? "success" : "error"}
               size="small"
               variant="filled"
+              sx={{
+                backgroundColor: isConnected ? "#00ff04ff" : undefined,
+                color: isConnected ? "#000" : undefined,
+                fontWeight: 500
+              }}
+              color={isConnected ? undefined : "error"}
             />
           </Badge>
         </Box>

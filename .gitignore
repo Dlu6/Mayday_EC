@@ -17,6 +17,7 @@ npm-debug.log*
 .env
 .env.local
 .env.*.local
+.env_*
 *.pem
 
 # OS files

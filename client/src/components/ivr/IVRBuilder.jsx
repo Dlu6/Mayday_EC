@@ -24,6 +24,7 @@ import {
   Checkbox,
   Alert,
   Snackbar,
+  FormHelperText,
 } from "@mui/material";
 import {
   Save,
@@ -61,7 +62,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import apiClient from "../../api/apiClient";
 
 const GRID_SIZE = 20; // Size of grid cells
-const SNAP_THRESHOLD = 10; // Distance in pixels to trigger snapping
 const SCROLL_THRESHOLD = 100; // Distance from edge to trigger scrolling
 const SCROLL_SPEED = 10; // Pixels to scroll per frame
 const SCROLL_INTERVAL = 16; // Milliseconds between scroll updates (60fps)
@@ -326,28 +326,28 @@ const IVRBuilder = () => {
   };
 
   const handleConnectionEnd = (targetBlockId, targetType, targetIndex) => {
-    console.log("Connection End Data:", {
-      targetBlockId,
-      targetType,
-      targetIndex,
-      connectionInProgress,
-    });
-
     if (!connectionInProgress) {
-      console.log("No connection in progress");
       return;
     }
 
-    // Prevent connecting same types
+    // Prevent connecting same types (output to output, input to input)
     if (connectionInProgress.sourceType === targetType) {
-      console.log("Cannot connect same types");
+      setSnackbar({
+        open: true,
+        message: "Cannot connect same connection types (output to output or input to input)",
+        severity: "warning",
+      });
       setConnectionInProgress(null);
       return;
     }
 
     // Prevent self-connections
     if (connectionInProgress.sourceBlockId === targetBlockId) {
-      console.log("Cannot connect to self");
+      setSnackbar({
+        open: true,
+        message: "Cannot connect a block to itself",
+        severity: "warning",
+      });
       setConnectionInProgress(null);
       return;
     }
@@ -371,18 +371,132 @@ const IVRBuilder = () => {
           : connectionInProgress.sourceIndex,
     };
 
-    // Validate connection
-    if (isValidConnection(newConnection)) {
+    // Validate connection with detailed error messages
+    const validationResult = validateConnection(newConnection);
+    if (validationResult.valid) {
       setConnections((prev) => [...prev, newConnection]);
-      console.log("Connection created:", newConnection);
     } else {
-      console.log("Invalid connection");
+      setSnackbar({
+        open: true,
+        message: validationResult.message,
+        severity: "warning",
+      });
     }
 
     setConnectionInProgress(null);
   };
 
-  const isValidConnection = (connection) => {
+  // Connection validation rules based on block types
+  const getConnectionRules = () => {
+    return {
+      // Start block can only connect to: Answer, Menu, Playback, Queue, InternalDial, ExternalDial
+      Start: {
+        canConnectTo: ["Answer", "Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Goto", "GotoIf", "GotoIfTime", "Switch", "NoOp", "AGI", "System"],
+        canReceiveFrom: [], // Start cannot receive connections
+      },
+      Answer: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Start"],
+      },
+      Menu: {
+        canConnectTo: ["Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End", "Menu"],
+        canReceiveFrom: ["Start", "Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial"],
+      },
+      Playback: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Start", "Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial", "Record", "Database", "RestApi", "AGI", "System", "Math"],
+      },
+      Record: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch"],
+      },
+      Queue: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Start", "Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue"],
+      },
+      InternalDial: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Start", "Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch"],
+      },
+      ExternalDial: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Start", "Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch"],
+      },
+      Callback: {
+        canConnectTo: ["Playback", "Hangup", "End", "NoOp"],
+        canReceiveFrom: ["Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial"],
+      },
+      Goto: {
+        canConnectTo: [], // Goto jumps to another context, no direct connection needed
+        canReceiveFrom: ["Start", "Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial", "Record", "Database", "RestApi", "AGI", "System", "Math"],
+      },
+      GotoIf: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Start", "Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial", "Record", "Database", "RestApi", "AGI", "System", "Math"],
+      },
+      GotoIfTime: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Start", "Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial", "Record", "Database", "RestApi", "AGI", "System", "Math"],
+      },
+      Switch: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Start", "Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial", "Record", "Database", "RestApi", "AGI", "System", "Math"],
+      },
+      Goal: {
+        canConnectTo: ["Hangup", "End", "NoOp"],
+        canReceiveFrom: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "GotoIf", "GotoIfTime", "Switch"],
+      },
+      Database: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial", "Record", "Database", "RestApi", "AGI", "System", "Math"],
+      },
+      RestApi: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial", "Record", "Database", "RestApi", "AGI", "System", "Math"],
+      },
+      AGI: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Start", "Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial", "Record", "Database", "RestApi", "AGI", "System", "Math"],
+      },
+      System: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Start", "Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial", "Record", "Database", "RestApi", "AGI", "System", "Math"],
+      },
+      Math: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial", "Record", "Database", "RestApi", "AGI", "System", "Math"],
+      },
+      NoOp: {
+        canConnectTo: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "Record", "Goto", "GotoIf", "GotoIfTime", "Switch", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Hangup", "End"],
+        canReceiveFrom: ["Start", "Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial", "Record", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Callback", "Goal"],
+      },
+      Hangup: {
+        canConnectTo: [], // Hangup is terminal
+        canReceiveFrom: ["Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial", "Record", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Goal"],
+      },
+      Finally: {
+        canConnectTo: ["End", "Hangup", "NoOp"],
+        canReceiveFrom: ["Menu", "Playback", "Queue", "InternalDial", "ExternalDial", "GotoIf", "GotoIfTime", "Switch"],
+      },
+      End: {
+        canConnectTo: [], // End is terminal
+        canReceiveFrom: ["Answer", "Menu", "Playback", "GotoIf", "GotoIfTime", "Switch", "Queue", "InternalDial", "ExternalDial", "Record", "Callback", "Database", "RestApi", "AGI", "System", "Math", "NoOp", "Goal", "Finally"],
+      },
+    };
+  };
+
+  const validateConnection = (connection) => {
+    const sourceBlock = blocks.find((b) => b.id === connection.from);
+    const targetBlock = blocks.find((b) => b.id === connection.to);
+
+    if (!sourceBlock || !targetBlock) {
+      return { valid: false, message: "Invalid block reference" };
+    }
+
+    const sourceType = sourceBlock.type;
+    const targetType = targetBlock.type;
+    const rules = getConnectionRules();
+
     // Check if connection already exists
     const duplicateConnection = connections.find(
       (conn) =>
@@ -393,23 +507,42 @@ const IVRBuilder = () => {
     );
 
     if (duplicateConnection) {
-      console.log("Connection already exists");
-      return false;
+      return { valid: false, message: "This connection already exists" };
     }
 
     // Check if target block can accept more connections
-    const targetBlock = blocks.find((b) => b.id === connection.to);
-    const targetType = BLOCK_TYPES.find((t) => t.id === targetBlock.type);
+    const targetBlockType = BLOCK_TYPES.find((t) => t.id === targetBlock.type);
     const existingInputs = connections.filter(
       (conn) => conn.to === connection.to
     );
 
-    if (existingInputs.length >= targetType.connections.inputs) {
-      console.log("Target block cannot accept more connections");
-      return false;
+    if (existingInputs.length >= targetBlockType.connections.inputs) {
+      return { valid: false, message: `${targetType} block cannot accept more input connections` };
     }
 
-    return true;
+    // Check connection rules
+    const sourceRules = rules[sourceType];
+    const targetRules = rules[targetType];
+
+    if (!sourceRules) {
+      return { valid: false, message: `Unknown source block type: ${sourceType}` };
+    }
+
+    if (!targetRules) {
+      return { valid: false, message: `Unknown target block type: ${targetType}` };
+    }
+
+    // Check if source can connect to target
+    if (!sourceRules.canConnectTo.includes(targetType)) {
+      return { valid: false, message: `${sourceType} cannot connect to ${targetType}` };
+    }
+
+    // Check if target can receive from source
+    if (!targetRules.canReceiveFrom.includes(sourceType)) {
+      return { valid: false, message: `${targetType} cannot receive connections from ${sourceType}` };
+    }
+
+    return { valid: true, message: "" };
   };
 
   const handleDragStart = (e, type) => {
@@ -422,13 +555,17 @@ const IVRBuilder = () => {
     const rect = e.currentTarget.getBoundingClientRect();
     const scale = zoom / 100;
 
+    // Calculate raw position and snap to grid for uniform alignment
+    const rawPosition = {
+      x: (e.clientX - rect.left) / scale,
+      y: (e.clientY - rect.top) / scale,
+    };
+    const snappedPosition = snapToGrid(rawPosition);
+
     const newBlock = {
       id: `${type.id}-${Date.now()}`,
       type: type.id,
-      position: {
-        x: (e.clientX - rect.left) / scale,
-        y: (e.clientY - rect.top) / scale,
-      },
+      position: snappedPosition,
       config: getDefaultConfig(type.id),
     };
 
@@ -472,8 +609,15 @@ const IVRBuilder = () => {
           priority: getNextPriority(connecting.sourceId),
         };
 
-        if (isValidConnection(newConnection)) {
+        const validationResult = validateConnection(newConnection);
+        if (validationResult.valid) {
           setConnections([...connections, newConnection]);
+        } else {
+          setSnackbar({
+            open: true,
+            message: validationResult.message,
+            severity: "warning",
+          });
         }
       }
       setConnecting(null);
@@ -546,10 +690,16 @@ const IVRBuilder = () => {
     setDraggingBlock(block);
   };
 
-  const snapToGrid = (value) => {
-    const snapped = Math.round(value / GRID_SIZE) * GRID_SIZE;
-    const diff = Math.abs(value - snapped);
-    return diff < SNAP_THRESHOLD ? snapped : value;
+  // Snap position to grid - always snaps for uniform alignment
+  const snapToGrid = (position) => {
+    if (typeof position === "object") {
+      return {
+        x: Math.round(position.x / GRID_SIZE) * GRID_SIZE,
+        y: Math.round(position.y / GRID_SIZE) * GRID_SIZE,
+      };
+    }
+    // Legacy support for single value
+    return Math.round(position / GRID_SIZE) * GRID_SIZE;
   };
 
   const handleBlockClick = (block) => {
@@ -701,7 +851,6 @@ const IVRBuilder = () => {
                 margin="normal"
                 required
                 error={!config.trunk}
-                helperText={!config.trunk ? "Please select a trunk" : ""}
               >
                 <InputLabel id="trunk-label">Select Trunk</InputLabel>
                 <Select
@@ -718,6 +867,7 @@ const IVRBuilder = () => {
                     </MenuItem>
                   ))}
                 </Select>
+                {!config.trunk && <FormHelperText>Please select a trunk</FormHelperText>}
               </FormControl>
               <TextField
                 fullWidth
@@ -794,7 +944,6 @@ const IVRBuilder = () => {
                 margin="normal"
                 required
                 error={!config.list}
-                helperText={!config.list ? "Please select a list" : ""}
               >
                 <InputLabel id="list-label">List</InputLabel>
                 <Select
@@ -811,6 +960,7 @@ const IVRBuilder = () => {
                     </MenuItem>
                   ))}
                 </Select>
+                {!config.list && <FormHelperText>Please select a list</FormHelperText>}
               </FormControl>
 
               {/* Delay */}
@@ -924,9 +1074,6 @@ const IVRBuilder = () => {
                 margin="normal"
                 required
                 error={!config.filename}
-                helperText={
-                  !config.filename ? "Please select an audio file" : ""
-                }
               >
                 <InputLabel id="audio-label">Audio</InputLabel>
                 <Select
@@ -943,6 +1090,7 @@ const IVRBuilder = () => {
                     </MenuItem>
                   ))}
                 </Select>
+                {!config.filename && <FormHelperText>Please select an audio file</FormHelperText>}
               </FormControl>
               {/* Checkbox for skip if channel answered */}
               <FormControlLabel
@@ -1133,7 +1281,6 @@ const IVRBuilder = () => {
                 margin="normal"
                 required
                 error={!config.interval}
-                helperText={!config.interval ? "Please select an interval" : ""}
               >
                 <InputLabel id="interval-label">Interval</InputLabel>
                 <Select
@@ -1150,6 +1297,7 @@ const IVRBuilder = () => {
                     </MenuItem>
                   ))}
                 </Select>
+                {!config.interval && <FormHelperText>Please select an interval</FormHelperText>}
               </FormControl>
             </>
           );
@@ -1174,7 +1322,6 @@ const IVRBuilder = () => {
                 margin="normal"
                 required
                 error={!config.variable}
-                helperText={!config.variable ? "Please select a variable" : ""}
               >
                 <InputLabel id="variable-label">Variable</InputLabel>
                 <Select
@@ -1191,6 +1338,7 @@ const IVRBuilder = () => {
                     </MenuItem>
                   ))}
                 </Select>
+                {!config.variable && <FormHelperText>Please select a variable</FormHelperText>}
               </FormControl>
             </>
           );
@@ -1710,22 +1858,9 @@ const IVRBuilder = () => {
     return (
       <div
         onMouseDown={(e) => {
-          console.log("Connection Point MouseDown:", {
-            type,
-            blockId,
-            index,
-            isConnecting,
-          });
           handleConnectionStart(blockId, type, index, e);
         }}
         onMouseUp={() => {
-          console.log("Connection Point MouseUp:", {
-            type,
-            blockId,
-            index,
-            isConnecting,
-            connectionInProgress,
-          });
           if (connectionInProgress) {
             handleConnectionEnd(blockId, type, index);
           }
@@ -1830,13 +1965,15 @@ const IVRBuilder = () => {
   // For Duplicating Blocks
   const handleBlockDuplicate = () => {
     if (blockContextMenu?.block) {
+      // Offset by 2 grid units for better visibility and snap to grid
+      const newPosition = snapToGrid({
+        x: blockContextMenu.block.position.x + GRID_SIZE * 2,
+        y: blockContextMenu.block.position.y + GRID_SIZE * 2,
+      });
       const newBlock = {
         ...blockContextMenu.block,
         id: `${blockContextMenu.block.type}-${Date.now()}`,
-        position: {
-          x: blockContextMenu.block.position.x + GRID_SIZE,
-          y: blockContextMenu.block.position.y + GRID_SIZE,
-        },
+        position: newPosition,
       };
       setBlocks([...blocks, newBlock]);
     }
@@ -1908,24 +2045,54 @@ const IVRBuilder = () => {
   };
 
   const renderConnections = () => {
+    const blockWidth = 160;
+    const blockHeight = 40;
+
     return connections.map((connection, index) => {
       const fromBlock = blocks.find((b) => b.id === connection.from);
       const toBlock = blocks.find((b) => b.id === connection.to);
 
       if (!fromBlock || !toBlock) return null;
 
+      // Get block types to calculate correct connection point positions
+      const fromBlockType = BLOCK_TYPES.find((t) => t.id === fromBlock.type);
+      const toBlockType = BLOCK_TYPES.find((t) => t.id === toBlock.type);
+
+      if (!fromBlockType || !toBlockType) return null;
+
+      const fromOutputCount = fromBlockType.connections.outputs;
+      const toInputCount = toBlockType.connections.inputs;
+
+      // Calculate Y position matching the ConnectionPoint component formula
+      const fromY =
+        fromBlock.position.y +
+        (blockHeight * (connection.fromIndex + 1)) / (fromOutputCount + 1);
+
+      const toY =
+        toBlock.position.y +
+        (blockHeight * (connection.toIndex + 1)) / (toInputCount + 1);
+
       const fromPoint = {
-        x: fromBlock.position.x + 160,
-        y: fromBlock.position.y + 20 + connection.fromIndex * 20,
+        x: fromBlock.position.x + blockWidth,
+        y: fromY,
       };
 
       const toPoint = {
         x: toBlock.position.x,
-        y: toBlock.position.y + 20 + connection.toIndex * 20,
+        y: toY,
       };
 
       const dx = toPoint.x - fromPoint.x;
-      const controlPointOffset = Math.abs(dx) / 2;
+      const dy = toPoint.y - fromPoint.y;
+
+      // React Flow-inspired bezier curve calculation
+      // Use a minimum offset for better curves when blocks are close
+      const minOffset = 50;
+      const controlPointOffset = Math.max(Math.abs(dx) * 0.5, minOffset);
+
+      // Handle cases where target is to the left of source (backward connections)
+      const isBackward = dx < 0;
+      const curvature = isBackward ? Math.max(Math.abs(dx), 100) : controlPointOffset;
 
       const isSelected = selectedConnections.some(
         (selected) =>
@@ -1935,11 +2102,22 @@ const IVRBuilder = () => {
           selected.toIndex === connection.toIndex
       );
 
-      // Create the path string once
-      const pathString = `M ${fromPoint.x} ${fromPoint.y} 
-        C ${fromPoint.x + controlPointOffset} ${fromPoint.y},
-          ${toPoint.x - controlPointOffset} ${toPoint.y},
-          ${toPoint.x} ${toPoint.y}`;
+      // Create smooth bezier path - React Flow style
+      let pathString;
+      if (isBackward) {
+        // For backward connections, create a loop-around curve
+        const loopOffset = Math.abs(dy) * 0.5 + 50;
+        pathString = `M ${fromPoint.x} ${fromPoint.y} 
+          C ${fromPoint.x + loopOffset} ${fromPoint.y},
+            ${toPoint.x - loopOffset} ${toPoint.y},
+            ${toPoint.x} ${toPoint.y}`;
+      } else {
+        // Standard forward bezier curve
+        pathString = `M ${fromPoint.x} ${fromPoint.y} 
+          C ${fromPoint.x + curvature} ${fromPoint.y},
+            ${toPoint.x - curvature} ${toPoint.y},
+            ${toPoint.x} ${toPoint.y}`;
+      }
 
       return (
         <svg
@@ -1964,7 +2142,7 @@ const IVRBuilder = () => {
             >
               <polygon
                 points="0 0, 10 3.5, 0 7"
-                fill={isSelected ? "#2196f3" : "#690"}
+                fill={isSelected ? "#2196f3" : "#555"}
               />
             </marker>
           </defs>
@@ -2020,8 +2198,8 @@ const IVRBuilder = () => {
 
           <path
             d={pathString}
-            stroke={isSelected ? "#2196f3" : "#690"}
-            strokeWidth={isSelected ? "2" : "1"}
+            stroke={isSelected ? "#2196f3" : "#555"}
+            strokeWidth={isSelected ? "2.5" : "2"}
             fill="none"
             markerEnd={`url(#arrowhead-${index})`}
             style={{ pointerEvents: "none" }}

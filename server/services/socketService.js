@@ -1,5 +1,6 @@
 // socketService.js
 import { Server } from "socket.io";
+import { io as Client } from "socket.io-client";
 // import { verifyToken } from "../utils/auth.js";
 import { ariService } from "./ariService.js";
 import { EventBusService } from "./eventBus.js";
@@ -8,13 +9,17 @@ import amiService from "./amiService.js";
 // import { Op } from "../config/sequelize.js";
 import { callMonitoringService } from "./callMonitoringService.js";
 import jwt from "jsonwebtoken";
+import { generateFingerprint } from "../utils/serverFingerprinting.js";
 
 let io = null;
+let masterSocket = null;
+let serverFingerprint = null;
 const connectedClients = new Map();
 let processHandlersInitialized = false;
 let eventBusHandlersInitialized = false;
 let ariHandlersInitialized = false;
 let amiRealtimeInitialized = false;
+let masterConnectionInitialized = false;
 const state = {
   registeredPeers: new Map(),
   deviceStates: new Map(),
@@ -130,6 +135,13 @@ export function initializeSocket(httpServer) {
     amiRealtimeInitialized = true;
   }
   setupCallMonitoringEvents(io);
+  
+  // Connect to master license server for real-time license updates
+  if (!masterConnectionInitialized) {
+    connectToMasterServer();
+    masterConnectionInitialized = true;
+  }
+  
   return io;
 }
 
@@ -382,6 +394,105 @@ function setupSocketEvents() {
       }
     });
   });
+}
+
+// Connect to master license server for real-time updates
+async function connectToMasterServer() {
+  try {
+    // Generate server fingerprint
+    serverFingerprint = await generateFingerprint();
+    console.log("🔍 Generated server fingerprint for license updates:", serverFingerprint);
+
+    const masterUrl = process.env.LICENSE_MGMT_API_URL?.replace("/api", "") || "http://localhost:8001";
+    console.log(`🔌 Connecting to master license server at: ${masterUrl}`);
+
+    masterSocket = Client(masterUrl, {
+      path: "/socket.io/",
+      transports: ["websocket", "polling"],
+      timeout: 5000,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 10000,
+    });
+
+    masterSocket.on("connect", () => {
+      console.log("✅ Connected to master license server for real-time updates.");
+      // Notify master server of this slave's fingerprint
+      masterSocket.emit("slave_connected", { serverFingerprint });
+    });
+
+    masterSocket.on("license:updated", async (data) => {
+      console.log("📡 Received license update from master:", data);
+      console.log("🔍 Current server fingerprint:", serverFingerprint);
+      console.log("📡 Master server fingerprint:", data.serverFingerprint);
+
+      // Check if this update is for our server
+      if (data.serverFingerprint === serverFingerprint) {
+        console.log("🔍 Fingerprint matches. Syncing license and notifying clients.");
+        await handleLicenseUpdateFromMaster(data);
+      } else {
+        // Even if fingerprints don't match, try to sync (handles fingerprint updates)
+        console.log("⚠️ Fingerprint mismatch, attempting sync anyway...");
+        await handleLicenseUpdateFromMaster(data);
+      }
+    });
+
+    masterSocket.on("disconnect", (reason) => {
+      console.log("❌ Disconnected from master license server:", reason);
+    });
+
+    masterSocket.on("connect_error", (error) => {
+      console.error("❌ Failed to connect to master license server:", error.message);
+    });
+  } catch (error) {
+    console.error("❌ Error setting up master server connection:", error);
+  }
+}
+
+// Handle license update from master server
+async function handleLicenseUpdateFromMaster(data) {
+  try {
+    // Dynamically import license service to avoid circular dependencies
+    const { default: createLicenseService } = await import("./licenseService.js");
+    const licenseService = createLicenseService();
+
+    // Force a fresh sync to get the latest license
+    console.log("🔄 Syncing license from master...");
+    const syncResult = await licenseService.syncLicenseFromMaster();
+
+    // Small delay to ensure cache is updated
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Get the updated license to broadcast to clients
+    const currentLicense = await licenseService.getCurrentLicense();
+
+    // Emit to all connected dashboard clients
+    if (io) {
+      const updateData = {
+        message: "License has been updated.",
+        timestamp: new Date().toISOString(),
+        license: currentLicense,
+      };
+
+      console.log("📤 Broadcasting license:updated to all connected clients");
+      io.emit("license:updated", updateData);
+      io.emit("license:update", updateData); // Also emit alternate event name
+
+      const connectedCount = io.sockets.sockets.size;
+      console.log(`📤 Emitted license update to ${connectedCount} connected clients`);
+    }
+  } catch (error) {
+    console.error("❌ Error handling license update from master:", error);
+    
+    // Still try to emit update notification even if sync failed
+    if (io) {
+      io.emit("license:updated", {
+        message: "License has been updated.",
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
 }
 
 // ARI event handlers

@@ -59,7 +59,6 @@ import {
   getQueueDistributionData,
   getSLAComplianceData,
   exportReportData,
-  getDataToolMetricsData,
 } from "../api/reportsApi";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
@@ -85,7 +84,6 @@ const Reports = ({ open, onClose }) => {
   const [agentPerformanceData, setAgentPerformanceData] = useState([]);
   const [queueDistributionData, setQueueDistributionData] = useState([]);
   const [slaData, setSlaData] = useState([]);
-  const [dataToolMetrics, setDataToolMetrics] = useState(null);
 
   // State for export menu
   const [exportAnchorEl, setExportAnchorEl] = useState(null);
@@ -159,18 +157,6 @@ const Reports = ({ open, onClose }) => {
       // Fetch SLA data
       const slaResponse = await getSLAComplianceData(startDate, endDate);
       setSlaData(slaResponse.data);
-
-      // Fetch DataTool metrics
-      try {
-        const dataToolResponse = await getDataToolMetricsData(
-          startDate,
-          endDate
-        );
-        setDataToolMetrics(dataToolResponse.data);
-      } catch (dataToolError) {
-        console.error("Error fetching DataTool metrics:", dataToolError);
-        // Don't fail the entire report if just DataTool fails
-      }
     } catch (err) {
       console.error("Error fetching report data:", err);
       setError("Failed to load report data. Please try again later.");
@@ -211,9 +197,7 @@ const Reports = ({ open, onClose }) => {
             ? "call-volume"
             : activeTab === 1
             ? "agent-performance"
-            : activeTab === 2
-            ? "queue-metrics"
-            : "datatool";
+            : "queue-metrics";
       }
 
       // Request report export from backend
@@ -1326,14 +1310,12 @@ const Reports = ({ open, onClose }) => {
           <Tab icon={<BarChart />} label="Call Volume" />
           <Tab icon={<Assessment />} label="Agent Performance" />
           <Tab icon={<PieChart />} label="Queue Metrics" />
-          <Tab icon={<Timeline />} label="DataTool" />
         </Tabs>
 
         {/* Report Content */}
         {activeTab === 0 && renderCallVolumeReport()}
         {activeTab === 1 && renderAgentPerformance()}
         {activeTab === 2 && renderQueueMetrics()}
-        {activeTab === 3 && renderDataToolReport()}
       </Box>
 
       {/* Modern Date Picker */}
@@ -1386,22 +1368,6 @@ const Reports = ({ open, onClose }) => {
             secondary="Channel utilization stats"
           />
         </MenuItem>
-        {activeTab === 3 && (
-          <>
-            <MenuItem onClick={() => handleExport("datatool")}>
-              <ListItemText
-                primary="DataTool Report"
-                secondary="Current date range"
-              />
-            </MenuItem>
-            <MenuItem onClick={() => handleExport("datatool-all-time")}>
-              <ListItemText
-                primary="DataTool All-Time Report"
-                secondary="Complete historical data"
-              />
-            </MenuItem>
-          </>
-        )}
       </Menu>
     </ContentFrame>
   );

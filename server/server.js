@@ -46,8 +46,7 @@ import whatsappRoutes from "./routes/whatsappRoutes.js";
 import intervalRoutes from "./routes/intervalRoutes.js";
 // Use enhanced transfer routes (includes legacy endpoints for compatibility)
 import enhancedTransferRoutes from "./routes/enhancedTransferRoutes.js";
-import dataToolRoute from "../datatool_server/routes/dataToolRoute.js";
-import enhancedDataToolRoutes from "./routes/enhancedDataToolRoutes.js";
+// datatool_server removed - not used in this project
 import { callMonitoringService } from "./services/callMonitoringService.js";
 // import CallRecords from "./models/callRecordsModel.js";
 import { setupWhatsAppAssociations } from "./models/whatsappAssociations.js";
@@ -62,6 +61,7 @@ import callsRoutes from "./routes/callsRoutes.js";
 import amiRoutes from "./routes/amiRoutes.js";
 import pauseRoutes from "./routes/pauseRoutes.js";
 import { seedPauseReasons } from "./models/pauseReasonModel.js";
+import licenseRoutes from "./routes/licenseRoutes.js";
 import setupDefaultIntervals from "./utils/setupDefaultIntervals.js";
 // Increase EventEmitter limit
 EventEmitter.defaultMaxListeners = 15;
@@ -411,14 +411,14 @@ app.use("/api/users/odbc", odbcRoutes);
 app.use("/api/users/intervals", intervalRoutes);
 app.use("/api/transfers", enhancedTransferRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
-app.use("/api/dataTool", dataToolRoute);
-app.use("/api/enhanced-datatool", enhancedDataToolRoutes);
+// datatool routes removed - not used in this project
 app.use("/api/cdr", cdrRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/recordings", recordingRoutes);
 app.use("/api/calls", callsRoutes);
 app.use("/api/ami", amiRoutes);
 app.use("/api/pause", pauseRoutes);
+app.use("/api/license", licenseRoutes);
 
 // app.use("/api/sip", sipRoutes);
 
@@ -522,25 +522,7 @@ const initializeAsteriskServices = async () => {
   }
 };
 
-// MongoDB Connection
-const connectMongoDB = async () => {
-  try {
-    console.log(chalk.gray("     Connecting to MongoDB..."));
-    await mongoose.connect(process.env.MONGODB_URI, {
-      autoIndex: true,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-      family: 4,
-    });
-    console.log(chalk.green("     ✅ MongoDB Connected"));
-  } catch (error) {
-    console.error(chalk.red("❌ MongoDB connection error:"), error.message);
-    if (error.stack) {
-      console.error(chalk.red("   Stack trace:"), error.stack);
-    }
-    throw error;
-  }
-};
+// MongoDB Connection removed - datatool_server not used in this project
 
 // Server initialization with proper error handling and progress indicators
 const initializeApp = async () => {
@@ -641,9 +623,7 @@ const initializeApp = async () => {
       );
     }
 
-    console.log(chalk.gray("   Connecting to MongoDB..."));
-    await connectMongoDB();
-    console.log(chalk.green("   ✅ MongoDB connected\n"));
+    // MongoDB connection removed - datatool_server not used in this project
 
     // Setup WebSocket handlers
     console.log(chalk.gray("   Setting up WebSocket handlers..."));
