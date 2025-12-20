@@ -534,6 +534,8 @@ export const getAllAgentsWithStatus = async (req, res) => {
       ],
     });
 
+    console.log(`[getAllAgentsWithStatus] Found ${users.length} users with extensions`);
+
     // Get real-time status from AMI
     let allExtensionStatuses = {};
     try {
