@@ -5,9 +5,10 @@ import { execSync } from "child_process";
 export const getCPUInfo = async () => {
   try {
     const cpuInfo = os.cpus()[0];
+    // Only use model, NOT speed (speed changes with CPU frequency scaling)
     return crypto
       .createHash("sha256")
-      .update(cpuInfo.model + cpuInfo.speed)
+      .update(cpuInfo.model)
       .digest("hex")
       .substring(0, 16);
   } catch {
