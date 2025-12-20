@@ -550,6 +550,49 @@ git log --oneline -5
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+### PM2 Environment Variables (IMPORTANT)
+
+PM2 caches environment variables when a process is first started. If you update environment variables in `.env` or `ecosystem.config.cjs`, you **must** delete and restart the process for changes to take effect.
+
+**Common Issue: CORS errors after changing PUBLIC_IP**
+
+If you get CORS errors like "Not allowed by CORS" after changing `PUBLIC_IP`, it's because PM2 is still using the cached old IP.
+
+**Solution: Delete and restart the PM2 process**
+
+```bash
+# This will NOT pick up new environment variables:
+pm2 restart mayday
+pm2 restart mayday --update-env  # Also doesn't always work
+
+# Correct way - delete and restart from ecosystem config:
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
+  "echo 'Pasword@1759' | sudo -S bash -c 'export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && cd /home/medhi/Mayday_EC && pm2 delete mayday && pm2 start ecosystem.config.cjs && pm2 save'"
+```
+
+**Verify the environment is correct:**
+
+```bash
+# Check current PM2 environment for process 0:
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
+  "echo 'Pasword@1759' | sudo -S bash -c 'export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && pm2 env 0'" | grep PUBLIC_IP
+
+# Should output: PUBLIC_IP: 192.168.1.14
+```
+
+**Environment variable sources (priority order):**
+
+1. `ecosystem.config.cjs` - Primary source for PM2 environment
+2. `server/.env` - Loaded by dotenv at runtime (supplements ecosystem config)
+
+**Key environment variables for CORS:**
+
+| Variable | Location | Purpose |
+|----------|----------|---------|
+| `PUBLIC_IP` | `ecosystem.config.cjs` | Used to build CORS allowed origins list |
+| `PORT` | `ecosystem.config.cjs` | Server port (default: 8004) |
+| `NODE_ENV` | `ecosystem.config.cjs` | Set to "production" for strict CORS |
+
 ### Accessing the Dashboard
 
 **URL**: http://192.168.1.14
