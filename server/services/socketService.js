@@ -399,11 +399,24 @@ function setupSocketEvents() {
 // Connect to master license server for real-time updates
 async function connectToMasterServer() {
   try {
+    // Skip license server connection if disabled or not configured
+    if (process.env.SKIP_LICENSE_SERVER === "true" || process.env.SKIP_LICENSE_SERVER === "1") {
+      console.log("ℹ️ License server connection disabled via SKIP_LICENSE_SERVER");
+      return;
+    }
+
     // Generate server fingerprint
     serverFingerprint = await generateFingerprint();
     console.log("🔍 Generated server fingerprint for license updates:", serverFingerprint);
 
     const masterUrl = process.env.LICENSE_MGMT_API_URL?.replace("/api", "") || "http://localhost:8001";
+    
+    // Skip if using default localhost URL in production (no license server configured)
+    if (masterUrl === "http://localhost:8001" && process.env.NODE_ENV === "production") {
+      console.log("ℹ️ No LICENSE_MGMT_API_URL configured, skipping license server connection");
+      return;
+    }
+    
     console.log(`🔌 Connecting to master license server at: ${masterUrl}`);
 
     masterSocket = Client(masterUrl, {
