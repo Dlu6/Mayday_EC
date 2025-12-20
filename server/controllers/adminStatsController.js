@@ -532,7 +532,10 @@ export const getAllAgentsWithStatus = async (req, res) => {
         "online",
         "lastLoginAt",
       ],
+      raw: true, // Return plain objects for debugging
     });
+
+    console.log(`[getAllAgentsWithStatus] Query returned ${users.length} users:`, JSON.stringify(users.map(u => ({ext: u.extension, name: u.fullName || u.name, role: u.role}))));
 
     // Get real-time status from AMI
     let allExtensionStatuses = {};
