@@ -298,7 +298,6 @@ const createLicenseService = () => {
       // URL encode the fingerprint (contains | and other special characters)
       const encodedFingerprint = encodeURIComponent(currentFingerprint);
       const fetchUrl = `${masterUrl}/licenses/fingerprint/${encodedFingerprint}`;
-      console.log(`🔗 Fetching from: ${fetchUrl}`);
 
       const response = await fetch(
         fetchUrl,

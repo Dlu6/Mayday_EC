@@ -592,6 +592,53 @@ ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
 | `PUBLIC_IP` | `ecosystem.config.cjs` | Used to build CORS allowed origins list |
 | `PORT` | `ecosystem.config.cjs` | Server port (default: 8004) |
 | `NODE_ENV` | `ecosystem.config.cjs` | Set to "production" for strict CORS |
+| `LICENSE_MGMT_API_URL` | `ecosystem.config.cjs` | License provisioning server URL |
+| `SECRET_INTERNAL_API_KEY` | `ecosystem.config.cjs` | API key for license server communication |
+
+### License Server Configuration (Master-Slave Architecture)
+
+The on-prem server acts as a **slave** that syncs licenses from the **master** (Heroku provisioning server).
+
+**ecosystem.config.cjs environment variables:**
+
+```javascript
+env: {
+  LICENSE_MGMT_API_URL: "https://mayday-website-backend-c2abb923fa80.herokuapp.com/api",
+  SECRET_INTERNAL_API_KEY: "aVeryLongAndRandomSecretStringForInternalComms_987654321_production",
+}
+```
+
+**Important: The `SECRET_INTERNAL_API_KEY` must match the key on the Heroku provisioning server.**
+
+#### Server Fingerprint
+
+The server generates a unique fingerprint for license identification using:
+- CPU model (hashed)
+- Disk serial
+- MAC address
+- Motherboard serial
+- Hostname
+
+**Get current fingerprint:**
+```bash
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
+  "echo 'Pasword@1759' | sudo -S bash -c 'export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && pm2 logs mayday --lines 50 --nostream'" 2>&1 | grep "Current fingerprint"
+```
+
+#### License Sync Troubleshooting
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| "No license found on master server" | Fingerprint not registered on master | Copy fingerprint from slave, create license on master with that fingerprint |
+| "Invalid internal API key" | API key mismatch | Ensure `SECRET_INTERNAL_API_KEY` in ecosystem.config.cjs matches Heroku's config |
+| "Failed to connect to master license server" | Network/CORS issue | Add slave's origin to Heroku's `ALLOWED_ORIGINS` config var |
+| License sync returns 404 | URL encoding issue | Fixed in licenseService.js - fingerprint is now URL-encoded |
+
+#### Heroku Provisioning Server Config Vars
+
+Required config vars on Heroku for slave communication:
+- `SECRET_INTERNAL_API_KEY` - Must match slave's key
+- `ALLOWED_ORIGINS` - Must include `https://192.168.1.14,http://192.168.1.14`
 
 ### Accessing the Dashboard
 
