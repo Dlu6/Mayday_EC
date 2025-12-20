@@ -409,14 +409,15 @@ async function connectToMasterServer() {
     serverFingerprint = await generateFingerprint();
     console.log("🔍 Generated server fingerprint for license updates:", serverFingerprint);
 
-    const masterUrl = process.env.LICENSE_MGMT_API_URL?.replace("/api", "") || "http://localhost:8001";
+    const licenseApiUrl = process.env.LICENSE_MGMT_API_URL;
     
-    // Skip if using default localhost URL in production (no license server configured)
-    if (masterUrl === "http://localhost:8001" && process.env.NODE_ENV === "production") {
+    // Skip if no license URL is configured in production
+    if (!licenseApiUrl && process.env.NODE_ENV === "production") {
       console.log("ℹ️ No LICENSE_MGMT_API_URL configured, skipping license server connection");
       return;
     }
     
+    const masterUrl = licenseApiUrl?.replace("/api", "") || "http://localhost:8001";
     console.log(`🔌 Connecting to master license server at: ${masterUrl}`);
 
     masterSocket = Client(masterUrl, {

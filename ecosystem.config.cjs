@@ -11,6 +11,7 @@ module.exports = {
         PORT: 8004,
         PUBLIC_IP: "192.168.1.14",
         ASTERISK_CONFIG_PATH: "/etc/asterisk",
+        LICENSE_MGMT_API_URL: "https://mayday-website-backend-c2abb923fa80.herokuapp.com/api",
       },
     },
   ],
