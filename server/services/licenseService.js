@@ -294,9 +294,14 @@ const createLicenseService = () => {
 
       // Try to fetch license from master server
       console.log("📡 Fetching license from master server...");
+      
+      // URL encode the fingerprint (contains | and other special characters)
+      const encodedFingerprint = encodeURIComponent(currentFingerprint);
+      const fetchUrl = `${masterUrl}/licenses/fingerprint/${encodedFingerprint}`;
+      console.log(`🔗 Fetching from: ${fetchUrl}`);
 
       const response = await fetch(
-        `${masterUrl}/licenses/fingerprint/${currentFingerprint}`,
+        fetchUrl,
         {
           method: "GET",
           headers: {
