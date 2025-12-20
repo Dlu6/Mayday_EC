@@ -85,42 +85,46 @@ const corsOptions = {
     const publicIp = process.env.PUBLIC_IP || "localhost";
     const port = process.env.PORT || "8004";
     
-    // In development, allow all origins for easier development
-    if (process.env.NODE_ENV === 'development') {
-      return callback(null, true);
-    }
-
-    // In production, only allow specific origins
     const allowedOrigins = [
-      // Production domains
-      `http://${process.env.PUBLIC_IP}:${process.env.PORT}`,
-      `https://${process.env.PUBLIC_IP}:${process.env.PORT}`,
-      `http://${process.env.PUBLIC_IP}`,
-      `https://${process.env.PUBLIC_IP}`,
+      // Dynamic origins from PUBLIC_IP env variable
+      `http://${publicIp}:${port}`,
+      `https://${publicIp}:${port}`,
+      `http://${publicIp}:8088`,
+      `https://${publicIp}:8088`,
+      `http://${publicIp}`,
+      `https://${publicIp}`,
+      `ws://${publicIp}:${port}`,
+      `wss://${publicIp}:${port}`,
+      `ws://${publicIp}`,
+      `wss://${publicIp}`,
       // Localhost for development
       "http://localhost:3000",
       "http://localhost:5173",
       "http://localhost:8004",
       "ws://localhost:8004",
-      // Add any other domains you need
     ];
 
-    // Check if the origin is in the allowed list or starts with any allowed origin
-    if (allowedOrigins.includes(origin) || 
-        allowedOrigins.some(allowed => origin.startsWith(allowed))) {
-      return callback(null, true);
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    if (process.env.NODE_ENV === "development") {
+      return callback(null, true); // Allow all origins in development
+    }
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
     } else {
-      console.warn(`Blocked request from origin: ${origin}`);
-      return callback(new Error('Not allowed by CORS'));
+      console.error(`CORS blocked origin: ${origin}`);
+      console.error(`Allowed origins: ${allowedOrigins.join(", ")}`);
+      callback(new Error("Not allowed by CORS"));
     }
   },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-Auth-Token"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   credentials: true,
   maxAge: 86400,
   preflightContinue: false,
   optionsSuccessStatus: 204,
-  exposedHeaders: ["Content-Range", "X-Total-Count"]
 };
 
 const swaggerOptions = {
