@@ -640,11 +640,47 @@ Required config vars on Heroku for slave communication:
 - `SECRET_INTERNAL_API_KEY` - Must match slave's key
 - `ALLOWED_ORIGINS` - Must include `https://192.168.1.14,http://192.168.1.14`
 
+### Client Environment Variables
+
+The React client requires environment variables for API communication.
+
+**Development (`client/.env`):**
+```
+REACT_APP_API_URL=http://localhost:8004/api
+REACT_APP_SOCKET_URL=http://localhost:8004
+REACT_APP_ENCRYPTION_KEY=Mayday_ivr_encryption_block_key
+```
+
+**Production Build:**
+
+For production, use `/api` (relative path) since nginx proxies API requests:
+
+```bash
+# SSH to server and rebuild client with production API URL
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
+  "echo 'Pasword@1759' | sudo -S bash -c 'cd /home/medhi/Mayday_EC/client && export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && echo \"REACT_APP_API_URL=/api\" > .env && npm run build'"
+```
+
+**Important:** After rebuilding the client, users must **hard refresh** their browser (Cmd+Shift+R / Ctrl+Shift+R) to load the new JavaScript bundle.
+
+**Troubleshooting API Calls:**
+
+If the dashboard shows "No agents available" or API calls fail:
+1. Check nginx access logs for requests missing `/api` prefix:
+   ```bash
+   sudo tail -50 /var/log/nginx/access.log | grep admin
+   ```
+2. If requests go to `/admin/all-agents` instead of `/api/admin/all-agents`, rebuild the client with correct `REACT_APP_API_URL=/api`
+3. Verify the build has correct baseURL:
+   ```bash
+   grep -o 'baseURL:"[^"]*"' /home/medhi/Mayday_EC/client/build/static/js/main*.js
+   ```
+
 ### Accessing the Dashboard
 
-**URL**: http://192.168.1.14
+**URL**: https://192.168.1.14
 
-Open your browser and navigate to `http://192.168.1.14` to access the Mayday CRM Dashboard.
+Open your browser and navigate to `https://192.168.1.14` to access the Mayday CRM Dashboard.
 
 **Default Login Credentials** (from .env):
 - **Username**: admin

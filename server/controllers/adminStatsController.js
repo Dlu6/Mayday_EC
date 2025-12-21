@@ -506,7 +506,6 @@ export const getAbandonRateStats = async (req, res) => {
  * Get all agents with their real-time status (including offline)
  */
 export const getAllAgentsWithStatus = async (req, res) => {
-  console.log("[getAllAgentsWithStatus] API endpoint called");
   try {
     // Import models dynamically to avoid circular dependencies
     const { default: UserModel } = await import("../models/UsersModel.js");
@@ -534,8 +533,6 @@ export const getAllAgentsWithStatus = async (req, res) => {
         "lastLoginAt",
       ],
     });
-
-    console.log(`[getAllAgentsWithStatus] Found ${users.length} users with extensions`);
 
     // Get real-time status from AMI
     let allExtensionStatuses = {};
