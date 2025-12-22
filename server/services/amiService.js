@@ -1127,7 +1127,285 @@ const createAmiService = () => {
       }
     },
 
-    // 🔌 UTILITY FUNCTIONS
+    // � CHANSPY FUNCTIONS - Call Monitoring/Supervision
+
+    /**
+     * Start spying on a channel (silent monitoring)
+     * @param {string} spyerExtension - The extension of the supervisor who will spy
+     * @param {string} targetChannel - The channel to spy on (e.g., "PJSIP/1001-00000001")
+     * @param {object} options - ChanSpy options
+     * @param {string} options.mode - 'listen' (silent), 'whisper' (speak to agent), 'barge' (speak to both)
+     * @param {boolean} options.quiet - Don't play beep to spied channel
+     * @param {number} options.volume - Volume adjustment (-4 to +4)
+     * @param {string} options.group - Only spy on channels in this group
+     */
+    startChanSpy: async (spyerExtension, targetChannel, options = {}) => {
+      try {
+        console.log(
+          chalk.blue(
+            `[AMI] Starting ChanSpy: ${spyerExtension} spying on ${targetChannel}`
+          )
+        );
+
+        // Build ChanSpy options string
+        let chanSpyOptions = "";
+
+        // Mode options
+        if (options.mode === "whisper") {
+          chanSpyOptions += "w"; // Enable whisper mode
+        } else if (options.mode === "barge") {
+          chanSpyOptions += "B"; // Enable barge mode (speak to both parties)
+        }
+        // Default is 'listen' (silent) - no option needed
+
+        // Quiet mode - don't play beep
+        if (options.quiet !== false) {
+          chanSpyOptions += "q";
+        }
+
+        // Volume adjustment
+        if (options.volume && options.volume >= -4 && options.volume <= 4) {
+          chanSpyOptions += `v(${options.volume})`;
+        }
+
+        // Group filter
+        if (options.group) {
+          chanSpyOptions += `g(${options.group})`;
+        }
+
+        // Stop when spied channel hangs up
+        chanSpyOptions += "S";
+
+        // Extract the channel prefix for ChanSpy (e.g., "PJSIP/1001" from "PJSIP/1001-00000001")
+        const channelPrefix = targetChannel.split("-")[0];
+
+        const action = {
+          Action: "Originate",
+          Channel: `PJSIP/${spyerExtension}`,
+          Application: "ChanSpy",
+          Data: `${channelPrefix},${chanSpyOptions}`,
+          Timeout: 30000,
+          CallerID: `Supervisor <${spyerExtension}>`,
+          Async: "yes",
+        };
+
+        const result = await state.client.sendAction(action);
+        console.log(chalk.green(`[AMI] ChanSpy started successfully:`, result));
+
+        return {
+          ...result,
+          spyerExtension,
+          targetChannel,
+          mode: options.mode || "listen",
+          options: chanSpyOptions,
+        };
+      } catch (error) {
+        console.error(chalk.red(`[AMI] ChanSpy failed:`, error.message));
+        throw error;
+      }
+    },
+
+    /**
+     * Start spying on a specific extension (finds active channel automatically)
+     * @param {string} spyerExtension - The extension of the supervisor who will spy
+     * @param {string} targetExtension - The extension to spy on
+     * @param {object} options - ChanSpy options (same as startChanSpy)
+     */
+    startChanSpyByExtension: async (spyerExtension, targetExtension, options = {}) => {
+      try {
+        console.log(
+          chalk.blue(
+            `[AMI] Starting ChanSpy by extension: ${spyerExtension} spying on ext ${targetExtension}`
+          )
+        );
+
+        // Find the active channel for the target extension
+        const channelInfo = await getChannelForExtension(targetExtension);
+
+        if (!channelInfo?.channel) {
+          throw new Error(`No active channel found for extension ${targetExtension}`);
+        }
+
+        console.log(
+          chalk.gray(`[AMI] Found channel for ${targetExtension}: ${channelInfo.channel}`)
+        );
+
+        // Build ChanSpy options string
+        let chanSpyOptions = "";
+
+        if (options.mode === "whisper") {
+          chanSpyOptions += "w";
+        } else if (options.mode === "barge") {
+          chanSpyOptions += "B";
+        }
+
+        if (options.quiet !== false) {
+          chanSpyOptions += "q";
+        }
+
+        if (options.volume && options.volume >= -4 && options.volume <= 4) {
+          chanSpyOptions += `v(${options.volume})`;
+        }
+
+        if (options.group) {
+          chanSpyOptions += `g(${options.group})`;
+        }
+
+        chanSpyOptions += "S";
+
+        // Use PJSIP/<extension> prefix for ChanSpy to target specific extension
+        const action = {
+          Action: "Originate",
+          Channel: `PJSIP/${spyerExtension}`,
+          Application: "ChanSpy",
+          Data: `PJSIP/${targetExtension},${chanSpyOptions}`,
+          Timeout: 30000,
+          CallerID: `Supervisor <${spyerExtension}>`,
+          Async: "yes",
+        };
+
+        const result = await state.client.sendAction(action);
+        console.log(
+          chalk.green(`[AMI] ChanSpy by extension started successfully:`, result)
+        );
+
+        return {
+          ...result,
+          spyerExtension,
+          targetExtension,
+          targetChannel: channelInfo.channel,
+          mode: options.mode || "listen",
+          options: chanSpyOptions,
+        };
+      } catch (error) {
+        console.error(
+          chalk.red(`[AMI] ChanSpy by extension failed:`, error.message)
+        );
+        throw error;
+      }
+    },
+
+    /**
+     * Stop an active ChanSpy session by hanging up the spy channel
+     * @param {string} spyerExtension - The extension doing the spying
+     */
+    stopChanSpy: async (spyerExtension) => {
+      try {
+        console.log(
+          chalk.blue(`[AMI] Stopping ChanSpy for extension ${spyerExtension}`)
+        );
+
+        // Find the spy channel
+        const channelInfo = await getChannelForExtension(spyerExtension);
+
+        if (!channelInfo?.channel) {
+          throw new Error(`No active spy channel found for extension ${spyerExtension}`);
+        }
+
+        // Hangup the spy channel
+        const result = await state.client.sendAction({
+          Action: "Hangup",
+          Channel: channelInfo.channel,
+          Cause: 16, // Normal clearing
+        });
+
+        console.log(chalk.green(`[AMI] ChanSpy stopped successfully:`, result));
+        return result;
+      } catch (error) {
+        console.error(chalk.red(`[AMI] Stop ChanSpy failed:`, error.message));
+        throw error;
+      }
+    },
+
+    /**
+     * Get list of calls that can be spied on (active bridged calls)
+     */
+    getSpyableChannels: async () => {
+      try {
+        console.log(chalk.blue(`[AMI] Getting spyable channels`));
+
+        const result = await state.client.sendAction({
+          Action: "CoreShowChannels",
+        });
+
+        // Filter to only show bridged/active calls
+        const spyableChannels = [];
+        if (result?.events && Array.isArray(result.events)) {
+          for (const event of result.events) {
+            if (
+              event.Event === "CoreShowChannel" &&
+              event.ChannelState === "6" && // Up state
+              (event.Channel?.startsWith("PJSIP/") || event.Channel?.startsWith("SIP/"))
+            ) {
+              // Extract extension from channel name
+              const channelMatch = event.Channel.match(/(?:PJSIP|SIP)\/(\d+)-/);
+              const extension = channelMatch ? channelMatch[1] : null;
+
+              spyableChannels.push({
+                channel: event.Channel,
+                extension: extension,
+                callerIdNum: event.CallerIDNum,
+                callerIdName: event.CallerIDName,
+                connectedLineNum: event.ConnectedLineNum,
+                connectedLineName: event.ConnectedLineName,
+                duration: event.Duration,
+                bridgeId: event.BridgeId,
+                application: event.Application,
+                uniqueId: event.Uniqueid,
+              });
+            }
+          }
+        }
+
+        console.log(
+          chalk.green(`[AMI] Found ${spyableChannels.length} spyable channels`)
+        );
+        return spyableChannels;
+      } catch (error) {
+        console.error(
+          chalk.red(`[AMI] Failed to get spyable channels:`, error.message)
+        );
+        throw error;
+      }
+    },
+
+    /**
+     * Switch ChanSpy mode during an active session
+     * @param {string} spyerExtension - The extension doing the spying
+     * @param {string} newMode - 'listen', 'whisper', or 'barge'
+     */
+    switchChanSpyMode: async (spyerExtension, newMode) => {
+      try {
+        console.log(
+          chalk.blue(`[AMI] Switching ChanSpy mode to ${newMode} for ${spyerExtension}`)
+        );
+
+        // DTMF codes for ChanSpy mode switching during active session
+        // Note: This requires the spy to be in an active ChanSpy application
+        const channelInfo = await getChannelForExtension(spyerExtension);
+
+        if (!channelInfo?.channel) {
+          throw new Error(`No active channel found for extension ${spyerExtension}`);
+        }
+
+        // ChanSpy doesn't have runtime mode switching via DTMF by default
+        // We need to use a custom dialplan or send appropriate DTMF
+        // For now, return info about the limitation
+        return {
+          success: false,
+          message: "Runtime mode switching requires dialplan configuration. Please stop and restart spy with new mode.",
+          currentChannel: channelInfo.channel,
+          requestedMode: newMode,
+        };
+      } catch (error) {
+        console.error(
+          chalk.red(`[AMI] Switch ChanSpy mode failed:`, error.message)
+        );
+        throw error;
+      }
+    },
+
+    // �🔌 UTILITY FUNCTIONS
     executeAction: async (action) => {
       if (!state.client?.isConnected()) {
         throw new Error("AMI not connected");

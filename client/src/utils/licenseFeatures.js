@@ -27,6 +27,7 @@ export const FEATURE_KEYS = {
   FACEBOOK: 'facebook',
   THIRD_PARTY_INTEGRATIONS: 'third_party_integrations',
   WEBRTC_EXTENSION: 'webrtc_extension',
+  CHANSPY: 'chanspy',
 };
 
 // Feature display names for UI
@@ -48,6 +49,7 @@ export const FEATURE_DISPLAY_NAMES = {
   [FEATURE_KEYS.FACEBOOK]: 'Facebook Integration',
   [FEATURE_KEYS.THIRD_PARTY_INTEGRATIONS]: 'Third-Party Integrations',
   [FEATURE_KEYS.WEBRTC_EXTENSION]: 'WebRTC Extension',
+  [FEATURE_KEYS.CHANSPY]: 'Call Monitoring (ChanSpy)',
 };
 
 // Feature descriptions for tooltips
@@ -69,6 +71,7 @@ export const FEATURE_DESCRIPTIONS = {
   [FEATURE_KEYS.FACEBOOK]: 'Facebook Messenger integration',
   [FEATURE_KEYS.THIRD_PARTY_INTEGRATIONS]: 'Third-party system integrations',
   [FEATURE_KEYS.WEBRTC_EXTENSION]: 'WebRTC browser extension for softphone',
+  [FEATURE_KEYS.CHANSPY]: 'Silent monitoring, whisper, and barge into live calls',
 };
 
 // Route to feature mapping for client application
@@ -83,6 +86,7 @@ export const ROUTE_FEATURE_MAP = {
   '/voice/outboundRoutes': FEATURE_KEYS.CALLS,
   '/voice/recordings': FEATURE_KEYS.RECORDING,
   '/voice/realtime': FEATURE_KEYS.CALLS,
+  '/voice/chanspy': FEATURE_KEYS.CHANSPY,  // Requires Enterprise/Professional license
   
   // Analytics
   '/analytics': FEATURE_KEYS.REPORTS,

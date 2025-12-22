@@ -405,6 +405,275 @@ GET    /api/enhanced-transfers/analytics     # Agent analytics
 - Queue member availability check
 - Call routing optimization
 
+## ChanSpy (Call Monitoring) System
+
+### Overview
+
+ChanSpy allows supervisors to monitor, whisper to, or barge into live calls. This feature is essential for quality assurance, agent training, and real-time coaching.
+
+### Monitoring Modes
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| **Listen** | Silent monitoring - hear both parties without being heard | Quality assurance, training review |
+| **Whisper** | Speak to the agent only (caller cannot hear) | Real-time coaching, providing information |
+| **Barge** | Speak to both parties (3-way conversation) | Escalation, intervention, customer service |
+
+### Architecture
+
+1. **Server Layer** (`server/services/amiService.js`)
+   - `startChanSpy()` - Start spying on a specific channel
+   - `startChanSpyByExtension()` - Start spying by extension (auto-finds active channel)
+   - `stopChanSpy()` - Stop an active spy session
+   - `getSpyableChannels()` - Get list of active calls that can be monitored
+   - `switchChanSpyMode()` - Switch between modes during active session
+
+2. **Route Layer** (`server/routes/amiRoutes.js`)
+   - RESTful API endpoints for ChanSpy operations
+   - Authentication middleware protection
+
+3. **Client Layer**
+   - `client/src/services/chanSpyService.js` - API service
+   - `client/src/components/ChanSpy.jsx` - Full UI component
+
+4. **Electron Softphone Layer**
+   - `electron-softphone/src/services/chanSpyService.js` - API service
+   - `electron-softphone/src/components/ChanSpy.jsx` - UI component (with compact mode)
+
+### API Endpoints
+
+```javascript
+// ChanSpy Routes
+POST   /api/ami/chanspy/start              # Start ChanSpy on specific channel
+POST   /api/ami/chanspy/start-by-extension # Start ChanSpy by extension (auto-finds channel)
+POST   /api/ami/chanspy/stop               # Stop active ChanSpy session
+GET    /api/ami/chanspy/channels           # Get list of spyable channels
+POST   /api/ami/chanspy/switch-mode        # Switch monitoring mode
+```
+
+### Request/Response Examples
+
+#### Start ChanSpy by Extension
+```bash
+curl -X POST "http://localhost:8004/api/ami/chanspy/start-by-extension" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{
+    "spyerExtension": "1000",
+    "targetExtension": "1001",
+    "mode": "listen",
+    "quiet": true,
+    "volume": 0
+  }'
+```
+
+#### Get Spyable Channels
+```bash
+curl -X GET "http://localhost:8004/api/ami/chanspy/channels" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+#### Stop ChanSpy
+```bash
+curl -X POST "http://localhost:8004/api/ami/chanspy/stop" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"spyerExtension": "1000"}'
+```
+
+### ChanSpy Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `spyerExtension` | string | Extension of the supervisor initiating the spy |
+| `targetExtension` | string | Extension to spy on (for start-by-extension) |
+| `targetChannel` | string | Full channel name (for start) |
+| `mode` | string | `listen`, `whisper`, or `barge` |
+| `quiet` | boolean | Don't play beep to spied channel (default: true) |
+| `volume` | integer | Volume adjustment (-4 to +4) |
+| `group` | string | Only spy on channels in this group |
+
+### UI Access
+
+- **Client Dashboard**: Navigate to **Voice → Call Monitoring** in the sidebar
+- **Electron Softphone**: Available as a component (can be integrated into sidebar)
+
+### License Feature
+
+ChanSpy requires the `chanspy` feature to be enabled in the license. Add to license features:
+
+```json
+{
+  "features": {
+    "chanspy": true
+  }
+}
+```
+
+### Testing
+
+```bash
+# Run server-side tests
+cd server && npm test -- --testPathPattern=chanSpy
+
+# Run client-side tests
+cd client && npm test -- --testPathPattern=ChanSpy
+
+# Run electron-softphone tests
+cd electron-softphone && npm test -- --testPathPattern=chanSpy
+```
+
+### How ChanSpy Works (Asterisk)
+
+1. Supervisor clicks "Monitor" on an active call in the UI
+2. Server sends AMI `Originate` action to supervisor's phone with `ChanSpy` application
+3. Supervisor's phone rings - they answer to start listening
+4. ChanSpy options determine mode (listen/whisper/barge)
+5. Supervisor hears the call (and can speak depending on mode)
+6. When supervisor hangs up or clicks "Stop", the spy session ends
+
+## Electron Softphone Build Guide
+
+### Overview
+
+The Electron Softphone (`electron-softphone/`) contains Windows-specific features (AppBar docking, native modules) that require building on a Windows PC. This section documents how to build and deploy the softphone.
+
+### Prerequisites (Windows)
+
+1. **Windows 10/11** (64-bit)
+2. **Node.js 16+** and npm 7+
+3. **Visual Studio Build Tools** (for native module compilation)
+   ```powershell
+   # Install via winget
+   winget install Microsoft.VisualStudio.2022.BuildTools
+   
+   # Or download from:
+   # https://visualstudio.microsoft.com/visual-cpp-build-tools/
+   ```
+4. **Python 3.x** (required by node-gyp)
+5. **Git for Windows**
+
+### Setup on Windows
+
+```powershell
+# 1. Clone the repository
+git clone <repository-url>
+cd Mayday_EC/electron-softphone
+
+# 2. Install dependencies
+npm install
+
+# 3. Build native modules (Windows AppBar)
+npm run build:native
+
+# 4. Verify native module build
+npm run check:native
+```
+
+### Development Mode
+
+```powershell
+# Start in development mode (hot reload)
+npm run start
+
+# Or use the explicit electron dev command
+npm run electron:dev
+```
+
+### Building for Production
+
+```powershell
+# Build Windows installer (NSIS)
+npm run electron:build:win
+
+# Output location: electron-softphone/release/{version}/
+# Creates: MHU Appbar Setup {version}.exe
+```
+
+### Build Scripts Reference
+
+| Script | Description |
+|--------|-------------|
+| `npm run start` | Development mode with hot reload |
+| `npm run build` | Build Vite frontend only |
+| `npm run electron:build:win` | Build Windows installer |
+| `npm run electron:build:mac` | Build macOS app (requires macOS) |
+| `npm run electron:build:linux` | Build Linux AppImage |
+| `npm run electron:deploy` | Build and publish to update server |
+| `npm run build:native` | Rebuild native Windows modules |
+| `npm run check:native` | Verify native module prerequisites |
+
+### Windows-Specific Features
+
+The softphone includes these Windows-specific features that require native compilation:
+
+1. **AppBar Docking** (`native/win-appbar/`)
+   - Docks to screen edge like Windows taskbar
+   - Reserves screen space
+   - Requires `win-appbar.node` native module
+
+2. **Auto-updater**
+   - Downloads updates from configured server
+   - NSIS installer for seamless updates
+
+### Environment Configuration
+
+Create `.env.production` before building:
+
+```env
+VITE_API_URL=https://your-production-server.com
+VITE_WS_URL=wss://your-production-server.com
+```
+
+### Updating the Auto-Update Server
+
+The softphone checks for updates from the URL configured in `package.json`:
+
+```json
+"publish": {
+  "provider": "generic",
+  "url": "http://192.168.1.14/downloads/"
+}
+```
+
+To deploy updates:
+1. Build the installer: `npm run electron:build:win`
+2. Copy files from `release/{version}/` to your update server:
+   - `MHU Appbar Setup {version}.exe`
+   - `latest.yml`
+
+### Troubleshooting Windows Build
+
+#### Native Module Build Fails
+```powershell
+# Ensure Visual Studio Build Tools are installed
+npm config set msvs_version 2022
+
+# Rebuild all native modules
+npm run rebuild:native
+```
+
+#### Electron Version Mismatch
+```powershell
+# Rebuild for current Electron version
+./node_modules/.bin/electron-rebuild
+```
+
+#### AppBar Not Docking
+- Verify `win-appbar.node` exists in `native/win-appbar/build/Release/`
+- Check Windows display settings (scaling, multiple monitors)
+- Run as Administrator for testing
+
+### Cross-Platform Build Notes
+
+| Platform | Build From | Command |
+|----------|------------|---------|
+| Windows | Windows only | `npm run electron:build:win` |
+| macOS | macOS only | `npm run electron:build:mac` |
+| Linux | Any | `npm run electron:build:linux` |
+
+**Important**: Windows builds with native modules MUST be built on Windows.
+
 ## Development Workflow
 
 ### 1. Local Development

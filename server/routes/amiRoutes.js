@@ -679,4 +679,225 @@ router.post("/call-events", requireAMI, async (req, res) => {
   }
 });
 
+// ========================================
+// 🔊 CHANSPY ROUTES - Call Monitoring/Supervision
+// ========================================
+
+/**
+ * @swagger
+ * /api/ami/chanspy/start:
+ *   post:
+ *     summary: Start ChanSpy session on a specific channel
+ *     tags: [ChanSpy]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - spyerExtension
+ *               - targetChannel
+ *             properties:
+ *               spyerExtension:
+ *                 type: string
+ *                 description: Extension of the supervisor
+ *               targetChannel:
+ *                 type: string
+ *                 description: Channel to spy on
+ *               mode:
+ *                 type: string
+ *                 enum: [listen, whisper, barge]
+ *                 default: listen
+ *               quiet:
+ *                 type: boolean
+ *                 default: true
+ *               volume:
+ *                 type: integer
+ *                 minimum: -4
+ *                 maximum: 4
+ */
+router.post("/chanspy/start", requireAMI, async (req, res) => {
+  try {
+    const { spyerExtension, targetChannel, mode, quiet, volume, group } = req.body;
+
+    if (!spyerExtension || !targetChannel) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required parameters",
+        message: "spyerExtension and targetChannel are required",
+      });
+    }
+
+    const result = await amiService.startChanSpy(spyerExtension, targetChannel, {
+      mode: mode || "listen",
+      quiet: quiet !== false,
+      volume,
+      group,
+    });
+
+    res.json({
+      success: true,
+      data: result,
+      message: `ChanSpy started successfully in ${mode || "listen"} mode`,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: "Failed to start ChanSpy",
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/ami/chanspy/start-by-extension:
+ *   post:
+ *     summary: Start ChanSpy session on a specific extension (auto-finds active channel)
+ *     tags: [ChanSpy]
+ */
+router.post("/chanspy/start-by-extension", requireAMI, async (req, res) => {
+  try {
+    const { spyerExtension, targetExtension, mode, quiet, volume, group } = req.body;
+
+    if (!spyerExtension || !targetExtension) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required parameters",
+        message: "spyerExtension and targetExtension are required",
+      });
+    }
+
+    const result = await amiService.startChanSpyByExtension(
+      spyerExtension,
+      targetExtension,
+      {
+        mode: mode || "listen",
+        quiet: quiet !== false,
+        volume,
+        group,
+      }
+    );
+
+    res.json({
+      success: true,
+      data: result,
+      message: `ChanSpy started on extension ${targetExtension} in ${mode || "listen"} mode`,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: "Failed to start ChanSpy by extension",
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/ami/chanspy/stop:
+ *   post:
+ *     summary: Stop an active ChanSpy session
+ *     tags: [ChanSpy]
+ */
+router.post("/chanspy/stop", requireAMI, async (req, res) => {
+  try {
+    const { spyerExtension } = req.body;
+
+    if (!spyerExtension) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required parameters",
+        message: "spyerExtension is required",
+      });
+    }
+
+    const result = await amiService.stopChanSpy(spyerExtension);
+
+    res.json({
+      success: true,
+      data: result,
+      message: "ChanSpy stopped successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: "Failed to stop ChanSpy",
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/ami/chanspy/channels:
+ *   get:
+ *     summary: Get list of channels that can be spied on
+ *     tags: [ChanSpy]
+ */
+router.get("/chanspy/channels", requireAMI, async (req, res) => {
+  try {
+    const result = await amiService.getSpyableChannels();
+
+    res.json({
+      success: true,
+      data: result,
+      count: result.length,
+      message: "Spyable channels retrieved successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: "Failed to get spyable channels",
+    });
+  }
+});
+
+/**
+ * @swagger
+ * /api/ami/chanspy/switch-mode:
+ *   post:
+ *     summary: Switch ChanSpy mode during an active session
+ *     tags: [ChanSpy]
+ */
+router.post("/chanspy/switch-mode", requireAMI, async (req, res) => {
+  try {
+    const { spyerExtension, mode } = req.body;
+
+    if (!spyerExtension || !mode) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required parameters",
+        message: "spyerExtension and mode are required",
+      });
+    }
+
+    if (!["listen", "whisper", "barge"].includes(mode)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid mode",
+        message: "mode must be 'listen', 'whisper', or 'barge'",
+      });
+    }
+
+    const result = await amiService.switchChanSpyMode(spyerExtension, mode);
+
+    res.json({
+      success: true,
+      data: result,
+      message: result.success
+        ? `Mode switched to ${mode}`
+        : result.message,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: "Failed to switch ChanSpy mode",
+    });
+  }
+});
+
 export default router;

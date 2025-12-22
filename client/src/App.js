@@ -38,6 +38,7 @@ import AudioManager from "./components/tools/AudioManager";
 import OutboundRoute from "./components/Routes/OutboundRoute.js";
 import ReportsAdminView from "./components/ReportsAdminView.js";
 import Realtime from "./components/Realtime.js";
+import ChanSpy from "./components/ChanSpy.jsx";
 import About from "./components/About.js";
 import IVRBuilder from "./components/ivr/IVRBuilder.jsx";
 import Odbc from "./components/Odbc.js";
@@ -113,6 +114,11 @@ const App = () => {
                 />
                 <Route path="analytics/realtime" element={<Realtime />} />
                 <Route path="voice/realtime" element={<Realtime />} />
+                <Route path="voice/chanspy" element={
+                  <FeatureGate feature={FEATURE_KEYS.CHANSPY}>
+                    <ChanSpy />
+                  </FeatureGate>
+                } />
                 <Route path="tools" element={<Tools />} />
                 <Route path="tools/trunks" element={<Trunks />} />
                 <Route path="tools/trunks/:trunkId" element={<TrunkEdit />} />
