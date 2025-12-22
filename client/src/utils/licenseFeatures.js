@@ -86,7 +86,7 @@ export const ROUTE_FEATURE_MAP = {
   '/voice/outboundRoutes': FEATURE_KEYS.CALLS,
   '/voice/recordings': FEATURE_KEYS.RECORDING,
   '/voice/realtime': FEATURE_KEYS.CALLS,
-  '/voice/chanspy': FEATURE_KEYS.CALLS,  // TODO: Change back to CHANSPY after license sync
+  '/voice/chanspy': FEATURE_KEYS.CHANSPY,  // Requires Enterprise/Professional license
   
   // Analytics
   '/analytics': FEATURE_KEYS.REPORTS,
