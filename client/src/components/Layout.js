@@ -1,5 +1,6 @@
 import getUserRoutes from "../utils/getUserRoutes";
 import React, { useEffect, useState, useMemo, useRef } from "react";
+import useLicense from "../hooks/useLicense";
 import {
   AppBar,
   Drawer,
@@ -38,6 +39,7 @@ import LogoutButton from "./auth/LogoutButton";
 const Layout = () => {
   // Add your logic to determine which routes are available to the current user
   const { user, isAuthenticated } = useAuth();
+  const { license } = useLicense();
   const [drawerOpen, setDrawerOpen] = useState(true); // State to control drawer open/close
   const [open, setOpen] = useState({});
   const location = useLocation();
@@ -47,9 +49,11 @@ const Layout = () => {
   const navigate = useNavigate();
 
   // Memoize userRoutes to prevent recreation on every render
+  // Now includes license-based filtering
   const userRoutes = useMemo(() => {
-    return isAuthenticated ? getUserRoutes(user) : [];
-  }, [isAuthenticated, user]);
+    if (!isAuthenticated) return [];
+    return getUserRoutes(user, license);
+  }, [isAuthenticated, user, license]);
 
   // Track if initial menu expansion has been done
   const initialExpandDone = useRef(false);

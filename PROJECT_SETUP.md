@@ -1375,6 +1375,172 @@ Users can manually check for updates via:
   - Improved update installer to use silent mode and proper window cleanup
   - Added NSIS elevation and runAfterFinish options for smoother updates
 
+## License-Based Feature Restriction System
+
+### Overview
+
+The Mayday platform implements a comprehensive license-based feature restriction system that controls access to UI components, routes, and menu items based on the organization's license plan.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         License Flow Architecture                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌─────────────────┐      ┌─────────────────────┐      ┌─────────────────┐  │
+│  │  Mayday-Website │      │     On-Prem Server  │      │  Client Apps    │  │
+│  │  (Master)       │─────▶│     (Slave)         │─────▶│                 │  │
+│  │                 │ sync │                     │ API  │  - client/      │  │
+│  │  License Mgmt   │      │  License Cache      │      │  - electron-    │  │
+│  │  Provisioning   │      │  License Service    │      │    softphone/   │  │
+│  └─────────────────┘      └─────────────────────┘      └─────────────────┘  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### License Plans and Features
+
+| Plan | Features Included |
+|------|-------------------|
+| **Basic** | calls, recording, transfers, conferences, reports, crm |
+| **Professional** | Basic + whatsapp, sms, video, voicemail, email, zoho, webrtc_extension |
+| **Enterprise** | All features including salesforce, twilio, facebook, third_party_integrations |
+| **Developer** | calls, reports, crm, zoho, third_party_integrations, webrtc_extension |
+
+### Key Files
+
+#### Client Application (`client/`)
+
+| File | Purpose |
+|------|---------|
+| `src/utils/licenseFeatures.js` | Feature constants, validation utilities, route/menu filtering |
+| `src/hooks/useLicense.js` | React hook for license state and feature checking |
+| `src/components/common/FeatureGate.jsx` | Component for conditional rendering based on license |
+
+#### Electron Softphone (`electron-softphone/`)
+
+| File | Purpose |
+|------|---------|
+| `src/utils/licenseFeatures.js` | Shared feature definitions (copy from client) |
+| `src/hooks/useLicense.js` | License hook with caching for electron app |
+| `src/components/FeatureGate.jsx` | Feature gating component for electron |
+
+### Feature Keys
+
+```javascript
+const FEATURE_KEYS = {
+  CALLS: 'calls',
+  RECORDING: 'recording',
+  VOICEMAIL: 'voicemail',
+  VIDEO: 'video',
+  SMS: 'sms',
+  TRANSFERS: 'transfers',
+  CONFERENCES: 'conferences',
+  REPORTS: 'reports',
+  CRM: 'crm',
+  WHATSAPP: 'whatsapp',
+  SALESFORCE: 'salesforce',
+  ZOHO: 'zoho',
+  TWILIO: 'twilio',
+  EMAIL: 'email',
+  FACEBOOK: 'facebook',
+  THIRD_PARTY_INTEGRATIONS: 'third_party_integrations',
+  WEBRTC_EXTENSION: 'webrtc_extension',
+};
+```
+
+### Usage Examples
+
+#### 1. FeatureGate Component
+
+```jsx
+import FeatureGate from './components/common/FeatureGate';
+import { FEATURE_KEYS } from './utils/licenseFeatures';
+
+// Basic usage - renders children only if feature is enabled
+<FeatureGate feature={FEATURE_KEYS.WHATSAPP}>
+  <WhatsAppComponent />
+</FeatureGate>
+
+// With custom fallback
+<FeatureGate 
+  feature={FEATURE_KEYS.RECORDING} 
+  fallback={<UpgradePrompt />}
+>
+  <RecordingComponent />
+</FeatureGate>
+```
+
+#### 2. useLicense Hook
+
+```jsx
+import useLicense from './hooks/useLicense';
+
+const MyComponent = () => {
+  const { checkFeature, isLicensed, licenseInfo } = useLicense();
+  
+  if (!checkFeature('whatsapp')) {
+    return <div>WhatsApp not available</div>;
+  }
+  
+  return <WhatsAppComponent />;
+};
+```
+
+#### 3. Route Filtering
+
+```jsx
+import { filterRoutesByLicense } from './utils/licenseFeatures';
+
+const userRoutes = useMemo(() => {
+  const baseRoutes = getUserRoutes(user);
+  return filterRoutesByLicense(baseRoutes, license);
+}, [user, license]);
+```
+
+### Route Feature Mappings
+
+| Route | Required Feature |
+|-------|------------------|
+| `/voice/recordings` | recording |
+| `/whatsapp` | whatsapp |
+| `/analytics/reports` | reports |
+| `/integrations/salesforceAccount` | salesforce |
+
+### Menu Item Feature Mappings
+
+| Menu Item ID | Required Feature |
+|--------------|------------------|
+| `whatsapp` | whatsapp |
+| `reports` | reports |
+| `transferHistory` | transfers |
+| `callHistory` | calls |
+
+### Visual Indicators
+
+- **Locked menu items**: Dimmed (50% opacity) with lock icon overlay
+- **Tooltip**: Shows "Feature requires a license upgrade"
+- **Fallback UI**: Professional card with lock icon and upgrade prompt
+
+### Unit Tests
+
+Comprehensive unit tests are located at `client/src/utils/licenseFeatures.test.js`:
+
+```bash
+# Run license feature tests
+cd client && npm test -- --testPathPattern="licenseFeatures.test.js" --watchAll=false
+```
+
+**Test Coverage:**
+- Feature key constants validation
+- Feature parsing (JSON string and object)
+- Route accessibility checks
+- Menu item accessibility checks
+- License validity checks (active, expired, suspended)
+- Development license detection
+- Route and menu filtering
+
 ## Support and Resources
 
 ### Documentation
@@ -1392,7 +1558,7 @@ Users can manually check for updates via:
 
 ---
 
-**Last Updated**: December 18, 2025  
+**Last Updated**: December 21, 2025  
 **Development Status**: On-Prem Deployment ✅ Complete  
 **Current Branch**: `development`  
 **On-Prem Server**: 192.168.1.14 (Static IP, Node.js v18.20.8, PM2 v6.0.14, nginx, MariaDB, Asterisk 20.12.0)  
@@ -1401,7 +1567,16 @@ Users can manually check for updates via:
 **GitHub Repo**: https://github.com/Dlu6/Mayday_EC.git  
 **SIP Trunk**: Registered with siptrunk.cyber-innovative.com (+256323300212)
 
-**Recent Updates (Dec 18, 2025)**:
+**Recent Updates (Dec 21, 2025)**:
+- ✅ **License-Based Feature Restriction System**: Comprehensive licensing logic across client and electron-softphone
+- ✅ **FeatureGate Component**: Conditional rendering based on license features with fallback UI
+- ✅ **useLicense Hook**: React hook for license state management and feature checking
+- ✅ **Route Filtering**: License-aware route filtering in Layout.js and getUserRoutes.js
+- ✅ **Menu Filtering**: License-based menu item filtering with lock icons in electron-softphone Appbar
+- ✅ **Unit Tests**: 51 comprehensive tests for license utilities (100% passing)
+- ✅ **License Cache Management**: Cache cleared on logout for security
+
+**Previous Updates (Dec 18, 2025)**:
 - ✅ **HTTPS/SSL Configuration**: Self-signed certificate configured for secure access
 - ✅ **Centralized Server Configuration**: Created `serverConfig.js` as single source of truth for IP/domain
 - ✅ Removed all hardcoded domain references from codebase

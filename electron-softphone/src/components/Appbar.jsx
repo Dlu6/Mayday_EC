@@ -104,6 +104,7 @@ import { useAuthGuard } from "../hooks/useAuthGuard";
 import { callMonitoringService } from "../services/callMonitoringServiceElectron";
 import connectionManager from "../services/connectionManager";
 import WhatsAppElectronComponent from "./WhatsAppElectronComponent";
+import FeatureGate from "./FeatureGate";
 import transferHistoryService from "../services/transferHistoryService";
 import { agentService } from "../services/agentService";
 import { pauseService } from "../services/pauseService";
@@ -116,6 +117,9 @@ import AppUpdater from "./AppUpdater";
 import { useStickyAppbar } from "../hooks/useStickyAppbar";
 import APPBAR_CONFIG from "../config/appbarConfig";
 import serverConfig from "../config/serverConfig";
+import useLicense, { clearLicenseCache } from "../hooks/useLicense";
+import { MENU_FEATURE_MAP, FEATURE_DISPLAY_NAMES } from "../utils/licenseFeatures";
+import LockIcon from "@mui/icons-material/Lock";
 
 // Debug connection manager import - removed excessive logging
 
@@ -189,6 +193,16 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
     toggle: toggleStickyAppbar,
     error: stickyAppbarError,
   } = useStickyAppbar(); // Uses global APPBAR_CONFIG
+
+  // License management for feature-based menu filtering
+  const {
+    checkMenuItem,
+    filterMenuItems,
+    isLicensed,
+    licenseInfo,
+    checkFeature,
+    FEATURE_KEYS,
+  } = useLicense();
 
   // Restore sticky appbar after successful authentication
   useEffect(() => {
@@ -646,6 +660,9 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
 
       // Clear storage
       storageService.clear();
+
+      // Clear license cache
+      clearLicenseCache();
 
       // Clear localStorage items that might persist
       // Note: We preserve "rememberMe" and encrypted credentials for the Remember Me functionality
@@ -2179,8 +2196,31 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
     },
   ];
 
+  // Filter menu items based on license features
+  // Items without a required feature are always shown
+  // Items with a required feature are shown only if the feature is enabled
+  const filteredMenuItems = useMemo(() => {
+    return menuItems.map((item) => {
+      const requiredFeature = MENU_FEATURE_MAP[item.id];
+      
+      // No feature requirement means always accessible
+      if (!requiredFeature) {
+        return { ...item, isLocked: false };
+      }
+      
+      // Check if feature is enabled in license
+      const hasAccess = checkMenuItem(item.id);
+      
+      return {
+        ...item,
+        isLocked: !hasAccess,
+        lockedReason: hasAccess ? null : `${FEATURE_DISPLAY_NAMES[requiredFeature] || requiredFeature} requires a license upgrade`,
+      };
+    });
+  }, [menuItems, checkMenuItem]);
+
   const handleMenuClick = useCallback(
-    (action) => {
+    (action, item) => {
       // CRITICAL: Ensure authentication is ready before menu action
       const token = storageService.getAuthToken();
       if (!token) {
@@ -2188,6 +2228,16 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
           message: "Authentication not ready. Please try again.",
           severity: "warning",
           duration: 3000,
+        });
+        return;
+      }
+
+      // Check if feature is locked
+      if (item?.isLocked) {
+        showNotification({
+          message: item.lockedReason || "This feature requires a license upgrade.",
+          severity: "warning",
+          duration: 4000,
         });
         return;
       }
@@ -5000,10 +5050,14 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
         </Box>
 
         <List sx={{ p: 1 }}>
-          {menuItems.map((item) => (
-            <Tooltip key={item.id} title={item.text} placement="right">
+          {filteredMenuItems.map((item) => (
+            <Tooltip 
+              key={item.id} 
+              title={item.isLocked ? item.lockedReason : item.text} 
+              placement="right"
+            >
               <ListItemButton
-                onClick={() => handleMenuClick(item.action)}
+                onClick={() => handleMenuClick(item.action, item)}
                 sx={{
                   borderRadius: 1,
                   mb: 0.5,
@@ -5011,6 +5065,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                   justifyContent: "center",
                   backgroundColor:
                     activeSection === item.id ? "#128C7E" : "transparent",
+                  opacity: item.isLocked ? 0.5 : 1,
                   "&:hover": {
                     backgroundColor:
                       activeSection === item.id
@@ -5024,12 +5079,26 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                     color:
                       activeSection === item.id
                         ? "#fff"
-                        : "rgba(255,255,255,0.7)",
+                        : item.isLocked 
+                          ? "rgba(255,255,255,0.4)"
+                          : "rgba(255,255,255,0.7)",
                     minWidth: "auto",
                     justifyContent: "center",
+                    position: "relative",
                   }}
                 >
                   {item.icon}
+                  {item.isLocked && (
+                    <LockIcon 
+                      sx={{ 
+                        position: "absolute", 
+                        bottom: -4, 
+                        right: -4, 
+                        fontSize: 12,
+                        color: "rgba(255,255,255,0.6)",
+                      }} 
+                    />
+                  )}
                 </ListItemIcon>
               </ListItemButton>
             </Tooltip>
@@ -5067,47 +5136,77 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
         </Box>
 
         <List sx={{ p: 1 }}>
-          {menuItems.map((item, index) => (
+          {filteredMenuItems.map((item, index) => (
             <React.Fragment key={item.id}>
-              <ListItemButton
-                onClick={() => handleMenuClick(item.action)}
-                sx={{
-                  borderRadius: 1,
-                  mb: 0.5,
-                  backgroundColor:
-                    activeSection === item.id ? "#128C7E" : "transparent",
-                  "&:hover": {
-                    backgroundColor:
-                      activeSection === item.id
-                        ? "#128C7E"
-                        : "rgba(255,255,255,0.1)",
-                  },
-                }}
+              <Tooltip
+                title={item.isLocked ? item.lockedReason : ""}
+                placement="right"
+                disableHoverListener={!item.isLocked}
               >
-                <ListItemIcon
+                <ListItemButton
+                  onClick={() => handleMenuClick(item.action, item)}
                   sx={{
-                    color:
-                      activeSection === item.id
-                        ? "#fff"
-                        : "rgba(255,255,255,0.7)",
-                    minWidth: 40,
+                    borderRadius: 1,
+                    mb: 0.5,
+                    backgroundColor:
+                      activeSection === item.id ? "#128C7E" : "transparent",
+                    opacity: item.isLocked ? 0.5 : 1,
+                    "&:hover": {
+                      backgroundColor:
+                        activeSection === item.id
+                          ? "#128C7E"
+                          : "rgba(255,255,255,0.1)",
+                    },
                   }}
                 >
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText
-                  primary={item.text}
-                  primaryTypographyProps={{
-                    sx: {
-                      fontSize: "0.9rem",
+                  <ListItemIcon
+                    sx={{
                       color:
                         activeSection === item.id
                           ? "#fff"
-                          : "rgba(255,255,255,0.7)",
-                    },
-                  }}
-                />
-              </ListItemButton>
+                          : item.isLocked
+                            ? "rgba(255,255,255,0.4)"
+                            : "rgba(255,255,255,0.7)",
+                      minWidth: 40,
+                      position: "relative",
+                    }}
+                  >
+                    {item.icon}
+                    {item.isLocked && (
+                      <LockIcon 
+                        sx={{ 
+                          position: "absolute", 
+                          bottom: -2, 
+                          right: 8, 
+                          fontSize: 14,
+                          color: "rgba(255,255,255,0.6)",
+                        }} 
+                      />
+                    )}
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={item.text}
+                    secondary={item.isLocked ? "License upgrade required" : null}
+                    primaryTypographyProps={{
+                      sx: {
+                        fontSize: "0.9rem",
+                        color:
+                          activeSection === item.id
+                            ? "#fff"
+                            : item.isLocked
+                              ? "rgba(255,255,255,0.4)"
+                              : "rgba(255,255,255,0.7)",
+                      },
+                    }}
+                    secondaryTypographyProps={{
+                      sx: {
+                        fontSize: "0.7rem",
+                        color: "rgba(255,200,100,0.7)",
+                      },
+                    }}
+                  />
+                </ListItemButton>
+              </Tooltip>
               {index === 2 && <Divider sx={{ my: 1, borderColor: "#444" }} />}
             </React.Fragment>
           ))}
@@ -5250,22 +5349,28 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
         title="Dashboard"
         isCollapsed={isCollapsed}
       />
-      <WhatsAppElectronComponent
-        open={activeSection === "whatsapp"}
-        onClose={handleCloseSection}
-        initialChat={whatsAppInitialChat}
-        isCollapsed={isCollapsed}
-      />
-      <CallHistory
-        open={activeSection === "callHistory"}
-        onClose={handleCloseSection}
-        onCallNumber={handleSetDialNumber}
-      />
+      <FeatureGate feature={FEATURE_KEYS.WHATSAPP} showFallback={activeSection === "whatsapp"}>
+        <WhatsAppElectronComponent
+          open={activeSection === "whatsapp"}
+          onClose={handleCloseSection}
+          initialChat={whatsAppInitialChat}
+          isCollapsed={isCollapsed}
+        />
+      </FeatureGate>
+      <FeatureGate feature={FEATURE_KEYS.CALLS} showFallback={activeSection === "callHistory"}>
+        <CallHistory
+          open={activeSection === "callHistory"}
+          onClose={handleCloseSection}
+          onCallNumber={handleSetDialNumber}
+        />
+      </FeatureGate>
       {/* SessionAnalytics and Clients removed - datatool_server not used in this project */}
-      <Reports
-        open={activeSection === "reports"}
-        onClose={handleCloseSection}
-      />
+      <FeatureGate feature={FEATURE_KEYS.REPORTS} showFallback={activeSection === "reports"}>
+        <Reports
+          open={activeSection === "reports"}
+          onClose={handleCloseSection}
+        />
+      </FeatureGate>
       {/* <Contacts
         open={activeSection === "contacts"}
         onClose={handleCloseSection}
@@ -5300,10 +5405,12 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
       />
 
       {/* Transfer History */}
-      <TransferHistory
-        open={activeSection === "transferHistory"}
-        onClose={handleCloseTransferHistory}
-      />
+      <FeatureGate feature={FEATURE_KEYS.TRANSFERS} showFallback={activeSection === "transferHistory"}>
+        <TransferHistory
+          open={activeSection === "transferHistory"}
+          onClose={handleCloseTransferHistory}
+        />
+      </FeatureGate>
 
       {/* App Updates Section */}
       {activeSection === "updates" && (

@@ -1,6 +1,7 @@
 // src/utils/getUserRoutes.js
+import { filterRoutesByLicense } from './licenseFeatures';
 
-const getUserRoutes = (user) => {
+const getUserRoutes = (user, license = null) => {
   //   console.log(user, "User in getUserRoutes>>>>");
   if (!user || !user.role) {
     // Return an empty array or some default routes if no user or user role is defined
@@ -128,8 +129,16 @@ const getUserRoutes = (user) => {
     ],
   };
 
-  // Return the routes available to the user's role
-  return routes[user.role] || [];
+  // Get routes for the user's role
+  const roleRoutes = routes[user.role] || [];
+  
+  // If no license provided, return all role routes
+  if (!license) {
+    return roleRoutes;
+  }
+  
+  // Filter routes based on license features
+  return filterRoutesByLicense(roleRoutes, license);
 };
 
 export default getUserRoutes;

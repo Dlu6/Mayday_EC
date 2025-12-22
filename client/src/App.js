@@ -7,6 +7,8 @@ import {
 import { UserProvider } from "./auth/UserContext";
 import PublicRoute from "./components/PublicRoute";
 import { Provider } from "react-redux";
+import FeatureGate from "./components/common/FeatureGate";
+import { FEATURE_KEYS } from "./utils/licenseFeatures";
 
 import Dashboard from "./components/Dashboard.js";
 import General from "./components/General.js";
@@ -90,7 +92,11 @@ const App = () => {
                   element={<OutboundRouteEdit />}
                 />
 
-                <Route path="voice/recordings" element={<Recordings />} />
+                <Route path="voice/recordings" element={
+                  <FeatureGate feature={FEATURE_KEYS.RECORDING}>
+                    <Recordings />
+                  </FeatureGate>
+                } />
 
                 <Route
                   path="voice/voiceQueues/:queueId"
@@ -99,7 +105,11 @@ const App = () => {
                 <Route path="analytics" element={<Analytics />} />
                 <Route
                   path="analytics/reports"
-                  element={<ReportsAdminView />}
+                  element={
+                    <FeatureGate feature={FEATURE_KEYS.REPORTS}>
+                      <ReportsAdminView />
+                    </FeatureGate>
+                  }
                 />
                 <Route path="analytics/realtime" element={<Realtime />} />
                 <Route path="voice/realtime" element={<Realtime />} />
@@ -120,7 +130,11 @@ const App = () => {
                 <Route path="ivr/projects" element={<IVRProjects />} />
                 <Route path="ivr/projects/:id" element={<IVRBuilder />} />
                 <Route path="ivr/odbc" element={<Odbc />} />
-                <Route path="whatsapp" element={<WhatsappWebConfig />} />
+                <Route path="whatsapp" element={
+                  <FeatureGate feature={FEATURE_KEYS.WHATSAPP}>
+                    <WhatsappWebConfig />
+                  </FeatureGate>
+                } />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Route>
