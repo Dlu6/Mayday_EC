@@ -28,6 +28,7 @@ import {
   SmsOutlined,
   BusinessOutlined,
   PhoneIphoneOutlined,
+  HeadsetMic,
 } from "@mui/icons-material";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchCurrentLicense } from "../features/licenses/licenseSlice";
@@ -55,6 +56,7 @@ const getFeatureDisplayName = (featureKey) => {
     video: "Video",
     voicemail: "Voicemail",
     webrtc_extension: "WebRTC Extension",
+    chanspy: "Call Monitoring",
   };
   return featureNames[featureKey] || featureKey;
 };
@@ -76,6 +78,7 @@ const getFeatureIcon = (featureKey) => {
     sms: <SmsOutlined />,
     video: <VideocamOutlined />,
     voicemail: <VoicemailIcon />,
+    chanspy: <HeadsetMic />,
     default: <IntegrationInstructionsOutlined />,
   };
   return icons[featureKey] || icons.default;
