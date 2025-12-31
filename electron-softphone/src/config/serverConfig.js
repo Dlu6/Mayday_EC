@@ -64,9 +64,9 @@ const useHttps = () => {
     if (saved !== null) return saved === "true";
   }
   
-  // Default: use HTTPS for production (self-signed cert configured on server)
-  // Development uses HTTP (localhost)
-  return !isDevelopment;
+  // Default: use HTTP for production (192.168.1.14 uses HTTP on port 80)
+  // Change to true if you configure HTTPS/SSL on the server
+  return false;
 };
 
 /**

@@ -2,17 +2,17 @@
 sidebar_position: 1
 ---
 
-# MHU CRM Documentation
+# Mayday CRM Documentation
 
-Welcome to the official documentation for the MHU Helpline CRM and Call Center System - a comprehensive omnichannel platform designed to streamline mental health helpline operations, manage client interactions, and improve service delivery.
+Welcome to the official documentation for the Mayday Helpline CRM and Call Center System - a comprehensive omnichannel platform designed to streamline mental health helpline operations, manage client interactions, and improve service delivery.
 
-## About MHU Helpline
+## About Mayday Helpline
 
-MHU Helpline is a complete omnichannel call center solution built on Asterisk 20.11.1 and Chan PJSIP. The system combines powerful telephony features with customer relationship management capabilities specifically designed for Mental Health Uganda's needs. Our platform enables support agents to create and manage client sessions while providing supervisors with robust monitoring and reporting tools.
+Mayday Helpline is a complete omnichannel call center solution built on Asterisk 20.11.1 and Chan PJSIP. The system combines powerful telephony features with customer relationship management capabilities specifically designed for Mental Health Uganda's needs. Our platform enables support agents to create and manage client sessions while providing supervisors with robust monitoring and reporting tools.
 
 ## System Architecture
 
-The MHU Helpline system is built on a modern technology stack:
+The Mayday Helpline system is built on a modern technology stack:
 
 - **Telephony Core**: Asterisk 20.11.1 with Chan PJSIP for reliable call handling
 - **Real-time Data**: Sequelize for call data and real-time operations
@@ -51,7 +51,7 @@ The MHU Helpline system is built on a modern technology stack:
 
 ## Getting Started
 
-New to MHU Helpline? Start here to learn the basics:
+New to Mayday Helpline? Start here to learn the basics:
 
 - [System Overview](./intro.md) - Understand the core components of the system
 - [User Guide](./intro.md) - Learn how to use the system as an agent
@@ -74,4 +74,4 @@ If you can't find what you're looking for in this documentation:
 - Submit a support ticket through the system
 - Check our [FAQ section](./intro.md) for quick answers
 
-We're committed to helping you get the most out of your MHU Helpline system.
+We're committed to helping you get the most out of your Mayday Helpline system.
