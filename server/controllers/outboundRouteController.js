@@ -288,11 +288,22 @@ export const getOutboundRouteById = async (req, res) => {
       (ext) => ext.isGenerated
     );
 
+    // Get ALL dialplan entries for this route's context and exten (sorted by priority)
+    const allDialplanEntries = await VoiceExtension.findAll({
+      where: {
+        type: 'outbound',
+        exten: route.phoneNumber,
+        context: route.context,
+      },
+      order: [['priority', 'ASC']],
+    });
+
     // Create a new response object with separated extensions
     const responseRoute = {
       ...route.toJSON(),
       voiceExtensions: manualExtensions, // Keep only manual extensions in the main array
       generatedExtensions: generatedExtensions, // Add generated extensions separately
+      dialplanEntries: allDialplanEntries, // All dialplan entries for display
     };
 
     res.status(200).json({

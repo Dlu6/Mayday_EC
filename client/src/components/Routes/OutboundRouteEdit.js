@@ -197,6 +197,7 @@ const OutboundRouteEdit = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editableApp, setEditableApp] = useState(null);
   const [voiceExtensions, setVoiceExtensions] = useState([]);
+  const [dialplanEntries, setDialplanEntries] = useState([]);
 
   const currentRoute = useSelector((state) => state.outboundRoute.currentRoute);
   // const loading = useSelector((state) => state.outboundRoute.loading);
@@ -219,6 +220,9 @@ const OutboundRouteEdit = () => {
 
       // Set manual voice extensions
       setVoiceExtensions(currentRoute.voiceExtensions || []);
+
+      // Set dialplan entries (all entries from database)
+      setDialplanEntries(currentRoute.dialplanEntries || []);
 
       // Handle generated extensions if needed
       const generatedExts = currentRoute.generatedExtensions || [];
@@ -701,35 +705,65 @@ const OutboundRouteEdit = () => {
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Generated Extensions
+              Dialplan Entries (Database View)
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              This shows all dialplan entries for this route as stored in the voice_extensions table, ordered by priority.
             </Typography>
             <TableContainer>
               <Table size="small">
                 <TableHead>
-                  <TableRow>
-                    <TableCell>Priority</TableCell>
-                    <TableCell>Application</TableCell>
-                    <TableCell>Data</TableCell>
-                    <TableCell>Description</TableCell>
-                    <TableCell>Type</TableCell>
+                  <TableRow sx={{ backgroundColor: "primary.main" }}>
+                    <TableCell sx={{ color: "white", fontWeight: "bold" }}>Priority</TableCell>
+                    <TableCell sx={{ color: "white", fontWeight: "bold" }}>Application</TableCell>
+                    <TableCell sx={{ color: "white", fontWeight: "bold" }}>App Data</TableCell>
+                    <TableCell sx={{ color: "white", fontWeight: "bold" }}>Description</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {currentRoute?.generatedExtensions?.map((ext) => (
-                    <TableRow key={ext.id}>
-                      <TableCell>{ext.priority}</TableCell>
-                      <TableCell>{ext.app}</TableCell>
-                      <TableCell>{ext.appdata}</TableCell>
-                      <TableCell>{ext.description}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={ext.isGenerated ? "Generated" : "Manual"}
-                          color={ext.isGenerated ? "primary" : "default"}
-                          size="small"
-                        />
+                  {dialplanEntries.length > 0 ? (
+                    dialplanEntries.map((ext, index) => (
+                      <TableRow 
+                        key={ext.id} 
+                        sx={{ 
+                          backgroundColor: index % 2 === 0 ? "inherit" : "action.hover",
+                          "&:hover": { backgroundColor: "action.selected" }
+                        }}
+                      >
+                        <TableCell>
+                          <Chip 
+                            label={ext.priority} 
+                            size="small" 
+                            color="primary" 
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={ext.app} 
+                            size="small" 
+                            color={
+                              ext.app === "Dial" ? "success" : 
+                              ext.app === "MixMonitor" ? "warning" : 
+                              ext.app === "Set" ? "info" : 
+                              ext.app === "System" ? "secondary" : 
+                              "default"
+                            }
+                          />
+                        </TableCell>
+                        <TableCell sx={{ maxWidth: 400, wordBreak: "break-all", fontSize: "0.85rem" }}>
+                          {ext.appdata}
+                        </TableCell>
+                        <TableCell>{ext.description || "-"}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center">
+                        No dialplan entries found for this route
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -743,7 +777,7 @@ const OutboundRouteEdit = () => {
   const tabs = [
     { value: "settings", label: "Settings" },
     { value: "actions", label: "Actions" },
-    { value: "extensions", label: "Voice Extensions" },
+    { value: "extensions", label: "Dialplan View" },
   ];
 
   return (

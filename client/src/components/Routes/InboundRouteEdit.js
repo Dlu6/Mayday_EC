@@ -8,6 +8,7 @@ import {
   Card,
   CardContent,
   Checkbox,
+  Chip,
   Dialog,
   DialogTitle,
   Divider,
@@ -21,6 +22,12 @@ import {
   Paper,
   Tabs,
   Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Tooltip,
   Toolbar,
   Typography,
@@ -120,6 +127,8 @@ const InboundRouteEdit = () => {
   });
 
   const [configuredApps, setConfiguredApps] = useState([]);
+  const [dialplanEntries, setDialplanEntries] = useState([]);
+  const [openDialplanDialog, setOpenDialplanDialog] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
   // console.log(flows, "<<<<<<flows");
@@ -254,9 +263,17 @@ const InboundRouteEdit = () => {
     const fetchRouteDetails = async () => {
       if (inboundRouteId) {
         try {
-          const applications = await dispatch(
+          const result = await dispatch(
             fetchInboundRouteApplications(inboundRouteId)
           ).unwrap();
+
+          // Handle both old format (array) and new format (object with applications)
+          const applications = Array.isArray(result) ? result : result.applications;
+          
+          // Store dialplan entries if available
+          if (result.dialplanEntries) {
+            setDialplanEntries(result.dialplanEntries);
+          }
 
           if (applications && Array.isArray(applications)) {
             const parsedApps = applications.map((app, index) => {
@@ -515,6 +532,9 @@ const InboundRouteEdit = () => {
             setOpenDialog={setOpenDialog}
             configuredApps={configuredApps}
             setConfiguredApps={setConfiguredApps}
+            dialplanEntries={dialplanEntries}
+            openDialplanDialog={openDialplanDialog}
+            setOpenDialplanDialog={setOpenDialplanDialog}
           />
         )}
         {/* </CardContent> */}
@@ -872,6 +892,9 @@ const ActionTabContent = ({
   setOpenDialog,
   configuredApps,
   setConfiguredApps,
+  dialplanEntries,
+  openDialplanDialog,
+  setOpenDialplanDialog,
 }) => {
   const { loading, error } = useSelector((state) => state.inboundRoute);
   const [editableApp, setEditableApp] = useState(null);
@@ -1158,9 +1181,19 @@ const ActionTabContent = ({
 
         {/* Right container for the drop area */}
         <Grid item xs={8}>
-          <Typography variant="h6" style={{ fontSize: "16px" }}>
-            Drag & Drop Routing
-          </Typography>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+            <Typography variant="h6" style={{ fontSize: "16px" }}>
+              Drag & Drop Routing
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setOpenDialplanDialog(true)}
+              disabled={dialplanEntries.length === 0}
+            >
+              View Dialplan ({dialplanEntries.length})
+            </Button>
+          </Box>
           <DragDropRoutingHeader />
           <Droppable droppableId="dropZone">
             {(provided, snapshot) => (
@@ -1392,6 +1425,84 @@ const ActionTabContent = ({
             onSave={handleSaveInterval}
           />
         )}
+
+        {/* Dialplan View Dialog */}
+        <Dialog
+          open={openDialplanDialog}
+          onClose={() => setOpenDialplanDialog(false)}
+          maxWidth="lg"
+          fullWidth
+        >
+          <DialogTitle sx={{ backgroundColor: "primary.main", color: "white" }}>
+            Dialplan Entries (Database View)
+          </DialogTitle>
+          <DialogContent sx={{ mt: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              This shows all dialplan entries for this route as stored in the voice_extensions table, ordered by priority.
+            </Typography>
+            <TableContainer component={Paper}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: "primary.main" }}>
+                    <TableCell sx={{ color: "white", fontWeight: "bold" }}>Priority</TableCell>
+                    <TableCell sx={{ color: "white", fontWeight: "bold" }}>Application</TableCell>
+                    <TableCell sx={{ color: "white", fontWeight: "bold" }}>App Data</TableCell>
+                    <TableCell sx={{ color: "white", fontWeight: "bold" }}>Description</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {dialplanEntries.length > 0 ? (
+                    dialplanEntries.map((ext, index) => (
+                      <TableRow 
+                        key={ext.id} 
+                        sx={{ 
+                          backgroundColor: index % 2 === 0 ? "inherit" : "action.hover",
+                          "&:hover": { backgroundColor: "action.selected" }
+                        }}
+                      >
+                        <TableCell>
+                          <Chip 
+                            label={ext.priority} 
+                            size="small" 
+                            color="primary" 
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={ext.app} 
+                            size="small" 
+                            color={
+                              ext.app === "Dial" ? "success" : 
+                              ext.app === "MixMonitor" ? "warning" : 
+                              ext.app === "Set" ? "info" : 
+                              ext.app === "Queue" ? "secondary" :
+                              ext.app === "GotoIf" ? "error" :
+                              "default"
+                            }
+                          />
+                        </TableCell>
+                        <TableCell sx={{ maxWidth: 400, wordBreak: "break-all", fontSize: "0.85rem" }}>
+                          {ext.appdata}
+                        </TableCell>
+                        <TableCell>{ext.description || "-"}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center">
+                        No dialplan entries found for this route
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenDialplanDialog(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
       </Grid>
     </DragDropContext>
   );

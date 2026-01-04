@@ -85,7 +85,12 @@ export const fetchInboundRouteApplications = createAsyncThunk(
       if (response.data.success) {
         // Parse the stringified applications
         const applications = JSON.parse(response.data.route.applications);
-        return applications;
+        // Return both applications and dialplan entries
+        return {
+          applications,
+          dialplanEntries: response.data.route.dialplanEntries || [],
+          routeData: response.data.route,
+        };
       }
       throw new Error("Failed to fetch applications");
     } catch (error) {
