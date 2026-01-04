@@ -10,9 +10,9 @@ import { themes as prismThemes } from "prism-react-renderer";
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: "MHU Helpline Documentation",
+  title: "Mayday Helpline Documentation",
   tagline:
-    "Comprehensive documentation for the MHU Helpline CRM and Call Center System",
+    "Comprehensive documentation for the Mayday Helpline CRM and Call Center System",
   favicon: "img/favicon.ico",
 
   // Set the production url of your site here
@@ -24,7 +24,7 @@ const config = {
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: "MHU", // Usually your GitHub org/user name.
+  organizationName: "Mayday", // Usually your GitHub org/user name.
   projectName: "mayday-wiki", // Usually your repo name.
 
   onBrokenLinks: "warn",
@@ -75,9 +75,9 @@ const config = {
       // Replace with your project's social card
       image: "img/mhu_logo.jpg",
       navbar: {
-        title: "MHU Helpline Documentation",
+        title: "Mayday Helpline Documentation",
         logo: {
-          alt: "MHU Logo",
+          alt: "Mayday Logo",
           src: "img/logo.svg",
         },
         items: [
@@ -146,7 +146,7 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} MHU Helpline. All rights reserved.`,
+        copyright: `Copyright © ${new Date().getFullYear()} Mayday Helpline. All rights reserved.`,
       },
       prism: {
         theme: prismThemes.github,

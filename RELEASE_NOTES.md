@@ -1,4 +1,4 @@
-# MHU Appbar v5.0.0 Release Notes
+# Mayday Appbar v5.0.0 Release Notes
 
 **Release Date:** November 27, 2025
 

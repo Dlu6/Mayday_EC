@@ -43,6 +43,30 @@ export const fetchRecordings = createAsyncThunk(
   }
 );
 
+// Fetch recordings for a date range
+export const fetchRecordingsByRange = createAsyncThunk(
+  "recordings/fetchByRange",
+  async ({ startDate, endDate }, { rejectWithValue }) => {
+    try {
+      const startDateStr = format(parseISO(startDate), "yyyy-MM-dd");
+      const endDateStr = format(parseISO(endDate), "yyyy-MM-dd");
+
+      const response = await apiClient.get(
+        `/recordings/list-range?startDate=${startDateStr}&endDate=${endDateStr}`
+      );
+      return response.data.recordings;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        return [];
+      }
+      return rejectWithValue(
+        error.response?.data?.message ||
+          "Failed to fetch recordings for this date range!"
+      );
+    }
+  }
+);
+
 // Rate a recording
 export const rateRecording = createAsyncThunk(
   "recordings/rate",
@@ -77,6 +101,8 @@ const initialState = {
   dates: [],
   recordings: [],
   selectedDate: new Date().toISOString(),
+  startDate: new Date().toISOString(),
+  endDate: new Date().toISOString(),
   loading: false,
   error: null,
 };
@@ -109,6 +135,15 @@ const recordingsSlice = createSlice({
     clearRecordings: (state) => {
       state.recordings = [];
     },
+    setDateRange: (state, action) => {
+      const { startDate, endDate } = action.payload;
+      if (startDate) {
+        state.startDate = startDate instanceof Date ? startDate.toISOString() : startDate;
+      }
+      if (endDate) {
+        state.endDate = endDate instanceof Date ? endDate.toISOString() : endDate;
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -140,6 +175,20 @@ const recordingsSlice = createSlice({
         state.error = action.payload;
       })
 
+      // Fetch Recordings by Range
+      .addCase(fetchRecordingsByRange.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchRecordingsByRange.fulfilled, (state, action) => {
+        state.loading = false;
+        state.recordings = action.payload || [];
+      })
+      .addCase(fetchRecordingsByRange.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
       // Rate Recording
       .addCase(rateRecording.pending, (state) => {
         state.error = null;
@@ -159,5 +208,5 @@ const recordingsSlice = createSlice({
   },
 });
 
-export const { setSelectedDate, clearRecordings } = recordingsSlice.actions;
+export const { setSelectedDate, clearRecordings, setDateRange } = recordingsSlice.actions;
 export default recordingsSlice.reducer;

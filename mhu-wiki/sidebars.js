@@ -22,7 +22,7 @@ const sidebars = {
       link: {
         type: "generated-index",
         title: "User Guide",
-        description: "Guides for daily users of the MHU Helpline system",
+        description: "Guides for daily users of the Mayday Helpline system",
       },
       items: [
         "user-guide/getting-started",
@@ -66,7 +66,7 @@ const sidebars = {
       link: {
         type: "generated-index",
         title: "Troubleshooting",
-        description: "Solutions to common issues with the MHU Helpline system",
+        description: "Solutions to common issues with the Mayday Helpline system",
       },
       items: [
         "troubleshooting/common-issues",

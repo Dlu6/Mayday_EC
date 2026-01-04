@@ -583,12 +583,24 @@ npm run electron:dev
 ### Building for Production
 
 ```powershell
+# Navigate to electron-softphone directory
+cd electron-softphone
+
 # Build Windows installer (NSIS)
 npm run electron:build:win
 
-# Output location: electron-softphone/release/{version}/
-# Creates: MHU Appbar Setup {version}.exe
+# Build output location
+# electron-softphone/release/5.1.5/
 ```
+
+**Build Artifacts Created:**
+
+| File | Path | Description |
+|------|------|-------------|
+| **Installer** | `release/5.1.5/Mayday Appbar Setup 5.1.5.exe` | Windows NSIS installer (distributable) |
+| **Update Manifest** | `release/5.1.5/latest.yml` | Auto-update configuration file |
+| **Unpacked App** | `release/5.1.5/win-unpacked/` | Unpacked application files (for testing) |
+| **Debug Info** | `release/5.1.5/builder-debug.yml` | Build configuration debug info |
 
 ### Build Scripts Reference
 
@@ -618,16 +630,40 @@ The softphone includes these Windows-specific features that require native compi
 
 ### Environment Configuration
 
-Create `.env.production` before building:
+**Production Server Configuration:**
+
+The following files must be configured with the production server IP (`192.168.1.14`):
+
+| File | Variable | Current Value |
+|------|----------|---------------|
+| `src/config/serverConfig.js` | `DEFAULT_SERVER_HOST` | `192.168.1.14` |
+| `vite.config.js` | `DEFAULT_SERVER_HOST` | `192.168.1.14` |
+| `electron/main.js` | `DEFAULT_SERVER_HOST` | `192.168.1.14` |
+| `.env.production` | `VITE_SERVER_HOST` | `192.168.1.14` |
+
+**Example `.env.production`:**
 
 ```env
-VITE_API_URL=https://your-production-server.com
-VITE_WS_URL=wss://your-production-server.com
+# Server Configuration
+VITE_SERVER_HOST=192.168.1.14
+VITE_PUBLIC_IP=192.168.1.14
+VITE_PORT=8004
+VITE_SIP_PORT=8088
+
+# API URLs
+VITE_API_URL=http://192.168.1.14
+VITE_WS_URL=ws://192.168.1.14:8088
+VITE_BASE_URL=http://192.168.1.14
+
+# Environment
+NODE_ENV=production
 ```
 
-### Updating the Auto-Update Server
+### Deploying Updates to Production
 
-The softphone checks for updates from the URL configured in `package.json`:
+The softphone uses **electron-updater** to automatically check for and install updates from the configured server.
+
+**Auto-Update Configuration** (`package.json`):
 
 ```json
 "publish": {
@@ -636,11 +672,70 @@ The softphone checks for updates from the URL configured in `package.json`:
 }
 ```
 
-To deploy updates:
-1. Build the installer: `npm run electron:build:win`
-2. Copy files from `release/{version}/` to your update server:
-   - `MHU Appbar Setup {version}.exe`
-   - `latest.yml`
+**Deployment Steps:**
+
+#### Option 1: Manual Deployment (Recommended for Production)
+
+```powershell
+# 1. Build the installer on Windows
+cd electron-softphone
+npm run electron:build:win
+
+# 2. Verify build artifacts exist
+dir release\5.1.5\
+
+# 3. Copy to production server (192.168.1.14)
+# Using SCP or file transfer tool, copy these files to /var/www/html/downloads/:
+# - release/5.1.5/Mayday Appbar Setup 5.1.5.exe
+# - release/5.1.5/latest.yml
+```
+
+**Using SCP (if SSH access available):**
+
+```bash
+# From Windows (using Git Bash or WSL)
+scp "release/5.1.5/Mayday Appbar Setup 5.1.5.exe" \
+    "release/5.1.5/latest.yml" \
+    medhi@192.168.1.14:/var/www/html/downloads/
+
+# Or using PowerShell with pscp (PuTTY)
+pscp "release\5.1.5\Mayday Appbar Setup 5.1.5.exe" medhi@192.168.1.14:/var/www/html/downloads/
+pscp "release\5.1.5\latest.yml" medhi@192.168.1.14:/var/www/html/downloads/
+```
+
+#### Option 2: Deploy via Git (Development/Testing)
+
+```powershell
+# 1. Add build files to git (normally ignored)
+git add -f "release/5.1.5/latest.yml" "release/5.1.5/Mayday Appbar Setup 5.1.5.exe"
+git commit -m "Add Windows build v5.1.5"
+git push origin development
+
+# 2. On server, pull and copy to nginx directory
+ssh medhi@192.168.1.14
+cd ~/Mayday_EC
+git pull origin development
+sudo cp electron-softphone/release/5.1.5/*.exe /var/www/html/downloads/
+sudo cp electron-softphone/release/5.1.5/latest.yml /var/www/html/downloads/
+```
+
+**Verify Deployment:**
+
+```bash
+# Check files are accessible
+curl -I http://192.168.1.14/downloads/latest.yml
+curl -I http://192.168.1.14/downloads/Mayday%20Appbar%20Setup%205.1.5.exe
+
+# Should return HTTP 200 OK
+```
+
+**Auto-Update Behavior:**
+
+- Installed apps check for updates on startup
+- Update check interval: 5 seconds after app launch
+- If new version found in `latest.yml`, download starts automatically
+- User is prompted to install and restart
+- Silent background download, no interruption to active calls
 
 ### Troubleshooting Windows Build
 
@@ -1490,7 +1585,7 @@ npm run build
 npm run electron:build:win
 
 # Commit build files to GitHub
-git add -f "release/5.1.5/latest.yml" "release/5.1.5/MHU Appbar Setup 5.1.5.exe"
+git add -f "release/5.1.5/latest.yml" "release/5.1.5/Mayday Appbar Setup 5.1.5.exe"
 git commit -m "Add Windows build v5.1.5 with native appbar module"
 git push origin feature/enhanced-transfer-system
 ```
@@ -1504,12 +1599,12 @@ git pull origin feature/enhanced-transfer-system
 
 # Delete previous version from server
 ssh -i ~/Downloads/MHU_Debian_Mumb.pem admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com \
-  "rm -f /var/www/html/downloads/latest.yml /var/www/html/downloads/'MHU Appbar Setup'*.exe"
+  "rm -f /var/www/html/downloads/latest.yml /var/www/html/downloads/'MaydayAppbar Setup'*.exe"
 
 # Upload new version
 scp -i ~/Downloads/MHU_Debian_Mumb.pem \
   "electron-softphone/release/5.1.5/latest.yml" \
-  "electron-softphone/release/5.1.5/MHU Appbar Setup 5.1.5.exe" \
+  "electron-softphone/release/5.1.5/MaydayAppbar Setup 5.1.5.exe" \
   admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com:/var/www/html/downloads/
 
 # Verify
@@ -1521,10 +1616,10 @@ curl -s http://192.168.1.14/downloads/latest.yml
 cd ~/Downloads/Mayday-CRM-Scracth && \
 git pull origin feature/enhanced-transfer-system && \
 ssh -i ~/Downloads/MHU_Debian_Mumb.pem admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com \
-  "rm -f /var/www/html/downloads/latest.yml /var/www/html/downloads/'MHU Appbar Setup'*.exe" && \
+  "rm -f /var/www/html/downloads/latest.yml /var/www/html/downloads/'MaydayAppbar Setup'*.exe" && \
 scp -i ~/Downloads/MHU_Debian_Mumb.pem \
   "electron-softphone/release/5.1.5/latest.yml" \
-  "electron-softphone/release/5.1.5/MHU Appbar Setup 5.1.5.exe" \
+  "electron-softphone/release/5.1.5/MaydayAppbar Setup 5.1.5.exe" \
   admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com:/var/www/html/downloads/ && \
 curl -s http://192.168.1.14/downloads/latest.yml
 ```
@@ -1537,7 +1632,7 @@ npm run build && \
 npm run electron:build:win && \
 scp -i ~/Downloads/MHU_Debian_Mumb.pem \
   "release/X.X.X/latest.yml" \
-  "release/X.X.X/MHU Appbar Setup X.X.X.exe" \
+  "release/X.X.X/MaydayAppbar Setup X.X.X.exe" \
   admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com:/var/www/html/downloads/ && \
 curl -s http://192.168.1.14/downloads/latest.yml
 ```
@@ -1560,8 +1655,8 @@ location /downloads/ {
 
 **Required files on server** (`/var/www/html/downloads/`):
 - `latest.yml` - Version metadata (auto-generated by electron-builder)
-- `MHU Appbar Setup X.X.X.exe` - The installer (~85 MB)
-- `MHU Appbar Setup X.X.X.exe.blockmap` - Delta updates (optional, only if differential packages enabled)
+- `MaydayAppbar Setup X.X.X.exe` - The installer (~85 MB)
+- `MaydayAppbar Setup X.X.X.exe.blockmap` - Delta updates (optional, only if differential packages enabled)
 
 **Verify deployment**:
 ```bash
@@ -1575,9 +1670,9 @@ To clean up old versions and free server space:
 **Delete specific versions:**
 ```bash
 ssh -i ~/Downloads/MHU_Debian_Mumb.pem admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com \
-  "rm -f /var/www/html/downloads/'MHU Appbar Setup 5.1.4.exe' \
-         /var/www/html/downloads/'MHU Appbar Setup 5.1.3.exe' \
-         /var/www/html/downloads/'MHU Appbar Setup 5.1.3.exe.blockmap'"
+  "rm -f /var/www/html/downloads/'MaydayAppbar Setup 5.1.4.exe' \
+         /var/www/html/downloads/'MaydayAppbar Setup 5.1.3.exe' \
+         /var/www/html/downloads/'MaydayAppbar Setup 5.1.3.exe.blockmap'"
 ```
 
 **List all versions on server:**
@@ -1594,7 +1689,7 @@ ssh -i ~/Downloads/MHU_Debian_Mumb.pem admin@ec2-65-1-149-92.ap-south-1.compute.
 
 # Delete all exe files except the latest version
 ssh -i ~/Downloads/MHU_Debian_Mumb.pem admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com \
-  "cd /var/www/html/downloads && rm -f 'MHU Appbar Setup 5.0.'*.exe 'MHU Appbar Setup 5.0.'*.blockmap"
+  "cd /var/www/html/downloads && rm -f 'MaydayAppbar Setup 5.0.'*.exe 'MaydayAppbar Setup 5.0.'*.blockmap"
 ```
 
 **Note**: Always keep `latest.yml` and the current version's `.exe` file. The auto-updater reads `latest.yml` to determine the current version.
@@ -1640,7 +1735,7 @@ Users can manually check for updates via:
   - Added AppUpdater component to Login screen for checking updates before login
   - Fixed URL preference switch clearing auth state (no longer clears localStorage)
   - Fixed "Remember Me" functionality race condition (credentials were being cleared on load)
-  - Fixed Windows auto-update "MHU Appbar cannot be closed" error
+  - Fixed Windows auto-update "Mayday Appbar cannot be closed" error
   - Improved update installer to use silent mode and proper window cleanup
   - Added NSIS elevation and runAfterFinish options for smoother updates
 

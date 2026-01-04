@@ -148,7 +148,13 @@ function createLoginWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       webSecurity: false,
+      allowRunningInsecureContent: true,
     },
+  });
+
+  // Ignore certificate errors for all requests
+  mainWindow.webContents.session.setCertificateVerifyProc((request, callback) => {
+    callback(0); // 0 means accept the certificate
   });
 
   forwardRendererConsole(mainWindow, "login");
@@ -192,6 +198,11 @@ function createAppbarWindow() {
       webSocketProtocols: ["sip", "wss", "ws"],
       allowRunningInsecureContent: true,
     },
+  });
+
+  // Ignore certificate errors for all requests
+  appbarWindow.webContents.session.setCertificateVerifyProc((request, callback) => {
+    callback(0); // 0 means accept the certificate
   });
 
   forwardRendererConsole(appbarWindow, "appbar");
@@ -301,6 +312,29 @@ app.whenReady().then(() => {
   // Remove the application menu bar entirely
   // Force reload is now available via the in-app button
   Menu.setApplicationMenu(null);
+  
+  // Register global keyboard shortcuts for DevTools
+  const { globalShortcut } = electron;
+  
+  // F12 - Toggle DevTools
+  globalShortcut.register('F12', () => {
+    const focusedWindow = BrowserWindow.getFocusedWindow();
+    if (focusedWindow) {
+      focusedWindow.webContents.toggleDevTools();
+      console.log('[main.js] DevTools toggled via F12');
+    }
+  });
+  
+  // Ctrl+Shift+I - Toggle DevTools (alternative)
+  globalShortcut.register('CommandOrControl+Shift+I', () => {
+    const focusedWindow = BrowserWindow.getFocusedWindow();
+    if (focusedWindow) {
+      focusedWindow.webContents.toggleDevTools();
+      console.log('[main.js] DevTools toggled via Ctrl+Shift+I');
+    }
+  });
+  
+  console.log('[main.js] DevTools shortcuts registered: F12, Ctrl+Shift+I');
   
   // Initialize auto-updater (lazy loaded)
   const { initAutoUpdater, checkForUpdates } = getAutoUpdaterModule();

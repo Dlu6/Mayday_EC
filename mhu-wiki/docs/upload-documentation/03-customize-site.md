@@ -68,7 +68,7 @@ const config = {
   // ... other config
   themeConfig: {
     navbar: {
-      title: "MHU Wiki",
+      title: "Mayday Wiki",
       logo: {
         alt: "Mayday Logo",
         src: "img/logo.svg",

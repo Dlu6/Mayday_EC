@@ -4,7 +4,7 @@ sidebar_position: 3
 
 # IVR Design Guide
 
-This guide explains how to design, build, and optimize Interactive Voice Response (IVR) systems using the MHU Helpline IVR Builder.
+This guide explains how to design, build, and optimize Interactive Voice Response (IVR) systems using the Mayday Helpline IVR Builder.
 
 ## IVR Fundamentals
 
@@ -21,7 +21,7 @@ An Interactive Voice Response (IVR) system allows callers to interact with your 
 
 ## Accessing the IVR Builder
 
-1. Log in to the MHU Helpline admin portal
+1. Log in to the Mayday Helpline admin portal
 2. Navigate to **IVR → IVR Projects**
 3. Click **Create New Project** or select an existing project to edit
 

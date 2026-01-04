@@ -140,13 +140,13 @@ const About = () => {
               variant="h4"
               gutterBottom
             >
-              About MHU-CRMS
+              About Mayday CRM
             </Typography>
             <Typography variant="body1" paragraph>
               Version: {systemInfo.version || "Loading..."}
             </Typography>
             <Typography variant="body1" paragraph>
-              MHU Client Record Management System (MHU-CRMS) is a comprehensive
+              Mayday Client Record Management System (Mayday) is a comprehensive
               call center management solution integrating with Asterisk PBX to
               provide advanced telephony features, queue management, and
               real-time monitoring capabilities and integrations.
@@ -420,16 +420,16 @@ const About = () => {
             </Card>
           </Grid>
 
-          {/* MHU Appbar Download */}
+          {/* Mayday Appbar Download */}
           <Grid item xs={12} md={6}>
             <Card elevation={2} sx={{ height: "100%", bgcolor: "primary.main", color: "white" }}>
               <CardContent>
                 <Box display="flex" alignItems="center" mb={2}>
                   <DesktopWindowsIcon sx={{ mr: 1 }} />
-                  <Typography variant="h6">MHU Appbar (Softphone)</Typography>
+                  <Typography variant="h6">Mayday Appbar (Softphone)</Typography>
                 </Box>
                 <Typography variant="body2" sx={{ mb: 2, opacity: 0.9 }}>
-                  Download the latest MHU Appbar desktop application for Windows.
+                  Download the latest Mayday Appbar desktop application for Windows.
                   Includes auto-update feature for future versions.
                 </Typography>
                 <Box display="flex" alignItems="center" justifyContent="space-between">

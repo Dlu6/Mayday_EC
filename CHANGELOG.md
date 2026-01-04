@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the MHU Mayday CRM project.
+All notable changes to the Mayday CRM project.
 
 ---
 
