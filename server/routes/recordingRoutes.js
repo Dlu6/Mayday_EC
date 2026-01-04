@@ -306,7 +306,7 @@ async function getRecordingsFromDir(recordingDir, year, month, day) {
         if ((type === "agent" || type === "outbound" || type === "queue") && agentExtension) {
           try {
             const userResult = await sequelize.query(
-              `SELECT username, firstName, lastName FROM users WHERE extension = ? LIMIT 1`,
+              `SELECT username, name, full_name FROM users WHERE extension = ? LIMIT 1`,
               {
                 replacements: [agentExtension],
                 type: sequelize.QueryTypes.SELECT,
@@ -314,9 +314,7 @@ async function getRecordingsFromDir(recordingDir, year, month, day) {
             );
             if (userResult && userResult.length > 0) {
               const user = userResult[0];
-              agentName = user.firstName && user.lastName 
-                ? `${user.firstName} ${user.lastName}` 
-                : user.username;
+              agentName = user.full_name || user.name || user.username;
             }
           } catch (err) {
             console.error("Error fetching agent info:", err);
