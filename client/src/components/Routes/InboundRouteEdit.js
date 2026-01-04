@@ -532,6 +532,9 @@ const InboundRouteEdit = () => {
             setOpenDialog={setOpenDialog}
             configuredApps={configuredApps}
             setConfiguredApps={setConfiguredApps}
+            dialplanEntries={dialplanEntries}
+            openDialplanDialog={openDialplanDialog}
+            setOpenDialplanDialog={setOpenDialplanDialog}
           />
         )}
         {/* </CardContent> */}
@@ -889,6 +892,9 @@ const ActionTabContent = ({
   setOpenDialog,
   configuredApps,
   setConfiguredApps,
+  dialplanEntries,
+  openDialplanDialog,
+  setOpenDialplanDialog,
 }) => {
   const { loading, error } = useSelector((state) => state.inboundRoute);
   const [editableApp, setEditableApp] = useState(null);
