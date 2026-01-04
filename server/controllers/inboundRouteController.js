@@ -801,6 +801,16 @@ export const getOneInboundRoute = async (req, res) => {
       },
     }));
 
+    // Get ALL dialplan entries for this route (including non-app entries)
+    const allDialplanEntries = await VoiceExtension.findAll({
+      where: {
+        context: route.context,
+        exten: route.phone_number,
+        type: "inbound",
+      },
+      order: [["priority", "ASC"]],
+    });
+
     const responseData = {
       success: true,
       route: {
@@ -810,6 +820,7 @@ export const getOneInboundRoute = async (req, res) => {
         alias: route.alias,
         description: route.description,
         applications: JSON.stringify(applications),
+        dialplanEntries: allDialplanEntries, // All dialplan entries for display
       },
     };
 
