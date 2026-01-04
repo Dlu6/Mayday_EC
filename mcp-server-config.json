@@ -1,12 +1,14 @@
 {
-  "_comment": "Mayday EC MCP Server Configuration - Updated Dec 18, 2025",
+  "_comment": "Mayday EC MCP Server Configuration - Updated Jan 4, 2026",
   "_notes": {
     "sshUser": "medhi (SSH key auth via ~/.ssh/id_ed25519)",
     "sudoPassword": "Pasword@1759 (for medhi user)",
     "rootPassword": "Lotuskm@1759 (root user - not used for SSH)",
     "nodeLocation": "Node.js installed via NVM at /root/.nvm/versions/node/v18.20.8",
     "pm2Note": "PM2 runs as root, requires sudo and NVM source to access",
-    "projectPath": "/home/medhi/Mayday_EC"
+    "projectPath": "/home/medhi/Mayday_EC",
+    "sshCommandPattern": "ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \"echo 'Pasword@1759' | sudo -S <command>\"",
+    "mysqlAsRoot": "echo 'Pasword@1759' | sudo -S mysql -u root asterisk -e '<query>'"
   },
   "mcpServers": {
     "mayday-asterisk-server": {
@@ -21,6 +23,49 @@
       },
       "cwd": "/home/medhi/Mayday_EC",
       "description": "On-prem Asterisk server (192.168.1.14) - SSH key authentication"
+    },
+    "mayday-asterisk-root": {
+      "command": "ssh",
+      "args": [
+        "-i",
+        "~/.ssh/id_ed25519",
+        "-t",
+        "medhi@192.168.1.14",
+        "echo 'Pasword@1759' | sudo -S su -"
+      ],
+      "env": {
+        "TERM": "xterm-256color"
+      },
+      "cwd": "/",
+      "description": "On-prem Asterisk server as ROOT - use for admin operations"
+    },
+    "mayday-mysql-root": {
+      "command": "ssh",
+      "args": [
+        "-i",
+        "~/.ssh/id_ed25519",
+        "medhi@192.168.1.14",
+        "echo 'Pasword@1759' | sudo -S mysql -u root asterisk"
+      ],
+      "env": {
+        "TERM": "xterm-256color"
+      },
+      "cwd": ".",
+      "description": "MySQL as root on Asterisk server - for database operations"
+    },
+    "mayday-asterisk-cli": {
+      "command": "ssh",
+      "args": [
+        "-i",
+        "~/.ssh/id_ed25519",
+        "medhi@192.168.1.14",
+        "echo 'Pasword@1759' | sudo -S asterisk -rx"
+      ],
+      "env": {
+        "TERM": "xterm-256color"
+      },
+      "cwd": ".",
+      "description": "Asterisk CLI commands - append command in quotes e.g. 'dialplan reload'"
     },
     "mayday-local-dev": {
       "command": "node",
