@@ -239,9 +239,10 @@ async function getRecordingsFromDir(recordingDir, year, month, day) {
 
         let callDetails = null;
         let duration = 0;
+        let queueAgentExtension = null;
         try {
           const cdr = await sequelize.query(
-            `SELECT src, dst, disposition, billsec, duration as call_duration, start as calldate 
+            `SELECT src, dst, dstchannel, disposition, billsec, duration as call_duration, start as calldate 
              FROM cdr 
              WHERE uniqueid = ? OR userfield LIKE ?`,
             {
@@ -256,6 +257,14 @@ async function getRecordingsFromDir(recordingDir, year, month, day) {
           if (cdr && cdr.length > 0) {
             callDetails = cdr[0];
             duration = callDetails.billsec > 0 ? callDetails.billsec : callDetails.call_duration || 0;
+            
+            // Extract agent extension from dstchannel for queue calls (e.g., "PJSIP/1002-0000000f")
+            if (type === "queue" && callDetails.dstchannel) {
+              const channelMatch = callDetails.dstchannel.match(/PJSIP\/(\d+)-/);
+              if (channelMatch) {
+                queueAgentExtension = channelMatch[1];
+              }
+            }
           }
         } catch (err) {
           console.error("Error fetching CDR info:", err);
@@ -287,12 +296,18 @@ async function getRecordingsFromDir(recordingDir, year, month, day) {
         // Look up agent username from extension number
         let agentName = null;
         let agentExtension = identifier;
-        if ((type === "agent" || type === "outbound") && identifier) {
+        
+        // For queue recordings, use the agent extension extracted from dstchannel
+        if (type === "queue" && queueAgentExtension) {
+          agentExtension = queueAgentExtension;
+        }
+        
+        if ((type === "agent" || type === "outbound" || type === "queue") && agentExtension) {
           try {
             const userResult = await sequelize.query(
               `SELECT username, firstName, lastName FROM users WHERE extension = ? LIMIT 1`,
               {
-                replacements: [identifier],
+                replacements: [agentExtension],
                 type: sequelize.QueryTypes.SELECT,
               }
             );
