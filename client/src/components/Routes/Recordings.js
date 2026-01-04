@@ -495,6 +495,9 @@ const Recordings = () => {
                     Type
                   </TableCell>
                   <TableCell sx={{ fontWeight: "bold", color: "white" }}>
+                    Agent
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: "white" }}>
                     Date
                   </TableCell>
                   <TableCell sx={{ fontWeight: "bold", color: "white" }}>
@@ -507,7 +510,7 @@ const Recordings = () => {
                     Size
                   </TableCell>
                   <TableCell sx={{ fontWeight: "bold", color: "white" }}>
-                    Caller/Queue
+                    Caller/Destination
                   </TableCell>
                   <TableCell sx={{ fontWeight: "bold", color: "white" }}>
                     Rating
@@ -573,6 +576,17 @@ const Recordings = () => {
                         </Box>
                       </TableCell>
                       <TableCell>
+                        {recording.agentName ? (
+                          <Tooltip title={`Extension: ${recording.agentExtension || recording.identifier}`}>
+                            <span>{recording.agentName}</span>
+                          </Tooltip>
+                        ) : recording.type === "agent" || recording.type === "outbound" ? (
+                          `Ext. ${recording.identifier}`
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
                         {recording.date || new Date(recording.created).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
@@ -590,9 +604,9 @@ const Recordings = () => {
                         {recording.type === "queue"
                           ? recording.identifier
                           : recording.type === "agent"
-                          ? `Ext. ${recording.identifier}`
+                          ? recording.callDetails?.src || "-"
                           : recording.type === "outbound"
-                          ? `From: ${recording.identifier}`
+                          ? recording.callDetails?.dst || "-"
                           : recording.callDetails?.src || "-"}
                       </TableCell>
                       <TableCell>
@@ -698,9 +712,9 @@ const Recordings = () => {
                   {selectedRecordingForModal.type === "queue"
                     ? "Inbound Queue Call"
                     : selectedRecordingForModal.type === "agent"
-                    ? `Agent Extension Call (${selectedRecordingForModal.identifier})`
+                    ? `Agent Extension Call (${selectedRecordingForModal.agentName || selectedRecordingForModal.identifier})`
                     : selectedRecordingForModal.type === "outbound"
-                    ? `Outbound Call (From: ${selectedRecordingForModal.identifier})`
+                    ? `Outbound Call (${selectedRecordingForModal.agentName || `Ext: ${selectedRecordingForModal.identifier}`})`
                     : "Inbound Call"}
                 </Typography>
               </Grid>
@@ -873,12 +887,15 @@ const Recordings = () => {
                 {selectedRecordingForModal.type === "queue"
                   ? "Inbound Queue Call"
                   : selectedRecordingForModal.type === "agent"
-                  ? `Agent Extension Call (${selectedRecordingForModal.identifier})`
+                  ? `Agent Extension Call (${selectedRecordingForModal.agentName || selectedRecordingForModal.identifier})`
                   : selectedRecordingForModal.type === "outbound"
-                  ? `Outbound Call (From: ${selectedRecordingForModal.identifier})`
+                  ? `Outbound Call (${selectedRecordingForModal.agentName || `Ext: ${selectedRecordingForModal.identifier}`})`
                   : "Inbound Call"}
-                {selectedRecordingForModal.callDetails?.src &&
-                  ` from ${selectedRecordingForModal.callDetails.src}`}
+                {selectedRecordingForModal.type === "outbound" && selectedRecordingForModal.callDetails?.dst
+                  ? ` to ${selectedRecordingForModal.callDetails.dst}`
+                  : selectedRecordingForModal.callDetails?.src
+                  ? ` from ${selectedRecordingForModal.callDetails.src}`
+                  : ""}
               </Typography>
 
               <Typography variant="body2" sx={{ mb: 1 }}>

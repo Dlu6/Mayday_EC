@@ -284,6 +284,29 @@ async function getRecordingsFromDir(recordingDir, year, month, day) {
           console.error("Error fetching rating:", err);
         }
 
+        // Look up agent username from extension number
+        let agentName = null;
+        let agentExtension = identifier;
+        if ((type === "agent" || type === "outbound") && identifier) {
+          try {
+            const userResult = await sequelize.query(
+              `SELECT username, firstName, lastName FROM users WHERE extension = ? LIMIT 1`,
+              {
+                replacements: [identifier],
+                type: sequelize.QueryTypes.SELECT,
+              }
+            );
+            if (userResult && userResult.length > 0) {
+              const user = userResult[0];
+              agentName = user.firstName && user.lastName 
+                ? `${user.firstName} ${user.lastName}` 
+                : user.username;
+            }
+          } catch (err) {
+            console.error("Error fetching agent info:", err);
+          }
+        }
+
         return {
           filename: file,
           path: `/api/recordings/play/${year}/${month}/${day}/${file}`,
@@ -293,6 +316,8 @@ async function getRecordingsFromDir(recordingDir, year, month, day) {
           modified: fileStat.mtime,
           type,
           identifier,
+          agentName,
+          agentExtension,
           callDetails,
           duration,
           rating,
