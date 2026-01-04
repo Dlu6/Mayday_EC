@@ -258,11 +258,11 @@ async function getRecordingsFromDir(recordingDir, year, month, day) {
             callDetails = cdr[0];
             duration = callDetails.billsec > 0 ? callDetails.billsec : callDetails.call_duration || 0;
             
-            // Extract agent extension from dstchannel for queue calls (e.g., "PJSIP/1002-0000000f")
+            // For queue calls, extract agent extension from dstchannel (e.g., "PJSIP/1002-00000013" -> "1002")
             if (type === "queue" && callDetails.dstchannel) {
-              const channelMatch = callDetails.dstchannel.match(/PJSIP\/(\d+)-/);
-              if (channelMatch) {
-                queueAgentExtension = channelMatch[1];
+              const dstMatch = callDetails.dstchannel.match(/PJSIP\/(\d+)-/);
+              if (dstMatch) {
+                queueAgentExtension = dstMatch[1];
               }
             }
           }
@@ -297,11 +297,12 @@ async function getRecordingsFromDir(recordingDir, year, month, day) {
         let agentName = null;
         let agentExtension = identifier;
         
-        // For queue recordings, use the agent extension extracted from dstchannel
+        // For queue calls, use the agent extension extracted from dstchannel
         if (type === "queue" && queueAgentExtension) {
           agentExtension = queueAgentExtension;
         }
         
+        // Look up agent for agent, outbound, or queue calls
         if ((type === "agent" || type === "outbound" || type === "queue") && agentExtension) {
           try {
             const userResult = await sequelize.query(
