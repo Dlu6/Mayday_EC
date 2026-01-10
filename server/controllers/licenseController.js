@@ -39,6 +39,7 @@ export const getCurrentLicense = async (req, res) => {
       id: license.id,
       master_license_id: license.master_license_id, // Add this for UI detection
       organization_name: license.organization_name,
+      features: license.features, // Add features at top level for client access
       license_type: {
         name: license.license_type_name,
         features: license.features,
@@ -62,8 +63,7 @@ export const getCurrentLicense = async (req, res) => {
     console.log(`[License] Stored fingerprint: ${license.server_fingerprint}`);
     console.log(`[License] Current fingerprint: ${currentFingerprint}`);
     console.log(
-      `[License] Fingerprint match: ${
-        license.server_fingerprint === currentFingerprint
+      `[License] Fingerprint match: ${license.server_fingerprint === currentFingerprint
       }`
     );
     console.log(`[License] Sync status: ${license.sync_status}`);
@@ -1114,8 +1114,7 @@ export const updateUserWebRTCAccess = async (req, res) => {
     // For now, this is a mock implementation
     // In a real system, you'd update user permissions in your user management system
     console.log(
-      `[Admin] WebRTC access ${
-        hasAccess ? "enabled" : "disabled"
+      `[Admin] WebRTC access ${hasAccess ? "enabled" : "disabled"
       } for user ${userId}`
     );
 
@@ -1139,9 +1138,8 @@ export const updateUserWebRTCAccess = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `User WebRTC access ${
-        hasAccess ? "enabled" : "disabled"
-      } successfully`,
+      message: `User WebRTC access ${hasAccess ? "enabled" : "disabled"
+        } successfully`,
       data: {
         userId,
         hasAccess,

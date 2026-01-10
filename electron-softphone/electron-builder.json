@@ -1,6 +1,6 @@
 {
   "appId": "com.mayday.appbar",
-  "productName": "Appbar",
+  "productName": "Mayday",
   "directories": {
     "output": "release/"
   },
@@ -14,19 +14,25 @@
     {
       "from": "native/win-appbar/build/Release/",
       "to": "native/win-appbar/build/Release/",
-      "filter": ["*.node"]
+      "filter": [
+        "*.node"
+      ]
     }
   ],
   "win": {
-    "target": ["nsis"],
-    "icon": "build/mayday_app_icon.ico"
+    "target": [
+      "nsis"
+    ],
+    "icon": "build/mayday_app_icon.ico",
+    "signAndEditExecutable": false,
+    "forceCodeSigning": false
   },
   "nsis": {
     "oneClick": false,
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "Appbar"
+    "shortcutName": "Mayday"
   },
   "asarUnpack": [
     "**/*.node",

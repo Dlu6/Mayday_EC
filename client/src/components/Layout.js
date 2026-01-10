@@ -104,7 +104,7 @@ const Layout = () => {
     };
 
     const expansions = expandParentMenus(userRoutes, location.pathname);
-    
+
     // Only update if there are menus to expand
     if (Object.keys(expansions).length > 0) {
       setOpen((prevOpen) => {
@@ -199,8 +199,8 @@ const Layout = () => {
     if (selectedRoutePath.startsWith(route.path + '/')) return true;
     // Check if any children are active (exact or nested match)
     if (route.children) {
-      return route.children.some((child) => 
-        selectedRoutePath === child.path || 
+      return route.children.some((child) =>
+        selectedRoutePath === child.path ||
         selectedRoutePath.startsWith(child.path + '/')
       );
     }
@@ -291,7 +291,7 @@ const Layout = () => {
             {drawerOpen ? <MenuOpenIcon /> : <MenuIcon />}
           </IconButton>
           <Typography variant="h6" noWrap sx={{ flexGrow: 1 }}>
-            Simi Valley CRM
+            BAZO TECH
           </Typography>
 
           {/* User Profile Section */}
