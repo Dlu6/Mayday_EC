@@ -109,7 +109,7 @@ const clearEncryptedCredentials = () => {
   try {
     localStorage.removeItem("encryptedCredentials");
     localStorage.removeItem("rememberMe");
-    console.log("✅ Encrypted credentials cleared");
+    console.log(" Encrypted credentials cleared");
   } catch (error) {
     console.error("Error clearing encrypted credentials:", error);
   }
