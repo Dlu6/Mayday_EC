@@ -1,6 +1,6 @@
 {
   "appId": "com.mayday.appbar",
-  "productName": "Appbar",
+  "productName": "Mayday",
   "directories": {
     "output": "release/"
   },
@@ -32,7 +32,7 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
-    "shortcutName": "Appbar"
+    "shortcutName": "Mayday"
   },
   "asarUnpack": [
     "**/*.node",

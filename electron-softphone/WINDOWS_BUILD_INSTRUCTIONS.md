@@ -258,9 +258,67 @@ Primary build config with code signing disabled:
 
 Alternative config used by `npm run electron:build:win`.
 
-## Cross-Platform Workflow: Build on Windows, Deploy from macOS
+## Server Deployment (192.168.1.14)
 
-Since SSH/SCP may not work reliably from Windows IDEs, use this workflow:
+After building on Windows and pushing to GitHub, deploy to the on-prem server:
+
+### Step 1: SSH to Server
+
+```bash
+ssh medhi@192.168.1.14
+# Password: (your password)
+sudo -i
+```
+
+### Step 2: Fix DNS (if git pull fails with "Could not resolve host")
+
+If DNS resolution fails, add Google DNS:
+
+```bash
+echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+```
+
+> **Note**: DNS issues can also cause SIP trunk registration failures. If trunks weren't registering, adding Google DNS may fix both git and SIP!
+
+### Step 3: Pull Latest Code
+
+```bash
+cd /home/medhi/Mayday_EC
+git pull origin development
+```
+
+### Step 4: Copy Build Files to Nginx
+
+```bash
+mkdir -p /var/www/html/downloads
+cp "electron-softphone/release/Appbar Setup 5.1.5.exe" /var/www/html/downloads/
+cp electron-softphone/release/latest.yml /var/www/html/downloads/
+```
+
+### Step 5: Configure Nginx (First Time Only)
+
+If `/downloads` returns HTML instead of files, add this location block to nginx:
+
+```bash
+# Add to /etc/nginx/sites-available/mayday inside the server block:
+location /downloads {
+    alias /var/www/html/downloads;
+    autoindex on;
+    add_header Access-Control-Allow-Origin *;
+}
+
+# Test and reload nginx
+nginx -t && systemctl reload nginx
+```
+
+### Step 6: Verify Deployment
+
+```bash
+curl -s http://localhost/downloads/latest.yml
+# Should show version info with releaseDate
+```
+
+## Cross-Platform Workflow: Build on Windows, Deploy via Git
 
 ### On Windows: Build and Commit
 
@@ -273,32 +331,17 @@ Since SSH/SCP may not work reliably from Windows IDEs, use this workflow:
    git push origin development
    ```
 
-### On macOS: Pull and Deploy
+### On Server: Pull and Deploy
 
-1. **Pull the Windows build**:
-   ```bash
-   cd ~/Mayday_EC
-   git pull origin development
-   ```
-
-2. **Delete previous version from server**:
-   ```bash
-   ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
-     "rm -f /var/www/html/downloads/latest.yml /var/www/html/downloads/'Appbar Setup'*.exe"
-   ```
-
-3. **Upload new version to server**:
-   ```bash
-   scp -i ~/.ssh/id_ed25519 \
-     "electron-softphone/release/latest.yml" \
-     "electron-softphone/release/Appbar Setup 5.1.5.exe" \
-     medhi@192.168.1.14:/var/www/html/downloads/
-   ```
-
-4. **Verify deployment**:
-   ```bash
-   curl -s http://192.168.1.14/downloads/latest.yml
-   ```
+```bash
+ssh medhi@192.168.1.14
+sudo -i
+cd /home/medhi/Mayday_EC
+git pull origin development
+cp "electron-softphone/release/Appbar Setup 5.1.5.exe" /var/www/html/downloads/
+cp electron-softphone/release/latest.yml /var/www/html/downloads/
+curl -s http://localhost/downloads/latest.yml
+```
 
 ## Current Version
 
@@ -313,3 +356,5 @@ Since SSH/SCP may not work reliably from Windows IDEs, use this workflow:
   - Native module properly reserves screen space when docked
   - Code signing disabled for easier builds
 - **Build Location**: `electron-softphone/release/`
+- **Deploy Location**: `/var/www/html/downloads/` on 192.168.1.14
+
