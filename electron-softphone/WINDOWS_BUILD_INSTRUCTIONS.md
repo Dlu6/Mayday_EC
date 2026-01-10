@@ -1,4 +1,4 @@
-# Windows Build Instructions for MHU Appbar
+# Windows Build Instructions for Mayday Appbar
 
 This document explains how to build the Electron softphone on Windows to include the native AppBar module that reserves screen space at the OS level.
 
@@ -12,7 +12,7 @@ Building on macOS cannot compile the Windows native module (`.node` file), so th
 
 Install the following on your Windows PC:
 
-1. **Node.js** (v16 or higher)
+1. **Node.js** (v18 or higher, tested with v24.12.0)
    - Download from: https://nodejs.org/
    - Verify: `node --version`
 
@@ -30,18 +30,35 @@ Install the following on your Windows PC:
    - Or download from: https://www.python.org/downloads/
    - Verify: `python --version`
 
-## Build Steps
+## Quick Start (TL;DR)
+
+```powershell
+# Navigate to electron-softphone directory
+cd Mayday_EC\electron-softphone
+
+# Install dependencies (also builds native modules)
+npm install
+
+# Build Windows installer (uses electron-builder.json config)
+npx electron-builder --win -c electron-builder.json
+
+# Output: release\Appbar Setup 5.1.5.exe
+```
+
+## Build Steps (Detailed)
 
 ### Step 1: Clone/Pull the Repository
 
 ```powershell
 # If cloning fresh:
-git clone <repository-url>
-cd Mayday-CRM-Scracth/electron-softphone
+git clone https://github.com/Dlu6/Mayday_EC.git
+cd Mayday_EC
+git checkout development
+cd electron-softphone
 
 # If pulling updates:
-cd Mayday-CRM-Scracth
-git pull origin feature/enhanced-transfer-system
+cd Mayday_EC
+git pull origin development
 cd electron-softphone
 ```
 
@@ -61,7 +78,8 @@ This will:
 Check that the native module was compiled:
 
 ```powershell
-dir native\win-appbar\build\Release\
+Test-Path "native\win-appbar\build\Release\win_appbar.node"
+# Should return: True
 ```
 
 You should see `win_appbar.node` file (~150KB).
@@ -77,27 +95,45 @@ cd ..\..
 
 ### Step 4: Build the Application
 
+**Recommended method** (uses `electron-builder.json` with code signing disabled):
+
+```powershell
+npx electron-builder --win -c electron-builder.json
+```
+
+**Alternative** (uses package.json config):
+
 ```powershell
 npm run build
 npm run electron:build:win
 ```
 
-This creates the installer in `release\5.1.5\`:
-- `MHU Appbar Setup 5.1.5.exe` - Windows installer
-- `latest.yml` - Version metadata for auto-updater
+> **Note**: The `electron-builder.json` config has `signAndEditExecutable: false` and `forceCodeSigning: false` set, which bypasses Windows code signing. If you have a code signing certificate, you can remove these settings.
+
+### Build Output
+
+The build creates files in `release\`:
+
+| File | Size | Description |
+|------|------|-------------|
+| `Appbar Setup 5.1.5.exe` | ~82 MB | Windows NSIS installer |
+| `latest.yml` | ~340 B | Auto-update manifest |
+| `win-unpacked\` | ~210 MB | Unpacked app (for testing) |
 
 ### Step 5: Upload to Server
 
-Upload the built files to the server:
+Upload the built files to the on-prem server for auto-updates:
 
 ```powershell
 # Using SCP (if you have SSH access configured)
-scp -i "path\to\MHU_Debian_Mumb.pem" ^
-  "release\5.1.5\latest.yml" ^
-  "release\5.1.5\MHU Appbar Setup 5.1.5.exe" ^
-  admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com:/var/www/html/downloads/
+scp -i "path\to\ssh_key" `
+  "release\Appbar Setup 5.1.5.exe" `
+  "release\latest.yml" `
+  medhi@192.168.1.14:/var/www/html/downloads/
 
-# Or use WinSCP/FileZilla to upload manually
+# Or use WinSCP/FileZilla to upload manually to:
+# Server: 192.168.1.14
+# Path: /var/www/html/downloads/
 ```
 
 ### Step 6: Verify Deployment
@@ -106,7 +142,57 @@ scp -i "path\to\MHU_Debian_Mumb.pem" ^
 curl http://192.168.1.14/downloads/latest.yml
 ```
 
+## Code Signing
+
+By default, this build is configured **without code signing**. This means:
+- Windows will show "Unknown publisher" warning when users install
+- Windows SmartScreen may block the first installation
+
+### To disable code signing (default):
+
+The `electron-builder.json` already contains:
+```json
+"win": {
+  "signAndEditExecutable": false,
+  "forceCodeSigning": false
+}
+```
+
+### To enable code signing:
+
+1. Obtain a Windows code signing certificate (.pfx file)
+2. Set environment variables:
+   ```powershell
+   $env:CSC_LINK="path\to\certificate.pfx"
+   $env:CSC_KEY_PASSWORD="your-certificate-password"
+   ```
+3. Remove `signAndEditExecutable` and `forceCodeSigning` from config
+4. Run the build
+
 ## Troubleshooting
+
+### "Code signing failed" / "winCodeSign" errors
+
+This happens when electron-builder tries to sign the executable but no certificate is available.
+
+**Solution**: Ensure `electron-builder.json` has:
+```json
+"win": {
+  "signAndEditExecutable": false,
+  "forceCodeSigning": false
+}
+```
+
+Then use the config explicitly:
+```powershell
+npx electron-builder --win -c electron-builder.json
+```
+
+### "'cross-env' is not recognized"
+
+The `cross-env` package is not installed globally.
+
+**Solution**: Run `npm install` first, which installs it as a dev dependency.
 
 ### "node-gyp rebuild failed"
 
@@ -123,7 +209,12 @@ The native module didn't compile. Check:
 
 ### "Failed to uninstall old application files"
 
-The app is still running. Close all instances of MHU Appbar before installing.
+The app is still running. Close all instances of Mayday Appbar before installing.
+
+### Build output in wrong folder
+
+If using `npm run electron:build:win`, output goes to `release\5.1.5\`.
+If using `npx electron-builder --win -c electron-builder.json`, output goes to `release\`.
 
 ## What the Native Module Does
 
@@ -138,6 +229,35 @@ Without the native module (fallback mode):
 2. Does NOT reserve screen space (other apps overlap)
 3. Uses Electron APIs to hide frame (less reliable)
 
+## Configuration Files
+
+### electron-builder.json
+
+Primary build config with code signing disabled:
+
+```json
+{
+  "appId": "com.mayday.appbar",
+  "productName": "Appbar",
+  "directories": { "output": "release/" },
+  "win": {
+    "target": ["nsis"],
+    "icon": "build/mayday_app_icon.ico",
+    "signAndEditExecutable": false,
+    "forceCodeSigning": false
+  },
+  "nsis": { ... },
+  "publish": {
+    "provider": "generic",
+    "url": "http://192.168.1.14/downloads/"
+  }
+}
+```
+
+### package.json (build section)
+
+Alternative config used by `npm run electron:build:win`.
+
 ## Cross-Platform Workflow: Build on Windows, Deploy from macOS
 
 Since SSH/SCP may not work reliably from Windows IDEs, use this workflow:
@@ -147,32 +267,32 @@ Since SSH/SCP may not work reliably from Windows IDEs, use this workflow:
 1. **Build the application** (Steps 1-4 above)
 2. **Commit build files to GitHub**:
    ```powershell
-   cd Mayday-CRM-Scracth\electron-softphone
-   git add -f "release/5.1.5/latest.yml" "release/5.1.5/MHU Appbar Setup 5.1.5.exe"
+   cd Mayday_EC\electron-softphone
+   git add -f "release/latest.yml" "release/Appbar Setup 5.1.5.exe"
    git commit -m "Add Windows build v5.1.5 with native appbar module"
-   git push origin feature/enhanced-transfer-system
+   git push origin development
    ```
 
 ### On macOS: Pull and Deploy
 
 1. **Pull the Windows build**:
    ```bash
-   cd ~/Downloads/Mayday-CRM-Scracth
-   git pull origin feature/enhanced-transfer-system
+   cd ~/Mayday_EC
+   git pull origin development
    ```
 
 2. **Delete previous version from server**:
    ```bash
-   ssh -i ~/Downloads/MHU_Debian_Mumb.pem admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com \
-     "rm -f /var/www/html/downloads/latest.yml /var/www/html/downloads/'MHU Appbar Setup'*.exe"
+   ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
+     "rm -f /var/www/html/downloads/latest.yml /var/www/html/downloads/'Appbar Setup'*.exe"
    ```
 
 3. **Upload new version to server**:
    ```bash
-   scp -i ~/Downloads/MHU_Debian_Mumb.pem \
-     "electron-softphone/release/5.1.5/latest.yml" \
-     "electron-softphone/release/5.1.5/MHU Appbar Setup 5.1.5.exe" \
-     admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com:/var/www/html/downloads/
+   scp -i ~/.ssh/id_ed25519 \
+     "electron-softphone/release/latest.yml" \
+     "electron-softphone/release/Appbar Setup 5.1.5.exe" \
+     medhi@192.168.1.14:/var/www/html/downloads/
    ```
 
 4. **Verify deployment**:
@@ -180,25 +300,16 @@ Since SSH/SCP may not work reliably from Windows IDEs, use this workflow:
    curl -s http://192.168.1.14/downloads/latest.yml
    ```
 
-### Quick Deploy from macOS (One-liner)
-
-```bash
-cd ~/Downloads/Mayday-CRM-Scracth && \
-git pull origin feature/enhanced-transfer-system && \
-ssh -i ~/Downloads/MHU_Debian_Mumb.pem admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com \
-  "rm -f /var/www/html/downloads/latest.yml /var/www/html/downloads/'MHU Appbar Setup'*.exe" && \
-scp -i ~/Downloads/MHU_Debian_Mumb.pem \
-  "electron-softphone/release/5.1.5/latest.yml" \
-  "electron-softphone/release/5.1.5/MHU Appbar Setup 5.1.5.exe" \
-  admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com:/var/www/html/downloads/ && \
-curl -s http://192.168.1.14/downloads/latest.yml
-```
-
 ## Current Version
 
 - **Version**: 5.1.5
+- **Build Date**: January 2026
+- **Node.js**: Tested with v24.12.0
+- **Electron**: 25.9.8
+- **electron-builder**: 25.1.8
 - **Changes in this version**:
   - Restored native title bar when NOT docked
   - Removed custom window controls (using native title bar)
   - Native module properly reserves screen space when docked
-- **Build Location**: `electron-softphone/release/5.1.5/` (committed to GitHub)
+  - Code signing disabled for easier builds
+- **Build Location**: `electron-softphone/release/`
