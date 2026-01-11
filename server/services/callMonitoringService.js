@@ -783,9 +783,31 @@ const handleHangup = async (event) => {
       }
 
       // Determine call type based on channel and context
+      // Determine call type based on phone number patterns (Robust Match)
+      const src = (actualCaller || "").toString().trim();
+      const dst = (callData.dst || event.Exten || event.exten || "").toString().trim();
+
+      // Clean numbers (remove non-digits for length check)
+      const srcClean = src.replace(/\D/g, '');
+      const dstClean = dst.replace(/\D/g, '');
+
+      const srcIsExternal = srcClean.length >= 7;
+      const dstIsExternal = dstClean.length >= 7;
+      const srcIsExtension = srcClean.length >= 3 && srcClean.length <= 4;
+      const dstIsExtension = dstClean.length >= 3 && dstClean.length <= 4;
+
+      let callType = "inbound"; // default
+      if (srcIsExternal && dstIsExtension) {
+        callType = "inbound";
+      } else if (srcIsExtension && dstIsExternal) {
+        callType = "outbound";
+      } else if (srcIsExtension && dstIsExtension) {
+        callType = "internal";
+      }
+
       const channel = callData.channel || event.Channel || event.channel || "";
-      const isOutbound = channel.match(/^PJSIP\/\d{4}-/) && context === "from-internal";
-      const callType = isOutbound ? "outbound" : "inbound";
+      // const isOutbound = channel.match(/^PJSIP\/\d{4}-/) && context === "from-internal";
+      // const callType = isOutbound ? "outbound" : "inbound";
 
       await CDR.create({
         uniqueid: uniqueid,
