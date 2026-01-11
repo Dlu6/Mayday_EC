@@ -115,33 +115,43 @@ export const formatCdrRecord = (record, extension) => {
 
   // Determine call type
   // Priority 1: Use the type field from database if available (set by callMonitoringService)
-  // Priority 2: Use dcontext for reliable direction detection
-  // Priority 3: Fallback to channel-based detection
+  // Priority 2: Use phone number patterns (most reliable)
+  // Priority 3: Fallback to src/dst matching
   let type = record.type; // Use database value if present
 
   if (!type) {
-    // Use dcontext as primary indicator (most reliable)
-    // from-voip-provider = inbound from external trunk
-    // from-internal = could be internal or outbound via trunk
-    const dcontext = record.dcontext || "";
-    const srcMatchesExtension = record.src === extension;
-    const dstMatchesExtension = record.dst === extension;
+    // Use phone number patterns as primary indicator
+    // External numbers are typically 7+ digits, internal extensions are 3-4 digits
+    const src = record.src || "";
+    const dst = record.dst || "";
+    const srcIsExternal = src.length >= 7 && /^\d+$/.test(src);
+    const dstIsExternal = dst.length >= 7 && /^\d+$/.test(dst);
+    const srcIsExtension = /^\d{3,4}$/.test(src);
+    const dstIsExtension = /^\d{3,4}$/.test(dst);
 
-    if (dcontext === "from-voip-provider") {
-      // External call coming in through trunk
+    if (srcIsExternal && dstIsExtension) {
+      // External caller to internal extension = inbound
       type = "inbound";
-    } else if (dcontext === "from-internal" && srcMatchesExtension && !dstMatchesExtension) {
-      // Agent initiated call to someone else (internal or external via trunk)
+    } else if (srcIsExtension && dstIsExternal) {
+      // Internal extension to external number = outbound
       type = "outbound";
-    } else if (dstMatchesExtension && !srcMatchesExtension) {
-      // Destination is our extension = inbound to us
-      type = "inbound";
-    } else if (srcMatchesExtension) {
-      // Source is our extension = we called out
-      type = "outbound";
+    } else if (srcIsExtension && dstIsExtension) {
+      // Both are extensions - internal call
+      // Determine direction based on which extension is ours
+      if (src === extension) {
+        type = "outbound"; // we called another extension
+      } else if (dst === extension) {
+        type = "inbound"; // another extension called us
+      } else {
+        type = "internal";
+      }
     } else {
-      // Default fallback
-      type = "inbound";
+      // Fallback: check if extension matches src or dst
+      if (record.src === extension) {
+        type = "outbound";
+      } else {
+        type = "inbound";
+      }
     }
   }
 

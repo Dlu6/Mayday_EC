@@ -1240,12 +1240,26 @@ const handleCdr = async (event) => {
 
     // Also save to database for persistence
     try {
-      // Determine call type based on dcontext (most reliable method)
-      // from-voip-provider = inbound from external trunk
-      // from-internal = outbound from internal extension
-      const dcontext = event.dcontext || event.Context || "";
-      const isOutbound = dcontext === "from-internal" || dcontext.includes("outbound");
-      const callType = isOutbound ? "outbound" : "inbound";
+      // Determine call type based on phone number patterns
+      // External numbers are typically 7+ digits, internal extensions are 3-4 digits
+      const src = event.src || "";
+      const dst = event.dst || "";
+      const srcIsExternal = src.length >= 7 && /^\d+$/.test(src);
+      const dstIsExternal = dst.length >= 7 && /^\d+$/.test(dst);
+      const srcIsExtension = /^\d{3,4}$/.test(src);
+      const dstIsExtension = /^\d{3,4}$/.test(dst);
+
+      // Inbound: external src calling internal dst
+      // Outbound: internal src calling external dst
+      let callType = "inbound"; // default
+      if (srcIsExternal && dstIsExtension) {
+        callType = "inbound";
+      } else if (srcIsExtension && dstIsExternal) {
+        callType = "outbound";
+      } else if (srcIsExtension && dstIsExtension) {
+        // Internal call - use dcontext to determine from whose perspective
+        callType = "internal";
+      }
 
       await CDR.create({
         uniqueid: event.uniqueid,
