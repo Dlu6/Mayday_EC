@@ -683,7 +683,7 @@ const handleHangup = async (event) => {
     const cause = event.Cause || event.cause;
     const isNormalClearing = cause === "16";
     const disposition = isNormalClearing ? "NORMAL" : "NO ANSWER";
-    
+
     // Debug: Log the disposition decision for trunk channels
     const dcontext = event.Context || event.context;
     if (dcontext === "from-voip-provider") {
@@ -700,17 +700,30 @@ const handleHangup = async (event) => {
       // The CDR might have the DID as src, but ConnectedLineNum has the actual caller
       const connectedLineNum = event.ConnectedLineNum || event.connectedlinenum;
       const context = event.Context || event.context || cdrRecord.dcontext;
-      
-      // Build update object
+
+      // CRITICAL FIX: Preserve Asterisk's authoritative values
+      // Only update disposition if not already set to ANSWERED
+      // (Asterisk's Cdr event has the authoritative disposition)
+      const finalDisposition = (cdrRecord.disposition === "ANSWERED")
+        ? "ANSWERED"
+        : disposition;
+
+      // Only recalculate billsec if record doesn't already have a value
+      // (Asterisk's Cdr event has the authoritative billsec)
+      const finalBillsec = cdrRecord.billsec > 0
+        ? cdrRecord.billsec
+        : cdrRecord.answer
+          ? Math.ceil((endTime - new Date(cdrRecord.answer)) / 1000)
+          : 0;
+
+      // Build update object with preserved values
       const updateData = {
         end: endTime,
-        disposition: disposition,
+        disposition: finalDisposition,
         duration: durationSeconds,
-        billsec: cdrRecord.answer
-          ? Math.ceil((endTime - new Date(cdrRecord.answer)) / 1000)
-          : 0,
+        billsec: finalBillsec,
       };
-      
+
       // If this is an inbound call to an extension (from-internal context) and
       // ConnectedLineNum has a valid external number, update src and clid
       if (context === "from-internal" && connectedLineNum && connectedLineNum.length >= 7 && /^\d+$/.test(connectedLineNum)) {
@@ -727,7 +740,7 @@ const handleHangup = async (event) => {
       log.success(
         `CDR record updated for call: ${uniqueid}, disposition: ${disposition}`
       );
-      
+
       // Emit call history update to notify clients
       // Fetch the updated record and format it for the client
       const updatedRecord = await CDR.findOne({ where: { uniqueid: uniqueid } });
@@ -736,7 +749,7 @@ const handleHangup = async (event) => {
         const channel = event.Channel || event.channel || "";
         const extensionMatch = channel.match(/PJSIP\/(\d+)-/);
         const extension = extensionMatch ? extensionMatch[1] : null;
-        
+
         if (extension) {
           const formattedRecord = formatCdrRecord(updatedRecord, extension);
           socketService.emitCallHistoryUpdate(formattedRecord);
@@ -760,7 +773,7 @@ const handleHangup = async (event) => {
       const connectedLineNum = event.ConnectedLineNum || event.connectedlinenum;
       const callerIdNum = event.CallerIDNum || event.calleridnum;
       const context = callData.dcontext || event.Context || event.context || "from-voip-provider";
-      
+
       // Determine the actual caller number for inbound calls
       // If context is from-internal and ConnectedLineNum looks like an external number, use it
       let actualCaller = callData.src || callerIdNum || "unknown";
@@ -1085,15 +1098,15 @@ function processUserResultsWithAMI(users, extensionStatuses) {
       lastSeen: lastSeen,
       currentCall: currentCall
         ? {
-            uniqueId: currentCall.uniqueId || currentCall.uniqueid,
-            callerId:
-              currentCall.callerId ||
-              currentCall.callerid ||
-              currentCall.src ||
-              null,
-            startTime: currentCall.startTime,
-            duration: currentCall.duration || 0,
-          }
+          uniqueId: currentCall.uniqueId || currentCall.uniqueid,
+          callerId:
+            currentCall.callerId ||
+            currentCall.callerid ||
+            currentCall.src ||
+            null,
+          startTime: currentCall.startTime,
+          duration: currentCall.duration || 0,
+        }
         : null,
       paused: user.paused || false,
       // Add AMI-specific data for debugging
@@ -1146,12 +1159,12 @@ const handleQueueMember = async (event) => {
     memberStatus === "1"
       ? "Not in use"
       : memberStatus === "2"
-      ? "In use"
-      : memberStatus === "3"
-      ? "Busy"
-      : memberStatus === "6"
-      ? "Unavailable"
-      : "Unknown";
+        ? "In use"
+        : memberStatus === "3"
+          ? "Busy"
+          : memberStatus === "6"
+            ? "Unavailable"
+            : "Unknown";
 
   const memberData = {
     name: memberName,
