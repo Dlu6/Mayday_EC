@@ -1,7 +1,7 @@
 //electron-softphone/src/hooks/useCallState.js
 import { SessionState } from "sip.js";
 import { useState, useEffect, useCallback, useRef } from "react";
-import ringtoneMp3 from "../assets/sounds/promise.mp3";
+import { ringtoneService } from "../services/ringtoneService";
 // import ringbackMp3 from "../assets/sounds/ringback.mp3";
 import { storageService, isLoggingOut } from "../services/storageService";
 // Centralized call states
@@ -83,7 +83,7 @@ export const useCallState = (sipService, sipCallService) => {
             );
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // If already playing and we still desire playback, do nothing
     if (!audio.paused) {
@@ -296,12 +296,23 @@ export const useCallState = (sipService, sipCallService) => {
       ringToneRef.current.loop = true;
       ringToneRef.current.volume = 0.8;
       ringToneRef.current.muted = false;
-      ringToneRef.current.src = ringtoneMp3; // Default to ringtone
+      ringToneRef.current.src = ringtoneService.getSelectedRingtoneUrl(); // Use selected ringtone
       ringToneRef.current.load(); // Preload the audio
     }
 
+    // Listen for ringtone changes and update the audio source
+    const handleRingtoneChange = (ringtone) => {
+      if (ringToneRef.current) {
+        ringToneRef.current.src = ringtone.file;
+        ringToneRef.current.load();
+      }
+    };
+
+    ringtoneService.events.on("ringtoneChanged", handleRingtoneChange);
+
     // Cleanup
     return () => {
+      ringtoneService.events.off("ringtoneChanged", handleRingtoneChange);
       if (ringToneRef.current) {
         ringToneRef.current.pause();
         ringToneRef.current.currentTime = 0;
@@ -395,7 +406,7 @@ export const useCallState = (sipService, sipCallService) => {
           // For inbound calls, always use local ringtone
           if (currentDirection === "inbound") {
             console.log("INBOUND CALL - Using ringtone");
-            safePlayAudio(ringtoneMp3, 0.8);
+            safePlayAudio(ringtoneService.getSelectedRingtoneUrl(), 0.8);
           }
           // For outbound calls, we'll play ringback when we get 180/183 response
           // This is now handled in the progress event
@@ -483,7 +494,7 @@ export const useCallState = (sipService, sipCallService) => {
         });
 
         // Use safe audio play for inbound ringtone
-        safePlayAudio(ringtoneMp3, 0.8);
+        safePlayAudio(ringtoneService.getSelectedRingtoneUrl(), 0.8);
       },
       progress: (response) => {
         // Prevent call progress during logout
