@@ -1957,3 +1957,37 @@ cd client && npm test -- --testPathPattern="licenseFeatures.test.js" --watchAll=
 - ✅ **PM2 Auto-Restart**: Configured to restart after Asterisk restarts
 - ✅ **Static IP**: Configured server with static IP 192.168.1.14
 - ✅ **Removed MongoDB**: Removed all MongoDB dependencies from usersController.js
+
+## Troubleshooting & Known Issues History
+
+### 1. Missed Call Bug (Resolved Jan 2026)
+
+**Issue**: Outbound calls answered by the recipient were incorrectly appearing as "Missed" in Call History.
+
+**Root Cause**:
+A race condition existed between two AMI event handlers in `server/services/callMonitoringService.js`:
+- `handleCdr()`: Processes Asterisk's native `Cdr` event (Authoritative).
+- `handleHangup()`: Processes `Hangup` event (Custom logic).
+
+Since `handleHangup` often triggered first or concurrently, it overwrote the authoritative `disposition` with "NORMAL" and calculated `billsec` manually. If `cdrRecord.answer` timestamp was missing (due to timing), `billsec` became 0.
+The `cdrController` then classified `disposition="NORMAL"` + `billsec=0` as "Missed".
+
+**Fix**:
+- **Preserve Data**: Modified `callMonitoringService.js` to only update `disposition` and `billsec` in `handleHangup` if they are not already set to "ANSWERED"/valid values.
+- **Status Logic**: Updated `cdrController.js` to treat `disposition="NORMAL"` with `billsec > 0` as Completed.
+
+### 2. Direction Display Bug (Resolved Jan 2026)
+
+**Issue**: Inbound calls from external numbers were consistently displaying as "Outgoing".
+
+**Root Cause**:
+- **Unreliable Detection**: The system relied on matching channel names (`PJSIP/xxxx-`) to determine direction.
+- **Race Condition**: `handleHangup` created the initial CDR record with this flawed logic, often incorrectly marking it "Outbound" before `handleCdr` could correct it.
+- **Regex Failure**: Telephony numbers often contain non-digits (e.g. `+256...`) which caused simple regex checks (`^\d+$`) to fail.
+
+**Fix**:
+- **Robust Pattern Matching**: Replaced channel-based logic with Phone Number Pattern Matching in both `callMonitoringService.js` and `cdrController.js`.
+  - **External**: 7+ digits (stripping non-digits)
+  - **Extension**: 3-4 digits
+- **Logic**: If `Src` is External AND `Dst` is Extension → **Inbound**.
+- **Consistency**: Applied this logic to both `handleCdr` and `handleHangup` handlers to ensure consistency regardless of which event processes first.
