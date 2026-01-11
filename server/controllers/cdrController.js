@@ -46,7 +46,7 @@ export const getCallHistory = async (req, res) => {
         userfield: record.userfield,
         start: record.start,
       }));
-      
+
       return res.status(200).json({
         success: true,
         debug: true,
@@ -115,20 +115,34 @@ export const formatCdrRecord = (record, extension) => {
 
   // Determine call type
   // Priority 1: Use the type field from database if available (set by callMonitoringService)
-  // Priority 2: Fallback to channel-based detection
+  // Priority 2: Use dcontext for reliable direction detection
+  // Priority 3: Fallback to channel-based detection
   let type = record.type; // Use database value if present
-  
+
   if (!type) {
-    // Fallback: determine from channel and context
+    // Use dcontext as primary indicator (most reliable)
+    // from-voip-provider = inbound from external trunk
+    // from-internal = could be internal or outbound via trunk
+    const dcontext = record.dcontext || "";
     const srcMatchesExtension = record.src === extension;
     const dstMatchesExtension = record.dst === extension;
-    const channelMatchesExtension = record.channel && record.channel.startsWith(`PJSIP/${extension}-`);
-    
-    // Determine if outbound:
-    // - Channel starts with PJSIP/{extension} (agent's channel initiated the call), OR
-    // - src matches extension AND dst doesn't (agent called someone else)
-    const isOutbound = channelMatchesExtension || (srcMatchesExtension && !dstMatchesExtension);
-    type = isOutbound ? "outbound" : "inbound";
+
+    if (dcontext === "from-voip-provider") {
+      // External call coming in through trunk
+      type = "inbound";
+    } else if (dcontext === "from-internal" && srcMatchesExtension && !dstMatchesExtension) {
+      // Agent initiated call to someone else (internal or external via trunk)
+      type = "outbound";
+    } else if (dstMatchesExtension && !srcMatchesExtension) {
+      // Destination is our extension = inbound to us
+      type = "inbound";
+    } else if (srcMatchesExtension) {
+      // Source is our extension = we called out
+      type = "outbound";
+    } else {
+      // Default fallback
+      type = "inbound";
+    }
   }
 
   let status = "completed";
@@ -136,16 +150,19 @@ export const formatCdrRecord = (record, extension) => {
     status = "missed";
   } else if (record.disposition === "FAILED" || record.disposition === "BUSY") {
     status = "failed";
-  } else if (record.disposition === "NORMAL" && record.billsec === 0) {
-    // NORMAL disposition but zero billsec likely means a failed or missed call
-    status = "missed";
+  } else if (record.disposition === "ANSWERED" || record.disposition === "NORMAL") {
+    // ANSWERED or NORMAL = successful call
+    status = "completed";
+  } else if (record.billsec > 0) {
+    // If billsec > 0, call was definitely answered
+    status = "completed";
   }
 
   // Get phone number based on call direction
   // For inbound: we want the caller's number (from clid or src)
   // For outbound: we want the destination number (dst)
   let phoneNumber;
-  
+
   if (type === "outbound") {
     phoneNumber = record.dst;
   } else {
@@ -153,7 +170,7 @@ export const formatCdrRecord = (record, extension) => {
     // 1. userfield - we store ConnectedLineNum here for inbound calls to extensions
     // 2. clid - standard caller ID field
     // 3. src - source field (but might contain DID for extension CDRs)
-    
+
     // First check userfield which may have ConnectedLineNum (the actual external caller)
     if (record.userfield && record.userfield.length >= 7 && /^\d+$/.test(record.userfield)) {
       phoneNumber = record.userfield;
@@ -162,7 +179,7 @@ export const formatCdrRecord = (record, extension) => {
       phoneNumber = callerFromClid || record.src;
     }
   }
-  
+
   // Helper function to check if a value is a placeholder pattern
   const isPlaceholderValue = (value) => {
     if (!value || value === 's' || value === '') return true;
@@ -172,10 +189,10 @@ export const formatCdrRecord = (record, extension) => {
     if (/^[_X.!]+$/.test(value)) return true;
     return false;
   };
-  
+
   // Check if phoneNumber is a placeholder pattern
   let isPlaceholder = isPlaceholderValue(phoneNumber);
-  
+
   if (isPlaceholder) {
     // For inbound calls, try multiple sources to find the caller's number
     if (type !== "outbound") {
@@ -187,7 +204,7 @@ export const formatCdrRecord = (record, extension) => {
           isPlaceholder = false;
         }
       }
-      
+
       // Try channel field - for inbound, channel might be like PJSIP/trunk-0x... or contain caller info
       if (isPlaceholder && record.channel) {
         // Extract caller number from channel patterns like PJSIP/256700123456-xxx
@@ -197,39 +214,39 @@ export const formatCdrRecord = (record, extension) => {
           isPlaceholder = false;
         }
       }
-      
+
       // Try src if it looks like a real phone number (not a short extension or DID)
       if (isPlaceholder && record.src && record.src.length >= 9 && /^\+?\d+$/.test(record.src)) {
         phoneNumber = record.src;
         isPlaceholder = false;
       }
     }
-    
+
     // For outbound calls with placeholder dst, try multiple sources
     if (type === "outbound") {
       // Try dstchannel first - extract number from channel like PJSIP/256700123456-00000001 or SIP/trunk/256700123456
       if (record.dstchannel) {
         // Try various patterns: PJSIP/number, SIP/trunk/number, or just extract any 7+ digit sequence
         const dstMatch = record.dstchannel.match(/(?:PJSIP|SIP)\/(?:[^\/]+\/)?(\d{7,})/) ||
-                         record.dstchannel.match(/\/(\d{7,})/);
+          record.dstchannel.match(/\/(\d{7,})/);
         if (dstMatch && !isPlaceholderValue(dstMatch[1])) {
           phoneNumber = dstMatch[1];
           isPlaceholder = false;
         }
       }
-      
+
       // Try lastdata which often contains the dialed number in various formats
       if (isPlaceholder && record.lastdata) {
         // lastdata might be like "PJSIP/256700123456", "SIP/trunk/256700123456", "Dial(PJSIP/number)", or just the number
-        const lastDataMatch = record.lastdata.match(/(?:PJSIP|SIP)\/(?:[^\/]+\/)?(\d{7,})/) || 
-                              record.lastdata.match(/\/(\d{7,})/) ||
-                              record.lastdata.match(/(\d{7,})/);
+        const lastDataMatch = record.lastdata.match(/(?:PJSIP|SIP)\/(?:[^\/]+\/)?(\d{7,})/) ||
+          record.lastdata.match(/\/(\d{7,})/) ||
+          record.lastdata.match(/(\d{7,})/);
         if (lastDataMatch && !isPlaceholderValue(lastDataMatch[1])) {
           phoneNumber = lastDataMatch[1];
           isPlaceholder = false;
         }
       }
-      
+
       // Try clid for outbound calls too - sometimes the dialed number is stored there
       if (isPlaceholder && record.clid) {
         const clidNumber = extractPhoneFromClid(record.clid);
@@ -239,7 +256,7 @@ export const formatCdrRecord = (record, extension) => {
         }
       }
     }
-    
+
     // Try extracting from channel field as last resort for both inbound and outbound
     if (isPlaceholder && record.channel) {
       const channelMatch = record.channel.match(/(?:PJSIP|SIP)\/(\d{7,})/);
@@ -248,7 +265,7 @@ export const formatCdrRecord = (record, extension) => {
         isPlaceholder = false;
       }
     }
-    
+
     // Final fallback: check userfield which sometimes contains call metadata
     if (isPlaceholder && record.userfield) {
       const userfieldMatch = record.userfield.match(/(\d{7,})/);

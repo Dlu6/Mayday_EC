@@ -1240,9 +1240,11 @@ const handleCdr = async (event) => {
 
     // Also save to database for persistence
     try {
-      // Determine call type based on channel
-      const channel = event.channel || "";
-      const isOutbound = channel.match(/^PJSIP\/\d{4}-/);
+      // Determine call type based on dcontext (most reliable method)
+      // from-voip-provider = inbound from external trunk
+      // from-internal = outbound from internal extension
+      const dcontext = event.dcontext || event.Context || "";
+      const isOutbound = dcontext === "from-internal" || dcontext.includes("outbound");
       const callType = isOutbound ? "outbound" : "inbound";
 
       await CDR.create({
