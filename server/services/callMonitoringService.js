@@ -1242,12 +1242,20 @@ const handleCdr = async (event) => {
     try {
       // Determine call type based on phone number patterns
       // External numbers are typically 7+ digits, internal extensions are 3-4 digits
-      const src = event.src || "";
-      const dst = event.dst || "";
-      const srcIsExternal = src.length >= 7 && /^\d+$/.test(src);
-      const dstIsExternal = dst.length >= 7 && /^\d+$/.test(dst);
-      const srcIsExtension = /^\d{3,4}$/.test(src);
-      const dstIsExtension = /^\d{3,4}$/.test(dst);
+      const src = (event.src || "").toString().trim();
+      const dst = (event.dst || "").toString().trim();
+
+      // Clean numbers (remove non-digits for length check)
+      const srcClean = src.replace(/\D/g, '');
+      const dstClean = dst.replace(/\D/g, '');
+
+      const srcIsExternal = srcClean.length >= 7;
+      const dstIsExternal = dstClean.length >= 7;
+      const srcIsExtension = srcClean.length >= 3 && srcClean.length <= 4;
+      const dstIsExtension = dstClean.length >= 3 && dstClean.length <= 4;
+
+      // Debug logging for direction detection
+      // console.log(`Direction check: src=${src}(${srcClean}), dst=${dst}(${dstClean})`);
 
       // Inbound: external src calling internal dst
       // Outbound: internal src calling external dst
@@ -1264,8 +1272,8 @@ const handleCdr = async (event) => {
       await CDR.create({
         uniqueid: event.uniqueid,
         calldate: new Date(),
-        src: event.src,
-        dst: event.dst,
+        src: src, // save original
+        dst: dst, // save original
         disposition: event.disposition,
         duration: event.duration || 0,
         billsec: event.billsec || 0,

@@ -122,12 +122,17 @@ export const formatCdrRecord = (record, extension) => {
   if (!type) {
     // Use phone number patterns as primary indicator
     // External numbers are typically 7+ digits, internal extensions are 3-4 digits
-    const src = record.src || "";
-    const dst = record.dst || "";
-    const srcIsExternal = src.length >= 7 && /^\d+$/.test(src);
-    const dstIsExternal = dst.length >= 7 && /^\d+$/.test(dst);
-    const srcIsExtension = /^\d{3,4}$/.test(src);
-    const dstIsExtension = /^\d{3,4}$/.test(dst);
+    const src = (record.src || "").toString().trim();
+    const dst = (record.dst || "").toString().trim();
+
+    // Clean numbers (digits only) for reliable length check
+    const srcClean = src.replace(/\D/g, '');
+    const dstClean = dst.replace(/\D/g, '');
+
+    const srcIsExternal = srcClean.length >= 7;
+    const dstIsExternal = dstClean.length >= 7;
+    const srcIsExtension = srcClean.length >= 3 && srcClean.length <= 4;
+    const dstIsExtension = dstClean.length >= 3 && dstClean.length <= 4;
 
     if (srcIsExternal && dstIsExtension) {
       // External caller to internal extension = inbound
