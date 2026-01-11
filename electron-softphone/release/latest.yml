@@ -1,8 +1,8 @@
-version: 5.1.5
+version: 5.1.6
 files:
-  - url: Mayday Setup 5.1.5.exe
-    sha512: F8FxHbSIBg7ArzIuiki+9/hPj74nt6JN0O/sw7T3HIQUVoz0SFUQYMcazwDEQ3Jo4qbtPG4k+qCpFKCOESH3NA==
-    size: 85419905
-path: Mayday Setup 5.1.5.exe
-sha512: F8FxHbSIBg7ArzIuiki+9/hPj74nt6JN0O/sw7T3HIQUVoz0SFUQYMcazwDEQ3Jo4qbtPG4k+qCpFKCOESH3NA==
-releaseDate: '2026-01-10T22:30:43.290Z'
+  - url: Mayday Setup 5.1.6.exe
+    sha512: 8hQ5WNmghHQLy+kickQ3DykamIcrqez5blUPj+zcXZtp9RjA4FTbkxxuEOgXwlyxruJHlKIlH3U+drFUM+ysIA==
+    size: 87135361
+path: Mayday Setup 5.1.6.exe
+sha512: 8hQ5WNmghHQLy+kickQ3DykamIcrqez5blUPj+zcXZtp9RjA4FTbkxxuEOgXwlyxruJHlKIlH3U+drFUM+ysIA==
+releaseDate: '2026-01-11T14:43:41.410Z'
