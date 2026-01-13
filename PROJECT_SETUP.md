@@ -36,13 +36,60 @@ Mayday EC is a comprehensive customer relationship management system with Asteri
 - Git
 - SSH key configured for on-prem server access (`~/.ssh/id_ed25519`)
 
-### On-Prem Server Requirements (192.168.1.14)
+### Dell Server - Primary Production (192.168.1.14)
 
+| Setting | Value |
+|---------|-------|
+| IP Address | 192.168.1.14 |
+| Hardware | Dell PowerEdge |
+| Purpose | Primary production server with Cloud SIP trunk |
+| SSH User | `medhi` |
+| Project Path | `/home/medhi/Mayday_EC` |
+
+**Requirements:**
 - Debian/Ubuntu server with Asterisk
 - Node.js 18.x
 - PM2 for process management
 - MariaDB 10.11+
-- SSH user: `medhi`
+
+### HPE Server - PBX/Asterisk (192.168.1.15)
+
+| Setting | Value |
+|---------|-------|
+| IP Address | 192.168.1.15 |
+| Hardware | HPE ProLiant DL380 Gen11 |
+| Purpose | Asterisk/MySQL server (MTN SIP trunk via leased line) |
+| SSH User | `mayday` |
+| Project Path | `/home/mayday/Mayday_EC` |
+
+**Requirements:**
+- Debian 12 (Bookworm) - Minimal installation
+- Asterisk 20.x (for MTN leased line SIP trunk)
+- MariaDB 10.11+
+- Node.js 18.x
+- PM2 for process management
+
+> [!WARNING]
+> **No sudo installed**: HPE uses minimal Debian 12 without sudo. Use `su -` to elevate to root instead.
+
+**Root Access Pattern (HPE):**
+```bash
+# SSH as mayday, then switch to root
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15
+su -
+# Password: Pasword@1759
+
+# For automated commands via SSH:
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c '<command>'"
+```
+
+**Cloning the Repository (as root):**
+```bash
+git clone https://github.com/Dlu6/Mayday_EC.git /home/mayday/Mayday_EC
+cd /home/mayday/Mayday_EC
+git checkout development
+chown -R mayday:mayday /home/mayday/Mayday_EC
+```
 
 ## Project Structure
 

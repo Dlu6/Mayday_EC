@@ -1,14 +1,28 @@
 {
-  "_comment": "Mayday EC MCP Server Configuration - Updated Jan 4, 2026",
+  "_comment": "Mayday EC MCP Server Configuration - Updated Jan 13, 2026",
+  "_servers": {
+    "dell-server": {
+      "ip": "192.168.1.14",
+      "hardware": "Dell PowerEdge",
+      "purpose": "Primary production server with Cloud SIP trunk",
+      "user": "medhi",
+      "sudoPassword": "Pasword@1759",
+      "rootPassword": "Lotuskm@1759"
+    },
+    "hpe-server": {
+      "ip": "192.168.1.15",
+      "hardware": "HPE ProLiant DL380 Gen11",
+      "purpose": "New server for Asterisk/MySQL (MTN SIP trunk via leased line)",
+      "user": "mayday",
+      "sudoPassword": "Pasword@1759",
+      "rootPassword": "Pasword@1759"
+    }
+  },
   "_notes": {
-    "sshUser": "medhi (SSH key auth via ~/.ssh/id_ed25519)",
-    "sudoPassword": "Pasword@1759 (for medhi user)",
-    "rootPassword": "Lotuskm@1759 (root user - not used for SSH)",
     "nodeLocation": "Node.js installed via NVM at /root/.nvm/versions/node/v18.20.8",
     "pm2Note": "PM2 runs as root, requires sudo and NVM source to access",
-    "projectPath": "/home/medhi/Mayday_EC",
-    "sshCommandPattern": "ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \"echo 'Pasword@1759' | sudo -S <command>\"",
-    "mysqlAsRoot": "echo 'Pasword@1759' | sudo -S mysql -u root asterisk -e '<query>'"
+    "projectPath": "/home/medhi/Mayday_EC (Dell) | /home/mayday (HPE)",
+    "sshCommandPattern": "ssh -i ~/.ssh/id_ed25519 <user>@<ip> \"echo 'Pasword@1759' | sudo -S <command>\""
   },
   "mcpServers": {
     "mayday-asterisk-server": {
@@ -69,7 +83,9 @@
     },
     "mayday-local-dev": {
       "command": "node",
-      "args": ["server/server.js"],
+      "args": [
+        "server/server.js"
+      ],
       "env": {
         "NODE_ENV": "development",
         "PORT": "8004"
@@ -97,7 +113,9 @@
     },
     "mayday-database-monitor": {
       "command": "node",
-      "args": ["scripts/db-monitor.js"],
+      "args": [
+        "scripts/db-monitor.js"
+      ],
       "env": {
         "NODE_ENV": "development"
       },
@@ -169,6 +187,34 @@
       ],
       "cwd": ".",
       "description": "Restart nginx on on-prem server"
+    },
+    "mayday-pbx-server": {
+      "command": "ssh",
+      "args": [
+        "-i",
+        "~/.ssh/id_ed25519",
+        "mayday@192.168.1.15"
+      ],
+      "env": {
+        "TERM": "xterm-256color"
+      },
+      "cwd": "/home/mayday",
+      "description": "New HPE ProLiant DL380 Gen11 server (192.168.1.15) - SSH key authentication"
+    },
+    "mayday-pbx-root": {
+      "command": "ssh",
+      "args": [
+        "-i",
+        "~/.ssh/id_ed25519",
+        "-t",
+        "mayday@192.168.1.15",
+        "echo 'Pasword@1759' | sudo -S su -"
+      ],
+      "env": {
+        "TERM": "xterm-256color"
+      },
+      "cwd": "/",
+      "description": "New HPE ProLiant server as ROOT - use for admin operations"
     }
   },
   "context7": {

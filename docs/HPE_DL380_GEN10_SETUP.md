@@ -37,8 +37,12 @@ Use HPE iLO 5 to install the OS remotely without physical access to the server.
 |---------|-------|
 | **iLO IP Address** | `192.168.1.13` |
 | **Web Interface** | `https://192.168.1.13` |
-| **Default Username** | `Administrator` |
-| **Default Password** | (Check iLO tag on server or set during initial setup) |
+| **Username** | `Administrator` |
+| **Password** | `792HCDNR` |
+| **iLO Version** | iLO 6 (v1.69) |
+| **Server Model** | ProLiant DL380 Gen11 |
+| **Server Serial** | `CZ2D3B07HD` |
+| **Product ID** | `P81777-425` |
 
 ### Step-by-Step: Remote OS Installation via iLO
 
