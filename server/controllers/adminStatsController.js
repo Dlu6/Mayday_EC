@@ -11,8 +11,9 @@ export const getCallStats = async (req, res) => {
     const activeCalls = callMonitoringService.getActiveCalls();
 
     // Count calls in different states
+    // Note: Queue calls are added with status "ringing" by callMonitoringService
     const waitingCalls = activeCalls.filter(
-      (call) => call.status === "waiting" || call.status === "queued"
+      (call) => call.status === "waiting" || call.status === "queued" || call.status === "ringing"
     ).length;
     const talkingCalls = activeCalls.filter(
       (call) => call.status === "answered" || call.status === "in-progress"
@@ -367,12 +368,12 @@ export const getAbandonRateStats = async (req, res) => {
     // Today's start
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
-    
+
     // Week start (Monday)
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
     weekStart.setHours(0, 0, 0, 0);
-    
+
     // Month start
     const monthStart = new Date();
     monthStart.setDate(1);
@@ -469,7 +470,7 @@ export const getAbandonRateStats = async (req, res) => {
       const total = parseInt(row.total) || 0;
       const abandoned = parseInt(row.abandoned) || 0;
       const abandonRate = total > 0 ? Math.round((abandoned / total) * 100) : 0;
-      
+
       return {
         hour: `${hour.toString().padStart(2, "0")}:00`,
         totalCalls: total,

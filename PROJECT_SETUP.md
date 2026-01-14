@@ -91,6 +91,89 @@ git checkout development
 chown -R mayday:mayday /home/mayday/Mayday_EC
 ```
 
+**HPE Server Services (systemd):**
+
+Unlike the Dell server, the HPE server requires manual systemd service setup for Asterisk (compiled from source) and PM2.
+
+| Service | Status | Purpose |
+|---------|--------|---------|
+| `asterisk.service` | enabled | Starts Asterisk PBX on boot |
+| `pm2-root.service` | enabled | Resurrects PM2 processes (Node.js) on boot |
+| `mariadb.service` | enabled | Database server |
+
+**Boot Order:** `mariadb` → `asterisk` → `pm2-root` (PM2 depends on Asterisk being up)
+
+**Asterisk Service Setup (if not already configured):**
+
+The HPE server runs Asterisk compiled from source (`/usr/sbin/asterisk`). If the `asterisk.service` doesn't exist:
+
+```bash
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'cat > /etc/systemd/system/asterisk.service << EOF
+[Unit]
+Description=Asterisk PBX and telephony daemon.
+After=network.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=HOME=/var/lib/asterisk
+WorkingDirectory=/var/lib/asterisk
+User=asterisk
+Group=asterisk
+ExecStart=/usr/sbin/asterisk -f -C /etc/asterisk/asterisk.conf
+ExecReload=/usr/sbin/asterisk -rx \"core reload\"
+RuntimeDirectory=asterisk
+RuntimeDirectoryMode=0755
+LimitCORE=infinity
+Restart=always
+RestartSec=4
+StandardOutput=null
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload && systemctl enable asterisk && systemctl start asterisk'"
+```
+
+> [!NOTE]
+> The `RuntimeDirectory=asterisk` directive automatically creates `/var/run/asterisk` with correct permissions on each boot, solving the "asterisk.ctl does not exist" issue.
+
+**PM2 Depends on Asterisk (drop-in config):**
+
+To ensure PM2 starts *after* Asterisk is ready (so AMI connections succeed):
+
+```bash
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'mkdir -p /etc/systemd/system/pm2-root.service.d && cat > /etc/systemd/system/pm2-root.service.d/after-asterisk.conf << EOF
+[Unit]
+After=asterisk.service mariadb.service
+Wants=asterisk.service
+EOF
+systemctl daemon-reload'"
+```
+
+**Verify Services Are Enabled:**
+
+```bash
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'systemctl is-enabled asterisk pm2-root mariadb'"
+# Should output: enabled enabled enabled
+```
+
+**Quick Service Management (HPE):**
+
+```bash
+# Check Asterisk status
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'systemctl status asterisk --no-pager'"
+
+# Restart Asterisk
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'systemctl restart asterisk'"
+
+# Connect to Asterisk CLI
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'asterisk -rvv'"
+
+# View Asterisk logs
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'journalctl -u asterisk -f'"
+```
+
 ## Project Structure
 
 ```
@@ -959,6 +1042,71 @@ git log --oneline -5
 │                                                                 │
 │  Startup: systemd (auto-start on boot)                         │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+### PM2 Auto-Startup on Boot
+
+PM2 can automatically restart saved processes after a server reboot. This requires two things:
+1. **Startup script** — A systemd service that runs `pm2 resurrect` on boot
+2. **Saved process list** — A dump file (`/root/.pm2/dump.pm2`) with processes to restore
+
+#### Setup Commands (Run Once Per Server)
+
+**Dell Server (192.168.1.14):**
+```bash
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
+  "echo 'Pasword@1759' | sudo -S bash -c 'export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && pm2 startup systemd -u root --hp /root && pm2 save'"
+```
+
+**HPE Server (192.168.1.15):**
+```bash
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 \
+  "echo 'Pasword@1759' | su - -c 'source /root/.nvm/nvm.sh && pm2 startup systemd -u root --hp /root && pm2 save'"
+```
+
+#### What This Creates
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| Systemd Service | `/etc/systemd/system/pm2-root.service` | Runs `pm2 resurrect` on boot |
+| Process Dump | `/root/.pm2/dump.pm2` | List of processes to restore |
+
+#### How It Works
+
+1. Server boots → `systemd` starts `pm2-root.service`
+2. Service runs `pm2 resurrect`
+3. PM2 reads `/root/.pm2/dump.pm2` and starts all saved processes
+4. The `mayday` app is now running without manual intervention
+
+#### Important: Always Save After Changes
+
+After starting, stopping, or modifying PM2 processes, run `pm2 save` to update the dump file:
+
+```bash
+# After any PM2 process changes:
+pm2 save
+
+# If PM2 has no processes but you want to force save (rare):
+pm2 save --force
+```
+
+#### Verify Startup Configuration
+
+```bash
+# Check if systemd service is enabled
+systemctl is-enabled pm2-root
+
+# Check service status
+systemctl status pm2-root
+
+# Manual test: simulate boot resurrection
+pm2 kill && pm2 resurrect
+```
+
+#### Remove Auto-Startup (If Needed)
+
+```bash
+pm2 unstartup systemd
 ```
 
 ### PM2 Environment Variables (IMPORTANT)

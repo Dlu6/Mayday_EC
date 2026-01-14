@@ -200,31 +200,142 @@ const Dashboard = () => {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isConnected, setIsConnected] = useState(false);
 
-  // Initialize WebSocket connection for Live status
+  // Helper to format stats array for display
+  const formatStatsForDisplay = (callStats, prevStats) => {
+    return [
+      {
+        title: "WAITING",
+        value: callStats.waiting || 0,
+        icon: <PhoneCallbackIcon />,
+        color: theme.palette.info.main,
+        trend: prevStats
+          ? calculateTrend(callStats.waiting, prevStats.waiting)
+          : null,
+      },
+      {
+        title: "TALKING",
+        value: callStats.talking || 0,
+        icon: <TalkIcon />,
+        color: theme.palette.warning.main,
+        trend: prevStats
+          ? calculateTrend(callStats.talking, prevStats.talking)
+          : null,
+      },
+      {
+        title: "ANSWERED",
+        value: callStats.answered || 0,
+        icon: <AnswerIcon />,
+        color: theme.palette.success.main,
+        trend: prevStats
+          ? calculateTrend(callStats.answered, prevStats.answered)
+          : null,
+      },
+      {
+        title: "ABANDONED",
+        value: callStats.abandoned || 0,
+        icon: <PhoneMissedIcon />,
+        color: theme.palette.error.main,
+        trend: prevStats
+          ? calculateTrend(callStats.abandoned, prevStats.abandoned)
+          : null,
+      },
+      {
+        title: "TOTAL OFFERED",
+        value: callStats.totalOffered || 0,
+        icon: <PhoneForwardedIcon />,
+        color: theme.palette.primary.main,
+        trend: prevStats
+          ? calculateTrend(
+            callStats.totalOffered,
+            prevStats.totalOffered
+          )
+          : null,
+      },
+      {
+        title: "AVERAGE HOLD TIME",
+        value: formatTime(callStats.avgHoldTime),
+        icon: <TimerIcon />,
+        color: "#6b7280",
+        trend: null, // No trend for time values
+      },
+    ];
+  };
+
+  // Initialize WebSocket connection and subscribe to real-time callStats
   useEffect(() => {
     const socket = connectWebSocket();
     if (!socket) return;
 
     setIsConnected(socket.connected);
 
-    const onConnect = () => setIsConnected(true);
+    const onConnect = () => {
+      setIsConnected(true);
+      // Subscribe to call stats updates like the Electron softphone does
+      socket.emit("subscribeToCallStats");
+    };
     const onDisconnect = () => setIsConnected(false);
+
+    // Handle real-time callStats updates from server
+    const onCallStats = (data) => {
+      // Extract waiting/talking from activeCallsList if available
+      const activeCallsList = data.activeCallsList || [];
+      const waiting = activeCallsList.filter(
+        (call) => call.status === "waiting" || call.status === "queued" || call.status === "ringing"
+      ).length;
+      const talking = activeCallsList.filter(
+        (call) => call.status === "answered" || call.status === "in-progress"
+      ).length;
+
+      // Build callStats object from real-time data
+      const callStats = {
+        waiting: waiting,
+        talking: talking,
+        answered: data.totalCalls - data.abandonedCalls || 0,
+        abandoned: data.abandonedCalls || 0,
+        totalOffered: data.totalCalls || 0,
+        avgHoldTime: 0, // Would need to be calculated from queue data
+      };
+
+      // Update stats for display
+      const formattedStats = formatStatsForDisplay(callStats, previousStats);
+      setStats(formattedStats);
+
+      // Update queue activity from real-time data
+      if (data.queueStatus && data.queueStatus.length > 0) {
+        const queue = data.queueStatus[0];
+        setQueueActivity({
+          serviceLevel: queue.sla || 0,
+          waitTime: 0,
+          abandonRate: queue.abandonRate || 0,
+        });
+      }
+
+      setLastUpdated(new Date());
+      setIsLoading(false);
+    };
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
+    socket.on("callStats", onCallStats);
+
+    // If already connected, subscribe immediately
+    if (socket.connected) {
+      socket.emit("subscribeToCallStats");
+    }
 
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
+      socket.off("callStats", onCallStats);
     };
-  }, []);
+  }, [previousStats, theme]);
 
-  // Fetch call statistics
+  // Initial fetch and periodic refresh of CDR-based stats (answered, abandoned, etc.)
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Fetch current stats
+        // Fetch current stats from API (for CDR-based metrics)
         const callStats = await callStatsService.getCallStats();
         const queueData = await callStatsService.getQueueActivity();
         const abandonStats = await callStatsService.getAbandonRateStats();
@@ -234,74 +345,18 @@ const Dashboard = () => {
           setPreviousStats(
             stats.length > 0
               ? {
-                  waiting: stats[0]?.value || 0,
-                  talking: stats[1]?.value || 0,
-                  answered: stats[2]?.value || 0,
-                  abandoned: stats[3]?.value || 0,
-                  totalOffered: stats[4]?.value || 0,
-                  avgHoldTime: stats[5]?.value || "00:00",
-                }
+                waiting: stats[0]?.value || 0,
+                talking: stats[1]?.value || 0,
+                answered: stats[2]?.value || 0,
+                abandoned: stats[3]?.value || 0,
+                totalOffered: stats[4]?.value || 0,
+                avgHoldTime: stats[5]?.value || "00:00",
+              }
               : null
           );
 
           // Format the stats for display
-          const formattedStats = [
-            {
-              title: "WAITING",
-              value: callStats.waiting || 0,
-              icon: <PhoneCallbackIcon />,
-              color: theme.palette.info.main,
-              trend: previousStats
-                ? calculateTrend(callStats.waiting, previousStats.waiting)
-                : null,
-            },
-            {
-              title: "TALKING",
-              value: callStats.talking || 0,
-              icon: <TalkIcon />,
-              color: theme.palette.warning.main,
-              trend: previousStats
-                ? calculateTrend(callStats.talking, previousStats.talking)
-                : null,
-            },
-            {
-              title: "ANSWERED",
-              value: callStats.answered || 0,
-              icon: <AnswerIcon />,
-              color: theme.palette.success.main,
-              trend: previousStats
-                ? calculateTrend(callStats.answered, previousStats.answered)
-                : null,
-            },
-            {
-              title: "ABANDONED",
-              value: callStats.abandoned || 0,
-              icon: <PhoneMissedIcon />,
-              color: theme.palette.error.main,
-              trend: previousStats
-                ? calculateTrend(callStats.abandoned, previousStats.abandoned)
-                : null,
-            },
-            {
-              title: "TOTAL OFFERED",
-              value: callStats.totalOffered || 0,
-              icon: <PhoneForwardedIcon />,
-              color: theme.palette.primary.main,
-              trend: previousStats
-                ? calculateTrend(
-                    callStats.totalOffered,
-                    previousStats.totalOffered
-                  )
-                : null,
-            },
-            {
-              title: "AVERAGE HOLD TIME",
-              value: formatTime(callStats.avgHoldTime),
-              icon: <TimerIcon />,
-              color: "#6b7280",
-              trend: null, // No trend for time values
-            },
-          ];
+          const formattedStats = formatStatsForDisplay(callStats, previousStats);
 
           setStats(formattedStats);
           setQueueActivity(queueData);
@@ -317,7 +372,8 @@ const Dashboard = () => {
 
     fetchData();
 
-    // Set up polling every 30 seconds
+    // Set up polling every 30 seconds for CDR-based stats (answered, abandoned counts)
+    // Real-time active calls come via WebSocket
     const intervalId = setInterval(fetchData, 30000);
 
     // Clean up interval on component unmount
@@ -376,9 +432,9 @@ const Dashboard = () => {
             color: theme.palette.primary.main,
             trend: previousStats
               ? calculateTrend(
-                  callStats.totalOffered,
-                  previousStats.totalOffered
-                )
+                callStats.totalOffered,
+                previousStats.totalOffered
+              )
               : null,
           },
           {
@@ -457,14 +513,14 @@ const Dashboard = () => {
               </Typography>
               <Badge
                 variant="dot"
-                sx={{ 
+                sx={{
                   mt: 0.5,
-                  "& .MuiBadge-badge": { 
-                    width: 12, 
-                    height: 12, 
+                  "& .MuiBadge-badge": {
+                    width: 12,
+                    height: 12,
                     borderRadius: "50%",
                     backgroundColor: isConnected ? "#00ff04ff" : undefined
-                  } 
+                  }
                 }}
                 color={isConnected ? "success" : "error"}
               >
@@ -473,10 +529,10 @@ const Dashboard = () => {
                   size="small"
                   variant="filled"
                   sx={{
-                    backgroundColor: isLoading 
+                    backgroundColor: isLoading
                       ? alpha(theme.palette.warning.main, 0.1)
                       : isConnected ? "#00ff04ff" : undefined,
-                    color: isLoading 
+                    color: isLoading
                       ? theme.palette.warning.main
                       : isConnected ? "#000" : undefined,
                     fontWeight: 500
