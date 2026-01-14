@@ -141,6 +141,11 @@ export const VoiceQueue = sequelize.define(
       allowNull: true,
       defaultValue: "no",
     },
+    monitor_format: {
+      type: DataTypes.ENUM("wav", "mp3", "gsm", "inactive"),
+      allowNull: true,
+      defaultValue: "wav", // Enable recording by default with wav format
+    },
     description: {
       type: DataTypes.STRING(255),
       allowNull: true,

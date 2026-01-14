@@ -299,6 +299,9 @@ const Login = ({ onLoginSuccess }) => {
       // Clear logout flag on successful login
       clearLogoutFlag();
 
+      // CRITICAL: Persist the server host and protocol settings
+      // This ensures serverConfig.apiUrl uses the correct protocol (http vs https)
+      serverConfig.setServerHost(state.host);
       // STEP 2: Validate configuration
       setLoginProgress((prev) => ({
         ...prev,

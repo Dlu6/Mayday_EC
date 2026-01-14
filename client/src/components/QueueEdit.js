@@ -99,7 +99,7 @@ const QueueEdit = () => {
     autopause: "no",
     setinterfacevar: "no",
     setqueuevar: "no",
-    monitor_format: "gsm",
+    monitor_format: "wav",
     context: "from-queue",
     description: "",
     periodicAnnounce: [], // Initialize as an empty array
@@ -493,7 +493,7 @@ const QueueEdit = () => {
                     backgroundColor: (theme) => theme.palette.primary.dark,
                   },
                 }}
-                onClick={() => {}}
+                onClick={() => { }}
               >
                 <GroupAddIcon />
               </IconButton>
@@ -665,9 +665,8 @@ const QueueEdit = () => {
                                 >
                                   ●{" "}
                                 </Typography>
-                                {`Extension: ${member.extension} (Penalty: ${
-                                  member.penalty || 0
-                                })`}
+                                {`Extension: ${member.extension} (Penalty: ${member.penalty || 0
+                                  })`}
                               </>
                             }
                           />
@@ -1480,7 +1479,7 @@ const AnnouncementsTabContent = ({ formData, handleInputChange }) => {
                 label="Periodic Announce"
                 value={formData.periodicAnnounce}
                 onChange={handleInputChange}
-                // renderValue={(selected) => selected.join(', ')}
+              // renderValue={(selected) => selected.join(', ')}
               >
                 {periodicAnnounce.map((option) => (
                   <MenuItem key={option.value} value={option.value}>
@@ -1906,7 +1905,7 @@ const AdvancedTabContent = ({ formData, handleInputChange, setFormData }) => {
             id="monitor_format"
             name="monitor_format"
             label="Recording Format"
-            value={formData.monitor_format || "gsm"}
+            value={formData.monitor_format || "wav"}
             onChange={handleInputChange}
           >
             {recordingFormatOptions.map((option) => (

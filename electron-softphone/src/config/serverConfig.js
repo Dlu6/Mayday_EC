@@ -174,7 +174,29 @@ const serverConfig = {
   // Settings management
   setServerHost(host) {
     if (typeof localStorage !== "undefined") {
-      localStorage.setItem(STORAGE_KEYS.SERVER_HOST, host);
+      // Parse protocol from host if provided (e.g., "http://192.168.1.15" or "https://example.com")
+      let cleanHost = host;
+      let detectedHttps = null;
+
+      if (host.startsWith("https://")) {
+        cleanHost = host.replace("https://", "");
+        detectedHttps = true;
+      } else if (host.startsWith("http://")) {
+        cleanHost = host.replace("http://", "");
+        detectedHttps = false;
+      }
+
+      // Remove any trailing slashes or paths
+      cleanHost = cleanHost.split("/")[0];
+
+      // Store the clean host (just IP/domain, no protocol)
+      localStorage.setItem(STORAGE_KEYS.SERVER_HOST, cleanHost);
+
+      // Also update useHttps if protocol was detected
+      if (detectedHttps !== null) {
+        localStorage.setItem(STORAGE_KEYS.USE_HTTPS, String(detectedHttps));
+        console.log(`🔧 serverConfig: Host set to ${cleanHost}, useHttps=${detectedHttps}`);
+      }
     }
   },
 
