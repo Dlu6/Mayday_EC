@@ -50,7 +50,7 @@ const RECORDING_BASE_DIR =
 function generateAgentDialplanEntries(extension, recordingFormat = "inactive") {
   const isRecordingEnabled = recordingFormat && recordingFormat !== "inactive";
   const format = isRecordingEnabled ? recordingFormat : "wav";
-  
+
   const entries = [];
   let priority = 1;
 
@@ -599,8 +599,8 @@ export const updateAgentDetails = async (req, res) => {
           pjsipData.dtls_enabled !== undefined
             ? Boolean(pjsipData.dtls_enabled) // Ensure it's a boolean
             : user.dtls_enabled === undefined
-            ? true
-            : user.dtls_enabled, // Default to true
+              ? true
+              : user.dtls_enabled, // Default to true
         dtls_cert_file: pjsipData.dtls_cert_file || user.dtls_cert_file,
         dtls_private_key: pjsipData.dtls_private_key || user.dtls_private_key,
         direct_media: pjsipData.direct_media || user.direct_media || "no",
@@ -971,7 +971,7 @@ export const registerAgent = async (req, res) => {
             type: user.ps_endpoint?.type,
             extension: user.extension,
             password: user.ps_auth?.password,
-            server: process.env.ASTERISK_HOST,
+            server: process.env.SIP_DOMAIN || process.env.PUBLIC_IP,
             transport: user.transport,
             rtp_symmetric: user.ps_endpoint?.rtp_symmetric === "yes" || true,
             media_use_received_transport:

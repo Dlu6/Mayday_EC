@@ -197,3 +197,52 @@ After creation, click the **⚙️ Advanced Settings** (Manage Trunk) icon for t
 - **System Cleanliness**: All `Simi_Trunk` remnants removed from files and database.
 - **Ready for GUI**: System is prepared for the user to add the `MTN-Trunk` via the Mayday web interface.
 
+## SRTP Module Fix (Required for WebRTC Calls)
+The HPE server's Asterisk was compiled without SRTP support. To enable WebRTC/DTLS-SRTP calls:
+
+1. **Install libsrtp2-dev**:
+   ```bash
+   apt-get install -y libsrtp2-dev
+   ```
+
+2. **Recompile res_srtp module from Asterisk source**:
+   ```bash
+   cd /usr/src/asterisk
+   ./configure --with-srtp
+   make res
+   cp res/res_srtp.so /usr/lib/asterisk/modules/
+   ```
+
+3. **Load the module**:
+   ```bash
+   asterisk -rx "module load res_srtp.so"
+   ```
+
+4. **Verify**:
+   ```bash
+   asterisk -rx "module show like srtp"
+   # Should show: res_srtp.so    Secure RTP (SRTP)    Running    core
+   ```
+
+## DNS Resolution Fix
+MTN DNS servers (`193.108.252.50`, `193.108.252.51`) are not directly reachable from the leased line. Added static hosts entry:
+
+```bash
+echo "41.210.168.115 ucaas.mtn.co.ug" >> /etc/hosts
+```
+
+## Trunk Activation Status (Jan 13, 2026)
+- **MTN_TRUNK endpoint**: ✅ Available (RTT: ~42ms)
+- **Contact**: `sip:ucaas.mtn.co.ug:5060`
+- **Qualify**: 60 seconds
+- **Identify**: Matches `41.210.168.115/32`
+- **Outbound Auth**: `MTN_TRUNK_auth` (username: `326895850`)
+- **Caller ID**: `+256326895850`
+
+## MixMonitor Fix
+Removed the `W` option from MixMonitor that was causing warnings. The `W` option requires a volume level parameter:
+```sql
+UPDATE voice_extensions SET appdata = REPLACE(appdata, ',bW', ',b') 
+WHERE app="MixMonitor" AND appdata LIKE "%,bW%";
+```
+

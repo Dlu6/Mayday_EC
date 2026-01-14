@@ -1,6 +1,7 @@
 // config/sequelize.js
 import Sequelize from "sequelize";
 import dotenv from "dotenv";
+import dotenvExpand from "dotenv-expand";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
@@ -41,6 +42,7 @@ if (!envFound) {
 
 console.log("\nLoading .env from:", envPath);
 const result = dotenv.config({ path: envPath });
+dotenvExpand.expand(result);
 
 if (result.error) {
   console.error("Error loading .env:", result.error);
