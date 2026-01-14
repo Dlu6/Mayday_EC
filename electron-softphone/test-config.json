@@ -1,0 +1,15 @@
+{
+  "serverUrl": "http://localhost:8004",
+  "wsUrl": "ws://localhost:8004",
+  "testCredentials": {
+    "email": "sarah@gmail.com",
+    "password": "12345"
+  },
+  "testDuration": 30000,
+  "connectionTimeout": 15000,
+  "maxReconnectAttempts": 20,
+  "baseDelay": 1000,
+  "maxDelay": 30000,
+  "healthCheckInterval": 30000,
+  "heartbeatInterval": 25000
+}
