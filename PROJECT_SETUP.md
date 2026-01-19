@@ -174,6 +174,82 @@ ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'ast
 ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'journalctl -u asterisk -f'"
 ```
 
+**HPE Server ecosystem.config.cjs:**
+
+The HPE server requires specific environment variables for license server and AMI connectivity:
+
+```javascript
+// /home/mayday/Mayday_EC/ecosystem.config.cjs
+module.exports = {
+  apps: [
+    {
+      name: "mayday",
+      script: "server/server.js",
+      exec_mode: "fork",
+      instances: 1,
+      watch: false,
+      env: {
+        NODE_ENV: "production",
+        PORT: 8004,
+        PUBLIC_IP: "192.168.1.15",
+        ASTERISK_CONFIG_PATH: "/etc/asterisk",
+        LICENSE_MGMT_API_URL: "https://mayday-website-backend-c2abb923fa80.herokuapp.com/api",
+        LICENSE_MGMT_API_KEY: "maydayLicMgmtApiKey1759_production",
+        SECRET_INTERNAL_API_KEY: "aVeryLongAndRandomSecretStringForInternalComms_987654321_production",
+      },
+    },
+  ],
+};
+```
+
+**HPE Server .env Configuration:**
+
+> [!CAUTION]
+> Use literal IP values, not variable substitution (dotenv doesn't support `${VAR}` syntax).
+
+```env
+# /home/mayday/Mayday_EC/server/.env
+NODE_ENV=production
+PORT=8004
+SERVER_IP=192.168.1.15
+
+# Use 127.0.0.1 for local services (Asterisk/DB run on same server)
+PUBLIC_IP=192.168.1.15
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=mayday_user
+DB_PASSWORD=Pasword@1759
+DB_NAME=asterisk
+
+AMI_HOST=127.0.0.1
+AMI_PORT=5038
+ASTERISK_AMI_USERNAME=mayday_ami_user
+AMI_PASSWORD=mayday_ami_password
+
+ASTERISK_HOST=127.0.0.1
+ARI_URL=http://127.0.0.1:8088
+ARI_USERNAME=asterisk
+ARI_PASSWORD=Pasword@256ari
+
+JWT_SECRET=your_jwt_secret_here
+```
+
+**HPE Server Deployment Command:**
+
+```bash
+# Full deployment on HPE server
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c '
+export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh
+cd /home/mayday/Mayday_EC
+git pull origin development
+npm install
+cd client && npm install && npm run build && cd ..
+pm2 delete mayday 2>/dev/null
+pm2 start ecosystem.config.cjs
+pm2 save
+'"
+```
+
 ## Project Structure
 
 ```
@@ -1144,6 +1220,26 @@ ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
 1. `ecosystem.config.cjs` - Primary source for PM2 environment
 2. `server/.env` - Loaded by dotenv at runtime (supplements ecosystem config)
 
+> [!CAUTION]
+> **Node.js dotenv does NOT support bash-style variable substitution!**
+> 
+> The `.env` file cannot use `${VARIABLE}` syntax. This will cause connection failures:
+> ```env
+> # ❌ WRONG - dotenv reads this as literal string "${SERVER_IP}"
+> SERVER_IP=192.168.1.15
+> AMI_HOST=${SERVER_IP}
+> DB_HOST=${SERVER_IP}
+> ```
+> 
+> ```env
+> # ✅ CORRECT - use actual IP values
+> AMI_HOST=127.0.0.1
+> DB_HOST=127.0.0.1
+> PUBLIC_IP=192.168.1.15
+> ```
+> 
+> **If you see "AMI connection timeout" errors, check that `.env` uses literal IP values.**
+
 **Key environment variables for CORS:**
 
 | Variable | Location | Purpose |
@@ -1163,9 +1259,16 @@ The on-prem server acts as a **slave** that syncs licenses from the **master** (
 ```javascript
 env: {
   LICENSE_MGMT_API_URL: "https://mayday-website-backend-c2abb923fa80.herokuapp.com/api",
+  LICENSE_MGMT_API_KEY: "maydayLicMgmtApiKey1759_production",
   SECRET_INTERNAL_API_KEY: "aVeryLongAndRandomSecretStringForInternalComms_987654321_production",
 }
 ```
+
+> [!IMPORTANT]
+> **All three variables are required for license server connection:**
+> - `LICENSE_MGMT_API_URL` - The master license server API endpoint
+> - `LICENSE_MGMT_API_KEY` - API key for license management authentication
+> - `SECRET_INTERNAL_API_KEY` - Internal API key (must match Heroku config)
 
 **Important: The `SECRET_INTERNAL_API_KEY` must match the key on the Heroku provisioning server.**
 
@@ -1190,14 +1293,17 @@ ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
 |-------|-------|----------|
 | "No license found on master server" | Fingerprint not registered on master | Copy fingerprint from slave, create license on master with that fingerprint |
 | "Invalid internal API key" | API key mismatch | Ensure `SECRET_INTERNAL_API_KEY` in ecosystem.config.cjs matches Heroku's config |
-| "Failed to connect to master license server" | Network/CORS issue | Add slave's origin to Heroku's `ALLOWED_ORIGINS` config var |
+| "Failed to connect to master license server" | Missing `LICENSE_MGMT_API_KEY` or wrong `PUBLIC_IP` | Add `LICENSE_MGMT_API_KEY` to ecosystem.config.cjs and verify `PUBLIC_IP` matches server IP |
+| "Failed to connect to master license server" (websocket) | Network/CORS issue | Add slave's origin to Heroku's `ALLOWED_ORIGINS` config var |
 | License sync returns 404 | URL encoding issue | Fixed in licenseService.js - fingerprint is now URL-encoded |
 
 #### Heroku Provisioning Server Config Vars
 
 Required config vars on Heroku for slave communication:
 - `SECRET_INTERNAL_API_KEY` - Must match slave's key
-- `ALLOWED_ORIGINS` - Must include `https://192.168.1.14,http://192.168.1.14`
+- `ALLOWED_ORIGINS` - Must include all slave server origins:
+  - Dell: `https://192.168.1.14,http://192.168.1.14`
+  - HPE: `https://192.168.1.15,http://192.168.1.15`
 
 ### Client Environment Variables
 
