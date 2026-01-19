@@ -135,13 +135,13 @@ export function initializeSocket(httpServer) {
     amiRealtimeInitialized = true;
   }
   setupCallMonitoringEvents(io);
-  
+
   // Connect to master license server for real-time license updates
   if (!masterConnectionInitialized) {
     connectToMasterServer();
     masterConnectionInitialized = true;
   }
-  
+
   return io;
 }
 
@@ -280,12 +280,12 @@ function setupSocketEvents() {
         const all = await amiService.getAllExtensionStatuses();
         global._agentsSnapshotCache = Array.isArray(all)
           ? all.map((ext) => ({
-              extension: String(ext.extension),
-              status: ext.status || (ext.online ? "Registered" : "Offline"),
-              online: !!ext.online,
-              contactUri: ext.contactUri || null,
-              lastSeen: ext.lastSeen || null,
-            }))
+            extension: String(ext.extension),
+            status: ext.status || (ext.online ? "Registered" : "Offline"),
+            online: !!ext.online,
+            contactUri: ext.contactUri || null,
+            lastSeen: ext.lastSeen || null,
+          }))
           : [];
         global._agentsSnapshotCacheTime = now;
       }
@@ -410,13 +410,13 @@ async function connectToMasterServer() {
     console.log("🔍 Generated server fingerprint for license updates:", serverFingerprint);
 
     const licenseApiUrl = process.env.LICENSE_MGMT_API_URL;
-    
+
     // Skip if no license URL is configured in production
     if (!licenseApiUrl && process.env.NODE_ENV === "production") {
       console.log("ℹ️ No LICENSE_MGMT_API_URL configured, skipping license server connection");
       return;
     }
-    
+
     const masterUrl = licenseApiUrl?.replace("/api", "") || "http://localhost:8001";
     console.log(`🔌 Connecting to master license server at: ${masterUrl}`);
 
@@ -498,7 +498,7 @@ async function handleLicenseUpdateFromMaster(data) {
     }
   } catch (error) {
     console.error("❌ Error handling license update from master:", error);
-    
+
     // Still try to emit update notification even if sync failed
     if (io) {
       io.emit("license:updated", {
@@ -948,9 +948,21 @@ export const socketService = {
       const userSockets = Array.from(connectedClients.entries())
         .filter(([_, client]) => client.userId === userId)
         .map(([socketId, _]) => socketId);
-      
+
       userSockets.forEach(socketId => {
         io.to(socketId).emit(event, data);
+      });
+    }
+  },
+  // Emit user settings update to a specific extension for real-time sync
+  emitUserSettingsUpdate: (extension, settings) => {
+    if (io && extension) {
+      console.log(`[Socket] Emitting user:settings_updated to extension ${extension}:`, settings);
+      const roomName = `extension_${extension}`;
+      io.to(roomName).emit("message", {
+        type: "user:settings_updated",
+        settings,
+        timestamp: new Date().toISOString(),
       });
     }
   },

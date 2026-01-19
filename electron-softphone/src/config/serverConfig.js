@@ -38,8 +38,13 @@ const STORAGE_KEYS = {
  */
 const getServerHost = () => {
   if (typeof localStorage !== "undefined") {
-    const savedHost = localStorage.getItem(STORAGE_KEYS.SERVER_HOST);
-    if (savedHost) return savedHost;
+    let savedHost = localStorage.getItem(STORAGE_KEYS.SERVER_HOST);
+    if (savedHost) {
+      // Strip any port that might have been incorrectly saved with the host
+      // e.g., "localhost:8004" should become "localhost"
+      savedHost = savedHost.split(":")[0];
+      return savedHost;
+    }
   }
 
   // Check environment variable

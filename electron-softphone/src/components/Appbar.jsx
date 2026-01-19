@@ -108,6 +108,7 @@ import FeatureGate from "./FeatureGate";
 import transferHistoryService from "../services/transferHistoryService";
 import { agentService } from "../services/agentService";
 import { pauseService } from "../services/pauseService";
+import websocketService from "../services/websocketService";
 // SessionAnalytics and Clients removed - datatool_server not used in this project
 import ConfirmDialog from "./ConfirmDialog";
 import { useNavigate } from "react-router-dom";
@@ -311,6 +312,33 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
   const [maxReconnectionAttempts] = useState(5);
   const [reconnectionTimeout, setReconnectionTimeout] = useState(null);
   const [connectionHealth, setConnectionHealth] = useState(100);
+
+  // Auto-answer state - tracks the current phonebar auto-answer setting
+  const [autoAnswerEnabled, setAutoAnswerEnabled] = useState(
+    () => storageService.getUserData()?.user?.phoneBarAutoAnswer || false
+  );
+  const [autoAnswerDelay, setAutoAnswerDelay] = useState(
+    () => storageService.getUserData()?.user?.phoneBarAutoAnswerDelay || 0
+  );
+
+  // Listen for real-time auto-answer setting updates via websocket
+  useEffect(() => {
+    const handleSettingsUpdate = (settings) => {
+      console.log("[Appbar] Received user settings update:", settings);
+      if (settings?.phoneBarAutoAnswer !== undefined) {
+        setAutoAnswerEnabled(settings.phoneBarAutoAnswer);
+      }
+      if (settings?.phoneBarAutoAnswerDelay !== undefined) {
+        setAutoAnswerDelay(settings.phoneBarAutoAnswerDelay);
+      }
+    };
+
+    websocketService.on("user:settings_updated", handleSettingsUpdate);
+
+    return () => {
+      websocketService.off("user:settings_updated", handleSettingsUpdate);
+    };
+  }, []);
 
   // Client lookup removed - datatool_server not used in this project
 
@@ -5035,6 +5063,82 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                           • WS: Live
                         </span>
                       )}
+                      {/* Auto-Answer Switch with Tooltip */}
+                      <Tooltip
+                        title={autoAnswerEnabled
+                          ? `Auto-Answer is ON: Incoming calls will be answered automatically${autoAnswerDelay > 0 ? ` after ${autoAnswerDelay} second${autoAnswerDelay !== 1 ? 's' : ''}` : ' immediately'}`
+                          : "Auto-Answer is OFF: You must manually answer calls"}
+                        arrow
+                        placement="bottom"
+                      >
+                        <Box
+                          sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            ml: 1.5,
+                            mt: -0.5,
+                            px: 0.8,
+                            py: 0.3,
+                            borderRadius: '12px',
+                            backgroundColor: autoAnswerEnabled ? 'rgba(76, 175, 80, 0.15)' : 'rgba(244, 67, 54, 0.1)',
+                            border: `1px solid ${autoAnswerEnabled ? 'rgba(76, 175, 80, 0.3)' : 'rgba(207, 16, 32, 1)'}`,
+                            transition: 'all 0.3s ease',
+                          }}
+                        >
+                          <Switch
+                            size="small"
+                            checked={autoAnswerEnabled}
+                            disabled
+                            sx={{
+                              width: 28,
+                              height: 16,
+                              padding: 0,
+                              '& .MuiSwitch-thumb': {
+                                width: 12,
+                                height: 12,
+                                boxShadow: autoAnswerEnabled
+                                  ? '0 0 6px rgba(76, 175, 80, 0.8)'
+                                  : '0 0 4px rgba(201, 0, 0, 0.6)',
+                                backgroundColor: autoAnswerEnabled ? '#4caf50' : '#f44336',
+                              },
+                              '& .MuiSwitch-switchBase': {
+                                padding: '2px',
+                                '&.Mui-checked': {
+                                  transform: 'translateX(12px)',
+                                  color: '#4caf50',
+                                  '& + .MuiSwitch-track': {
+                                    backgroundColor: '#4caf50',
+                                    opacity: 0.5,
+                                  },
+                                },
+                                '&.Mui-disabled': {
+                                  '& .MuiSwitch-thumb': {
+                                    backgroundColor: autoAnswerEnabled ? '#4caf50' : '#f44336',
+                                  },
+                                },
+                              },
+                              '& .MuiSwitch-track': {
+                                borderRadius: 8,
+                                backgroundColor: autoAnswerEnabled ? '#4caf50' : '#f44336',
+                                opacity: autoAnswerEnabled ? 0.3 : 0.25,
+                              },
+                            }}
+                          />
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              ml: 0.5,
+                              fontSize: '0.65rem',
+                              fontWeight: 600,
+                              letterSpacing: '0.3px',
+                              textTransform: 'capitalize',
+                              color: autoAnswerEnabled ? '#4caf50' : '#f44336',
+                            }}
+                          >
+                            Auto
+                          </Typography>
+                        </Box>
+                      </Tooltip>
                     </>
                   ) : (
                     "❌ Not Registered 🛑"

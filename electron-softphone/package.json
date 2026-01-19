@@ -22,7 +22,7 @@
     "deploy:update": "bash scripts/deploy-update.sh",
     "clean": "rimraf dist",
     "prebuild": "npm run clean",
-    "postinstall": "electron-builder install-app-deps && npm run build:native",
+    "postinstall": "electron-builder install-app-deps && (node -e \"process.platform === 'win32' && process.exit(0) || process.exit(1)\" && npm run build:native || true)",
     "build:native": "cd native/win-appbar && npm install && npm run build",
     "rebuild:native": "cd native/win-appbar && npm run build",
     "check:native": "node scripts/check-native-prerequisites.js",

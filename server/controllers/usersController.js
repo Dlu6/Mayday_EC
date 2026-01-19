@@ -30,6 +30,7 @@ import { EventBusService } from "../services/eventBus.js";
 import amiService from "../services/amiService.js";
 import QueueMember from "../models/queueMemberModel.js";
 import VoiceExtension from "../models/voiceExtensionModel.js";
+import { socketService } from "../services/socketService.js";
 // datatool User model removed - not used in this project
 
 dotenv.config();
@@ -690,6 +691,14 @@ export const updateAgentDetails = async (req, res) => {
       ],
     });
 
+    // Emit updated phonebar settings to the agent's softphone in real-time
+    if (userData?.phoneBarAutoAnswer !== undefined && updatedAgent?.extension) {
+      socketService.emitUserSettingsUpdate(updatedAgent.extension, {
+        phoneBarAutoAnswer: userData.phoneBarAutoAnswer,
+        phoneBarAutoAnswerDelay: userData.phoneBarAutoAnswerDelay || 0,
+      });
+    }
+
     return res.json({
       success: true,
       message: "Agent updated successfully",
@@ -1049,6 +1058,8 @@ export const registerAgent = async (req, res) => {
           extension: user.extension,
           typology: user.typology,
           wss_port: user.wss_port || 8089,
+          phoneBarAutoAnswer: user.phoneBarAutoAnswer || false,
+          phoneBarAutoAnswerDelay: user.phoneBarAutoAnswerDelay || 0,
           pjsip: {
             type: user.ps_endpoint?.type,
             extension: user.extension,

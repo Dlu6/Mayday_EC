@@ -218,6 +218,9 @@ const AgentEdit = () => {
           dtls_enabled: formAgentDetails.dtls_enabled === true, // Explicitly use boolean
           dtls_setup: formAgentDetails.dtls_setup || "actpass",
           avpf: formAgentDetails.avpf || "yes",
+          // Phonebar settings - Auto Answer
+          phoneBarAutoAnswer: formAgentDetails.phoneBarAutoAnswer || false,
+          phoneBarAutoAnswerDelay: formAgentDetails.phoneBarAutoAnswerDelay || 0,
         },
         pjsipData: {
           // Convert string values to integers for boolean fields
