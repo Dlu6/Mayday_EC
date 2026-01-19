@@ -860,6 +860,88 @@ export const deleteAgent = async (req, res) => {
   }
 };
 
+// Reset Agent Password
+export const resetAgentPassword = async (req, res) => {
+  const { id } = req.params;
+  const { newPassword } = req.body;
+  let transaction;
+
+  try {
+    // Validate password
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters long",
+      });
+    }
+
+    transaction = await sequelize.transaction();
+
+    // Find the user
+    const user = await UserModel.findByPk(id);
+    if (!user) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Agent not found",
+      });
+    }
+
+    // Hash the new password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update user password
+    await UserModel.update(
+      { password: hashedPassword },
+      {
+        where: { id },
+        transaction,
+      }
+    );
+
+    // Also update PJSIP authentication password if the agent has an extension
+    if (user.extension) {
+      await PJSIPAuth.update(
+        { password: newPassword }, // PJSIP stores plaintext password
+        {
+          where: { id: user.extension },
+          transaction,
+        }
+      );
+    }
+
+    await transaction.commit();
+
+    // Reload Asterisk PJSIP to apply the new password
+    try {
+      await amiService.executeAction({
+        Action: "Command",
+        Command: "pjsip reload",
+      });
+      console.log(`✅ PJSIP reload triggered after password reset for extension ${user.extension}`);
+    } catch (amiError) {
+      console.error("Failed to reload PJSIP:", amiError);
+      // Non-critical error - password still updated in database
+    }
+
+    console.log(`🔐 Password reset successful for agent ${user.username} (ext: ${user.extension})`);
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successfully",
+    });
+  } catch (error) {
+    if (transaction) await transaction.rollback();
+    console.error("Error resetting agent password:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset password",
+      error: error.message,
+    });
+  }
+};
+
 // Agent Login to the phonebar
 export const registerAgent = async (req, res) => {
   const { email, password, isSoftphone, name } = req.body;
