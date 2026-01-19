@@ -14,7 +14,7 @@
 // ============================================================================
 // CHANGE THIS VALUE TO UPDATE THE SERVER HOST/IP EVERYWHERE
 // ============================================================================
-const DEFAULT_SERVER_HOST = "192.168.1.14";
+const DEFAULT_SERVER_HOST = "192.168.1.15";
 // ============================================================================
 
 const isDevelopment =
@@ -38,20 +38,25 @@ const STORAGE_KEYS = {
  */
 const getServerHost = () => {
   if (typeof localStorage !== "undefined") {
-    const savedHost = localStorage.getItem(STORAGE_KEYS.SERVER_HOST);
-    if (savedHost) return savedHost;
+    let savedHost = localStorage.getItem(STORAGE_KEYS.SERVER_HOST);
+    if (savedHost) {
+      // Strip any port that might have been incorrectly saved with the host
+      // e.g., "localhost:8004" should become "localhost"
+      savedHost = savedHost.split(":")[0];
+      return savedHost;
+    }
   }
-  
+
   // Check environment variable
   if (typeof import.meta !== "undefined" && import.meta.env?.VITE_SERVER_HOST) {
     return import.meta.env.VITE_SERVER_HOST;
   }
-  
+
   // Development uses localhost
   if (isDevelopment) {
     return "localhost";
   }
-  
+
   return DEFAULT_SERVER_HOST;
 };
 
@@ -63,10 +68,10 @@ const useHttps = () => {
     const saved = localStorage.getItem(STORAGE_KEYS.USE_HTTPS);
     if (saved !== null) return saved === "true";
   }
-  
-  // Default: use HTTPS for production (self-signed cert configured on server)
-  // Development uses HTTP (localhost)
-  return !isDevelopment;
+
+  // Default: use HTTP for production (192.168.1.15 uses HTTP on port 80)
+  // Change to true if you configure HTTPS/SSL on the server
+  return false;
 };
 
 /**
@@ -77,9 +82,9 @@ const getApiPort = () => {
     const saved = localStorage.getItem(STORAGE_KEYS.API_PORT);
     if (saved) return saved;
   }
-  
+
   if (isDevelopment) return "8004";
-  
+
   // Production on-prem uses nginx on port 80
   return "";
 };
@@ -92,7 +97,7 @@ const getSipPort = () => {
     const saved = localStorage.getItem(STORAGE_KEYS.SIP_PORT);
     if (saved) return saved;
   }
-  
+
   return "8088";
 };
 
@@ -115,50 +120,50 @@ const serverConfig = {
   useHttps,
   getApiPort,
   getSipPort,
-  
+
   // Computed URLs
   get host() {
     return getServerHost();
   },
-  
+
   get apiUrl() {
     const protocol = useHttps() ? "https" : "http";
     const host = getServerHost();
     const port = getApiPort();
     return buildUrl(protocol, host, port);
   },
-  
+
   get socketUrl() {
     const protocol = useHttps() ? "https" : "http";
     const host = getServerHost();
     const port = getApiPort();
     return buildUrl(protocol, host, port);
   },
-  
+
   get wsUrl() {
     const protocol = useHttps() ? "wss" : "ws";
     const host = getServerHost();
     const port = getSipPort();
     return `${buildUrl(protocol, host, port)}/ws`;
   },
-  
+
   get sipWsUrl() {
     const protocol = useHttps() ? "wss" : "ws";
     const host = getServerHost();
     const port = getSipPort();
     return `${buildUrl(protocol, host, port)}/ws`;
   },
-  
+
   get baseUrl() {
     return this.apiUrl;
   },
-  
+
   // Helper to get API URL with path
   getApiUrl(path = "") {
     const base = this.apiUrl;
     return path ? `${base}${path}` : base;
   },
-  
+
   // Helper to ensure we never use file:// URLs
   getSafeOrigin() {
     if (
@@ -170,32 +175,54 @@ const serverConfig = {
     }
     return window.location?.origin || this.apiUrl;
   },
-  
+
   // Settings management
   setServerHost(host) {
     if (typeof localStorage !== "undefined") {
-      localStorage.setItem(STORAGE_KEYS.SERVER_HOST, host);
+      // Parse protocol from host if provided (e.g., "http://192.168.1.15" or "https://example.com")
+      let cleanHost = host;
+      let detectedHttps = null;
+
+      if (host.startsWith("https://")) {
+        cleanHost = host.replace("https://", "");
+        detectedHttps = true;
+      } else if (host.startsWith("http://")) {
+        cleanHost = host.replace("http://", "");
+        detectedHttps = false;
+      }
+
+      // Remove any trailing slashes or paths
+      cleanHost = cleanHost.split("/")[0];
+
+      // Store the clean host (just IP/domain, no protocol)
+      localStorage.setItem(STORAGE_KEYS.SERVER_HOST, cleanHost);
+
+      // Also update useHttps if protocol was detected
+      if (detectedHttps !== null) {
+        localStorage.setItem(STORAGE_KEYS.USE_HTTPS, String(detectedHttps));
+        console.log(`🔧 serverConfig: Host set to ${cleanHost}, useHttps=${detectedHttps}`);
+      }
     }
   },
-  
+
   setUseHttps(value) {
     if (typeof localStorage !== "undefined") {
       localStorage.setItem(STORAGE_KEYS.USE_HTTPS, String(value));
     }
   },
-  
+
   setApiPort(port) {
     if (typeof localStorage !== "undefined") {
       localStorage.setItem(STORAGE_KEYS.API_PORT, port);
     }
   },
-  
+
   setSipPort(port) {
     if (typeof localStorage !== "undefined") {
       localStorage.setItem(STORAGE_KEYS.SIP_PORT, port);
     }
   },
-  
+
   // Reset to defaults
   resetToDefaults() {
     if (typeof localStorage !== "undefined") {
@@ -205,12 +232,12 @@ const serverConfig = {
       localStorage.removeItem(STORAGE_KEYS.SIP_PORT);
     }
   },
-  
+
   // Environment flags
   isDevelopment,
   isProduction: !isDevelopment,
   isElectron,
-  
+
   // Default value (for reference/display)
   DEFAULT_SERVER_HOST,
 };

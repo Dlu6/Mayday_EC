@@ -4,11 +4,11 @@ sidebar_position: 1
 
 # System Overview for Administrators
 
-This guide provides administrators with a comprehensive overview of the MHU Helpline system architecture, components, and administrative functions.
+This guide provides administrators with a comprehensive overview of the Mayday Helpline system architecture, components, and administrative functions.
 
 ## System Architecture
 
-The MHU Helpline system consists of several integrated components:
+The Mayday Helpline system consists of several integrated components:
 
 ### Core Components
 

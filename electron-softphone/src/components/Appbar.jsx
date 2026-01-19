@@ -108,6 +108,8 @@ import FeatureGate from "./FeatureGate";
 import transferHistoryService from "../services/transferHistoryService";
 import { agentService } from "../services/agentService";
 import { pauseService } from "../services/pauseService";
+import websocketService from "../services/websocketService";
+import networkService from "../services/networkService";
 // SessionAnalytics and Clients removed - datatool_server not used in this project
 import ConfirmDialog from "./ConfirmDialog";
 import { useNavigate } from "react-router-dom";
@@ -209,7 +211,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
     const restoreStickyAppbar = async () => {
       // Import the service directly to access restoreAfterAuth
       const { stickyAppbarService } = await import('../services/stickyAppbarService');
-      
+
       if (stickyAppbarService.isAvailable() && stickyAppbarService.shouldRestoreAfterAuth()) {
         console.log('[Appbar] Restoring sticky appbar after authentication');
         // Small delay to ensure the window is fully loaded
@@ -218,7 +220,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
         }, 500);
       }
     };
-    
+
     // Only run when authenticated
     if (isAuthenticated && !isLoading) {
       restoreStickyAppbar();
@@ -292,8 +294,11 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
   // Add state to track the currently pressed key
   const [activeKey, setActiveKey] = useState(null);
 
-  // Add this near your other state declarations
-  const [registrationState, setRegistrationState] = useState("Unregistered");
+  // ========== SIP Registration State Tracking ==========
+  // Track actual SIP registration state from sipService events
+  const [sipRegistrationState, setSipRegistrationState] = useState("Unregistered");
+  const [isNetworkHealthy, setIsNetworkHealthy] = useState(true);
+  const sipRegistrationDebounceRef = useRef(null);
 
   // Presence control for pauses
   const [presence, setPresence] = useState("READY");
@@ -312,10 +317,151 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
   const [reconnectionTimeout, setReconnectionTimeout] = useState(null);
   const [connectionHealth, setConnectionHealth] = useState(100);
 
+  // Auto-answer state - tracks the current phonebar auto-answer setting
+  const [autoAnswerEnabled, setAutoAnswerEnabled] = useState(
+    () => storageService.getUserData()?.user?.phoneBarAutoAnswer || false
+  );
+  const [autoAnswerDelay, setAutoAnswerDelay] = useState(
+    () => storageService.getUserData()?.user?.phoneBarAutoAnswerDelay || 0
+  );
+
+  // Listen for real-time auto-answer setting updates via websocket
+  useEffect(() => {
+    const handleSettingsUpdate = (settings) => {
+      console.log("[Appbar] Received user settings update:", settings);
+      if (settings?.phoneBarAutoAnswer !== undefined) {
+        setAutoAnswerEnabled(settings.phoneBarAutoAnswer);
+      }
+      if (settings?.phoneBarAutoAnswerDelay !== undefined) {
+        setAutoAnswerDelay(settings.phoneBarAutoAnswerDelay);
+      }
+    };
+
+    websocketService.on("user:settings_updated", handleSettingsUpdate);
+
+    return () => {
+      websocketService.off("user:settings_updated", handleSettingsUpdate);
+    };
+  }, []);
+
   // Client lookup removed - datatool_server not used in this project
 
-  // Registration status (align with DashboardView): prefer contactUri, fall back to AMI flags
+  // ========== SIP Registration State Effect ==========
+  // Listen to actual SIP registration events for real-time status updates
+  useEffect(() => {
+    const handleRegistered = (data) => {
+      console.log("[Appbar] SIP Registered event:", data);
+      // Clear any pending debounce
+      if (sipRegistrationDebounceRef.current) {
+        clearTimeout(sipRegistrationDebounceRef.current);
+      }
+      // Debounce "good" state to prevent flicker
+      sipRegistrationDebounceRef.current = setTimeout(() => {
+        setSipRegistrationState("Registered");
+      }, 500);
+    };
+
+    const handleUnregistered = (data) => {
+      console.log("[Appbar] SIP Unregistered event:", data);
+      // Clear any pending debounce
+      if (sipRegistrationDebounceRef.current) {
+        clearTimeout(sipRegistrationDebounceRef.current);
+      }
+      // Immediately update to "bad" states
+      setSipRegistrationState("Unregistered");
+    };
+
+    const handleRegistrationLost = (data) => {
+      console.log("[Appbar] SIP Registration lost:", data);
+      // Clear any pending debounce
+      if (sipRegistrationDebounceRef.current) {
+        clearTimeout(sipRegistrationDebounceRef.current);
+      }
+      // Show reconnecting state
+      setSipRegistrationState("Reconnecting");
+    };
+
+    const handleRegistrationFailed = (data) => {
+      console.log("[Appbar] SIP Registration failed:", data);
+      setSipRegistrationState("Failed");
+    };
+
+    // Subscribe to SIP service events
+    sipService.events.on("registered", handleRegistered);
+    sipService.events.on("unregistered", handleUnregistered);
+    sipService.events.on("registration_lost", handleRegistrationLost);
+    sipService.events.on("registration_failed", handleRegistrationFailed);
+    sipService.events.on("registration:state", (newState) => {
+      console.log("[Appbar] SIP registration:state event:", newState);
+      if (newState === "Registered") {
+        handleRegistered({ source: "state_change" });
+      } else if (newState === "Unregistered" || newState === "Terminated") {
+        handleUnregistered({ source: "state_change" });
+      }
+    });
+
+    // Set initial state from current SIP state
+    try {
+      if (sipService.state?.registerer?.state === "Registered") {
+        setSipRegistrationState("Registered");
+      } else if (sipService.isConnected) {
+        setSipRegistrationState("Registered");
+      }
+    } catch (_) { }
+
+    return () => {
+      sipService.events.off("registered", handleRegistered);
+      sipService.events.off("unregistered", handleUnregistered);
+      sipService.events.off("registration_lost", handleRegistrationLost);
+      sipService.events.off("registration_failed", handleRegistrationFailed);
+      if (sipRegistrationDebounceRef.current) {
+        clearTimeout(sipRegistrationDebounceRef.current);
+      }
+    };
+  }, []);
+
+  // ========== Network Health Tracking ==========
+  useEffect(() => {
+    const handleNetworkStatus = (status) => {
+      console.log("[Appbar] Network status:", status);
+      setIsNetworkHealthy(status.isOnline && status.isServerReachable);
+    };
+
+    const handleNetworkOffline = () => {
+      console.log("[Appbar] Network offline");
+      setIsNetworkHealthy(false);
+    };
+
+    const handleNetworkOnline = () => {
+      console.log("[Appbar] Network online");
+      setIsNetworkHealthy(true);
+    };
+
+    networkService.on("network:status", handleNetworkStatus);
+    networkService.on("network:offline", handleNetworkOffline);
+    networkService.on("network:online", handleNetworkOnline);
+    networkService.on("network:recovered", handleNetworkOnline);
+
+    // Set initial state
+    setIsNetworkHealthy(networkService.isHealthy());
+
+    return () => {
+      networkService.off("network:status", handleNetworkStatus);
+      networkService.off("network:offline", handleNetworkOffline);
+      networkService.off("network:online", handleNetworkOnline);
+      networkService.off("network:recovered", handleNetworkOnline);
+    };
+  }, []);
+
+  // Registration status: now based on actual SIP registration state (primary source)
+  // with fallback to registeredAgent API data for additional context
   const isRegistered = useMemo(() => {
+    // Primary: Use actual SIP registration state
+    if (sipRegistrationState === "Registered") {
+      return true;
+    }
+
+    // Secondary fallback: check registeredAgent API data for edge cases
     try {
       if (!registeredAgent) return false;
       const ext = registeredAgent.extension || "";
@@ -335,7 +481,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
     } catch (_) {
       return false;
     }
-  }, [registeredAgent]);
+  }, [sipRegistrationState, registeredAgent]);
 
   // Add new state for transfer dialog
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
@@ -553,21 +699,21 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
       }
 
       // Clear all custom event listeners
-      window.removeEventListener("websocket:event", () => {});
-      window.removeEventListener("sip:event", () => {});
-      window.removeEventListener("ami:event", () => {});
-      window.removeEventListener("websocket:connected", () => {});
-      window.removeEventListener("websocket:disconnected", () => {});
-      window.removeEventListener("websocket:connection_error", () => {});
-      window.removeEventListener("websocket:reconnected", () => {});
-      window.removeEventListener("websocket:reconnect_attempt", () => {});
-      window.removeEventListener("websocket:reconnect_error", () => {});
-      window.removeEventListener("websocket:reconnect_failed", () => {});
-      window.removeEventListener("connected", () => {});
-      window.removeEventListener("disconnected", () => {});
-      window.removeEventListener("connection_error", () => {});
-      window.removeEventListener("reconnected", () => {});
-      window.removeEventListener("reconnect_failed", () => {});
+      window.removeEventListener("websocket:event", () => { });
+      window.removeEventListener("sip:event", () => { });
+      window.removeEventListener("ami:event", () => { });
+      window.removeEventListener("websocket:connected", () => { });
+      window.removeEventListener("websocket:disconnected", () => { });
+      window.removeEventListener("websocket:connection_error", () => { });
+      window.removeEventListener("websocket:reconnected", () => { });
+      window.removeEventListener("websocket:reconnect_attempt", () => { });
+      window.removeEventListener("websocket:reconnect_error", () => { });
+      window.removeEventListener("websocket:reconnect_failed", () => { });
+      window.removeEventListener("connected", () => { });
+      window.removeEventListener("disconnected", () => { });
+      window.removeEventListener("connection_error", () => { });
+      window.removeEventListener("reconnected", () => { });
+      window.removeEventListener("reconnect_failed", () => { });
 
       // Clear any remaining timers
       if (reconnectionTimeout) {
@@ -590,7 +736,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
       // CRITICAL: Clear ALL remaining timers and intervals that might be running
       try {
         // Clear any remaining setInterval calls
-        const highestIntervalId = window.setInterval(() => {}, 0);
+        const highestIntervalId = window.setInterval(() => { }, 0);
         for (let i = 1; i <= highestIntervalId; i++) {
           try {
             clearInterval(i);
@@ -600,7 +746,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
         }
 
         // Clear any remaining setTimeout calls (except the one we're about to set)
-        const highestTimeoutId = window.setTimeout(() => {}, 0);
+        const highestTimeoutId = window.setTimeout(() => { }, 0);
         for (let i = 1; i <= highestTimeoutId; i++) {
           try {
             clearTimeout(i);
@@ -849,7 +995,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
 
         customEvents.forEach((eventName) => {
           try {
-            window.removeEventListener(eventName, () => {});
+            window.removeEventListener(eventName, () => { });
           } catch (error) {
             // Ignore errors for non-existent listeners
           }
@@ -1122,21 +1268,21 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
           }
 
           // Clear custom event listeners
-          window.removeEventListener("websocket:event", () => {});
-          window.removeEventListener("sip:event", () => {});
-          window.removeEventListener("ami:event", () => {});
-          window.removeEventListener("websocket:connected", () => {});
-          window.removeEventListener("websocket:disconnected", () => {});
-          window.removeEventListener("websocket:connection_error", () => {});
-          window.removeEventListener("websocket:reconnected", () => {});
-          window.removeEventListener("websocket:reconnect_attempt", () => {});
-          window.removeEventListener("websocket:reconnect_error", () => {});
-          window.removeEventListener("websocket:reconnect_failed", () => {});
-          window.removeEventListener("connected", () => {});
-          window.removeEventListener("disconnected", () => {});
-          window.removeEventListener("connection_error", () => {});
-          window.removeEventListener("reconnected", () => {});
-          window.removeEventListener("reconnect_failed", () => {});
+          window.removeEventListener("websocket:event", () => { });
+          window.removeEventListener("sip:event", () => { });
+          window.removeEventListener("ami:event", () => { });
+          window.removeEventListener("websocket:connected", () => { });
+          window.removeEventListener("websocket:disconnected", () => { });
+          window.removeEventListener("websocket:connection_error", () => { });
+          window.removeEventListener("websocket:reconnected", () => { });
+          window.removeEventListener("websocket:reconnect_attempt", () => { });
+          window.removeEventListener("websocket:reconnect_error", () => { });
+          window.removeEventListener("websocket:reconnect_failed", () => { });
+          window.removeEventListener("connected", () => { });
+          window.removeEventListener("disconnected", () => { });
+          window.removeEventListener("connection_error", () => { });
+          window.removeEventListener("reconnected", () => { });
+          window.removeEventListener("reconnect_failed", () => { });
         } catch (error) {
           console.warn("Event listener cleanup failed:", error);
         }
@@ -1356,17 +1502,17 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
   // Status Color Mapping
   const getStatusColor = useCallback(
     (status) =>
-      ({
-        registered: "#0ca",
-        unregistered: "#999",
-        error: "#f44",
-        READY: "#0ca",
-        NOT_READY: "#f44",
-        BUSY: "#f90",
-        BREAK: "#fc0",
-        "On Call": "#f44",
-        Ringing: "#f90",
-      }[status] || "#999"),
+    ({
+      registered: "#0ca",
+      unregistered: "#999",
+      error: "#f44",
+      READY: "#0ca",
+      NOT_READY: "#f44",
+      BUSY: "#f90",
+      BREAK: "#fc0",
+      "On Call": "#f44",
+      Ringing: "#f90",
+    }[status] || "#999"),
     []
   );
 
@@ -1386,7 +1532,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
     registered: (data) => {
       // no local SIP status; rely on contactUri fetch
     },
-    unregistered: () => {},
+    unregistered: () => { },
     registration_failed: (error) => {
       setCallFeedback(`Registration failed: ${error.cause}`);
       setTimeout(() => setCallFeedback(null), 3000);
@@ -1700,8 +1846,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
       }
     } catch (error) {
       setCallFeedback(
-        `Failed to ${callState.onHold ? "unhold" : "hold"} call: ${
-          error.message
+        `Failed to ${callState.onHold ? "unhold" : "hold"} call: ${error.message
         }`
       );
       setTimeout(() => setCallFeedback(null), 3000);
@@ -1797,8 +1942,8 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
           isIncomingCall
             ? handleAnswer
             : callState.state === "idle"
-            ? handleMakeCall
-            : handleEndCall
+              ? handleMakeCall
+              : handleEndCall
         }
         disabled={
           !isRegistered ||
@@ -1810,8 +1955,8 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
           isIncomingCall
             ? "Answer Call"
             : callState.state === "idle"
-            ? "Make Call"
-            : "End Call"
+              ? "Make Call"
+              : "End Call"
         }
         sx={{
           "&:hover": {
@@ -1979,7 +2124,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
   // Status Management - Load pause reasons
   const loadPauseReasons = useCallback(async () => {
     if (pauseReasonsLoading || pauseReasons.length > 0) return;
-    
+
     setPauseReasonsLoading(true);
     try {
       const reasons = await pauseService.getPauseReasons();
@@ -2012,9 +2157,9 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
         }
 
         console.log(`Pausing agent ${extension} with reason: ${reasonCode}`);
-        
+
         const result = await pauseService.pauseAgent(extension, reasonCode);
-        
+
         // Update local state
         setPresence("BREAK");
         setCurrentPauseReason(result.pauseReason);
@@ -2055,9 +2200,9 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
         }
 
         console.log(`Unpausing agent ${extension}`);
-        
+
         const result = await pauseService.unpauseAgent(extension);
-        
+
         // Update local state
         setPresence("READY");
         setCurrentPauseReason(null);
@@ -2202,15 +2347,15 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
   const filteredMenuItems = useMemo(() => {
     return menuItems.map((item) => {
       const requiredFeature = MENU_FEATURE_MAP[item.id];
-      
+
       // No feature requirement means always accessible
       if (!requiredFeature) {
         return { ...item, isLocked: false };
       }
-      
+
       // Check if feature is enabled in license
       const hasAccess = checkMenuItem(item.id);
-      
+
       return {
         ...item,
         isLocked: !hasAccess,
@@ -2649,7 +2794,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
     (async () => {
       try {
         await agentService.connect();
-      } catch (_) {}
+      } catch (_) { }
     })();
 
     const getCurrentExtension = () => sipService?.state?.lastConfig?.extension;
@@ -2672,7 +2817,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
           setCurrentPauseReason(null);
           setPauseStartTime(null);
         }
-      } catch (_) {}
+      } catch (_) { }
     };
 
     // Handle agent paused event (including auto-pause from server)
@@ -2696,7 +2841,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
         setPresence("READY");
         setCurrentPauseReason(null);
         setPauseStartTime(null);
-        
+
         // Show notification for auto-unpause
         if (data.autoUnpaused) {
           showNotification({
@@ -2752,7 +2897,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
           setCurrentPauseReason(null);
           setPauseStartTime(null);
         }
-      } catch (_) {}
+      } catch (_) { }
     }, remainingMs + 2000);
 
     return () => clearTimeout(timeout);
@@ -2875,7 +3020,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
     (async () => {
       try {
         await agentService.connect();
-      } catch (_) {}
+      } catch (_) { }
       // Seed list quickly from local snapshot, then refresh via API
       seedFromLocal();
       await seedFromAPI();
@@ -2908,10 +3053,10 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
     return () => {
       try {
         agentService.off("extension:status", onExt);
-      } catch (_) {}
+      } catch (_) { }
       try {
         agentService.off("statusChange", onExt);
-      } catch (_) {}
+      } catch (_) { }
       if (interval) clearInterval(interval);
     };
   }, [transferDialogOpen, isLoggingOut, canInitServices]);
@@ -3401,11 +3546,11 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
           // console.log("🔐 Connection Manager: Auth redirect in progress, stopping retries");
           return;
         }
-        
+
         const token = storageService.getAuthToken();
         if (!token) {
           authRetryCount++;
-          
+
           // CRITICAL: Check if we've exceeded max retries - redirect to login
           if (authRetryCount >= MAX_AUTH_RETRIES) {
             // Prevent multiple redirects
@@ -3413,14 +3558,14 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
               return;
             }
             window._authRedirectInProgress = true;
-            
+
             console.error(
               "❌ Connection Manager: Auth token not available after max retries. Session expired - redirecting to login."
             );
             // Set global flags to stop all services
             window.isLoggingOut = true;
             window.apiCallsBlocked = true;
-            
+
             // Clear any stale state and redirect to login
             storageService.clear();
             showNotification({
@@ -3436,7 +3581,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
             }, 500);
             return;
           }
-          
+
           // console.warn(`🔐 Connection Manager: No auth token, retry ${authRetryCount}/${MAX_AUTH_RETRIES}`);
           // Retry after another delay
           setTimeout(initializeConnectionManager, 1000);
@@ -3445,7 +3590,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
 
         // Reset retry count on success
         authRetryCount = 0;
-        
+
         // console.log("🔐 Connection Manager: Auth token confirmed, setting up services");
 
         // Set up bidirectional references to avoid circular dependencies
@@ -3760,7 +3905,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
             ),
           ]);
         }
-      } catch (_) {}
+      } catch (_) { }
 
       // Lightweight healing: only refresh agent details; no re-register, no restarts
       if (user?.extension) {
@@ -3905,7 +4050,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
       }
 
       // Disabled custom healing monitor; rely on SIP + backend
-      return () => {};
+      return () => { };
 
       // Expose direct call function
       window.handleDirectCall = handleDirectCall;
@@ -4123,7 +4268,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
             try {
               await fetchRegisteredAgentDetailsRef.current?.(user.extension);
               lastHeartbeat = Date.now();
-            } catch (_) {}
+            } catch (_) { }
           }
         }
       } catch (error) {
@@ -4170,9 +4315,8 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
         startTime: Date.now(),
       });
       showNotification({
-        message: `Consultation started with ${targetExtension}${
-          transferId ? ` (ID: ${transferId})` : ""
-        }`,
+        message: `Consultation started with ${targetExtension}${transferId ? ` (ID: ${transferId})` : ""
+          }`,
         severity: "info",
         duration: 4000,
       });
@@ -4180,9 +4324,8 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
 
     const onManagedCompleted = ({ transferId }) => {
       showNotification({
-        message: `Transfer completed${
-          transferId ? ` (ID: ${transferId})` : ""
-        }`,
+        message: `Transfer completed${transferId ? ` (ID: ${transferId})` : ""
+          }`,
         severity: "success",
         duration: 3000,
       });
@@ -4193,9 +4336,8 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
 
     const onManagedCancelled = ({ transferId }) => {
       showNotification({
-        message: `Transfer cancelled${
-          transferId ? ` (ID: ${transferId})` : ""
-        }`,
+        message: `Transfer cancelled${transferId ? ` (ID: ${transferId})` : ""
+          }`,
         severity: "info",
         duration: 3000,
       });
@@ -4255,8 +4397,8 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
           width: (isCollapsed || isStickyAppbarEnabled)
             ? "100%"
             : miniDrawerOpen
-            ? `calc(100% - 60px)`
-            : "100%",
+              ? `calc(100% - 60px)`
+              : "100%",
           transition: (isCollapsed || isStickyAppbarEnabled) ? "none" : "all 0.3s ease",
           // Add bottom border when in sticky mode to visually separate from other apps
           borderBottom: isStickyAppbarEnabled ? `${APPBAR_CONFIG.bottomPadding}px solid #1a1d20` : "none",
@@ -4306,75 +4448,75 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
             )}
 
             {/* Incoming Call Answer/Reject Buttons - Only visible in sticky mode when ringing */}
-            {(isCollapsed || isStickyAppbarEnabled) && 
-              callState.state === "ringing" && 
+            {(isCollapsed || isStickyAppbarEnabled) &&
+              callState.state === "ringing" &&
               callState.direction === "inbound" && (
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, ml: 1 }}>
-                {/* Caller ID display */}
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: "#fff",
-                    fontSize: "0.7rem",
-                    maxWidth: "80px",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    mr: 0.5,
-                  }}
-                >
-                  {callState.remoteIdentity || callState.callerid || "Incoming"}
-                </Typography>
-                {/* Animated Answer Button */}
-                <IconButton
-                  onClick={handleAnswer}
-                  size="small"
-                  sx={{
-                    backgroundColor: "#4caf50",
-                    color: "#fff",
-                    p: 0.5,
-                    animation: "dockedPulse 1.2s infinite",
-                    "@keyframes dockedPulse": {
-                      "0%": {
-                        transform: "scale(1)",
-                        boxShadow: "0 0 0 0 rgba(76, 175, 80, 0.9)",
+                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, ml: 1 }}>
+                  {/* Caller ID display */}
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: "#fff",
+                      fontSize: "0.7rem",
+                      maxWidth: "80px",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      mr: 0.5,
+                    }}
+                  >
+                    {callState.remoteIdentity || callState.callerid || "Incoming"}
+                  </Typography>
+                  {/* Animated Answer Button */}
+                  <IconButton
+                    onClick={handleAnswer}
+                    size="small"
+                    sx={{
+                      backgroundColor: "#4caf50",
+                      color: "#fff",
+                      p: 0.5,
+                      animation: "dockedPulse 1.2s infinite",
+                      "@keyframes dockedPulse": {
+                        "0%": {
+                          transform: "scale(1)",
+                          boxShadow: "0 0 0 0 rgba(76, 175, 80, 0.9)",
+                        },
+                        "50%": {
+                          transform: "scale(1.15)",
+                          boxShadow: "0 0 8px 4px rgba(76, 175, 80, 0.4)",
+                        },
+                        "100%": {
+                          transform: "scale(1)",
+                          boxShadow: "0 0 0 0 rgba(76, 175, 80, 0)",
+                        },
                       },
-                      "50%": {
-                        transform: "scale(1.15)",
-                        boxShadow: "0 0 8px 4px rgba(76, 175, 80, 0.4)",
+                      "&:hover": {
+                        backgroundColor: "#2e7d32",
+                        animation: "none",
+                        transform: "scale(1.2)",
                       },
-                      "100%": {
-                        transform: "scale(1)",
-                        boxShadow: "0 0 0 0 rgba(76, 175, 80, 0)",
+                    }}
+                  >
+                    <CallIcon fontSize="small" />
+                  </IconButton>
+                  {/* Reject Button */}
+                  <IconButton
+                    onClick={handleReject}
+                    size="small"
+                    sx={{
+                      backgroundColor: "#f44336",
+                      color: "#fff",
+                      p: 0.5,
+                      "&:hover": {
+                        backgroundColor: "#d32f2f",
+                        transform: "scale(1.1)",
                       },
-                    },
-                    "&:hover": {
-                      backgroundColor: "#2e7d32",
-                      animation: "none",
-                      transform: "scale(1.2)",
-                    },
-                  }}
-                >
-                  <CallIcon fontSize="small" />
-                </IconButton>
-                {/* Reject Button */}
-                <IconButton
-                  onClick={handleReject}
-                  size="small"
-                  sx={{
-                    backgroundColor: "#f44336",
-                    color: "#fff",
-                    p: 0.5,
-                    "&:hover": {
-                      backgroundColor: "#d32f2f",
-                      transform: "scale(1.1)",
-                    },
-                  }}
-                >
-                  <CallEndIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            )}
+                    }}
+                  >
+                    <CallEndIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              )}
 
             {/* Hamburger Menu - Hidden when docked OR in sticky mode */}
             {!isCollapsed && !isStickyAppbarEnabled && (
@@ -4394,31 +4536,64 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
 
             {/* Force Reload Button - Hidden when docked OR in sticky mode */}
             {!isCollapsed && !isStickyAppbarEnabled && (
-            <Tooltip title="Force Reload (Ctrl+Shift+R)">
-              <IconButton
-                size="small"
-                onClick={() => {
-                  // Trigger force reload - same as View > Force Reload
-                  if (window.require) {
-                    const { ipcRenderer } = window.require('electron');
-                    ipcRenderer.send('force-reload');
-                  } else {
-                    // Fallback for non-Electron environment
-                    window.location.reload();
-                  }
-                }}
-                sx={{
-                  ml: 1,
-                  color: "#fff",
-                  "&:hover": {
-                    backgroundColor: "rgba(255,255,255,0.1)",
-                    color: "#0ca",
-                  },
-                }}
-              >
-                <RefreshIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+              <Tooltip title="Reconnect Phone System (Ctrl+Shift+R)">
+                <IconButton
+                  size="small"
+                  onClick={async () => {
+                    // SIP Reconnection + WebSocket refresh to heal stale connections
+                    try {
+                      showNotification({
+                        message: "Reconnecting phone system...",
+                        severity: "info",
+                        duration: 3000,
+                      });
+
+                      console.log("🔄 Force Reload: Starting SIP reconnection...");
+                      await sipService.reconnect();
+                      console.log("✅ Force Reload: SIP reconnection completed");
+
+                      // Also refresh WebSocket connection if available
+                      if (callMonitoringService?.reinitialize) {
+                        console.log("🔄 Force Reload: Reinitializing WebSocket...");
+                        await callMonitoringService.reinitialize();
+                        console.log("✅ Force Reload: WebSocket reinitialized");
+                      }
+
+                      showNotification({
+                        message: "Phone system reconnected successfully",
+                        severity: "success",
+                        duration: 3000,
+                      });
+                    } catch (error) {
+                      console.error("❌ Force Reload: SIP reconnection failed:", error);
+                      showNotification({
+                        message: `Reconnection failed: ${error.message}. Reloading app...`,
+                        severity: "warning",
+                        duration: 3000,
+                      });
+                      // Fallback to full page reload if SIP reconnect fails
+                      setTimeout(() => {
+                        if (window.require) {
+                          const { ipcRenderer } = window.require('electron');
+                          ipcRenderer.send('force-reload');
+                        } else {
+                          window.location.reload();
+                        }
+                      }, 1500);
+                    }
+                  }}
+                  sx={{
+                    ml: 1,
+                    color: "#fff",
+                    "&:hover": {
+                      backgroundColor: "rgba(255,255,255,0.1)",
+                      color: "#0ca",
+                    },
+                  }}
+                >
+                  <RefreshIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
             )}
 
             {/* Windows Sticky Appbar Toggle - Only show in Electron on Windows, hidden when docked */}
@@ -4428,8 +4603,8 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                   isStickyAppbarEnabled
                     ? "Disable Sticky Mode (restore normal window)"
                     : isStickyAppbarNative
-                    ? "Enable Sticky Mode (dock to top, reserve screen space)"
-                    : "Enable Sticky Mode (dock to top, always on top)"
+                      ? "Enable Sticky Mode (dock to top, reserve screen space)"
+                      : "Enable Sticky Mode (dock to top, always on top)"
                 }
               >
                 <Box sx={{ display: "flex", alignItems: "center", ml: 1 }}>
@@ -4468,8 +4643,8 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                     {isStickyAppbarLoading
                       ? "..."
                       : isStickyAppbarEnabled
-                      ? "STICKY"
-                      : "Dock"}
+                        ? "STICKY"
+                        : "Dock"}
                   </Typography>
                 </Box>
               </Tooltip>
@@ -4608,93 +4783,111 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
             {(callState.state !== "idle" ||
               callFeedback ||
               isAttendedTransfer) && (
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  backgroundColor: callState.state === "ringing" 
-                    ? "rgba(255, 152, 0, 0.15)" 
-                    : "rgba(255,255,255,0.1)",
-                  borderRadius: 1,
-                  px: 1.5,
-                  py: 0.5,
-                  mr: 2,
-                  minHeight: "32px",
-                  minWidth: "180px",
-                  transition: "all 0.3s ease",
-                  ...(callState.state === "ringing" && {
-                    animation: `${ringingGlow} 1.5s ease-in-out infinite`,
-                    border: "1px solid rgba(255, 152, 0, 0.5)",
-                  }),
-                }}
-              >
-                {callState.state !== "idle" ? (
-                  <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
-                        fontWeight: 600,
-                        letterSpacing: "0.5px",
-                        fontSize: "0.875rem",
-                      }}
-                    >
-                      {callState.remoteIdentity || "Unknown"}
-                    </Typography>
-                    {callState.state === "ringing" && (
-                      <Box
-                        sx={{ 
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 0.5,
-                          animation: `${ringingPulse} 1s ease-in-out infinite`,
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    backgroundColor: callState.state === "ringing"
+                      ? "rgba(255, 152, 0, 0.15)"
+                      : "rgba(255,255,255,0.1)",
+                    borderRadius: 1,
+                    px: 1.5,
+                    py: 0.5,
+                    mr: 2,
+                    minHeight: "32px",
+                    minWidth: "180px",
+                    transition: "all 0.3s ease",
+                    ...(callState.state === "ringing" && {
+                      animation: `${ringingGlow} 1.5s ease-in-out infinite`,
+                      border: "1px solid rgba(255, 152, 0, 0.5)",
+                    }),
+                  }}
+                >
+                  {callState.state !== "idle" ? (
+                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 600,
+                          letterSpacing: "0.5px",
+                          fontSize: "0.875rem",
                         }}
                       >
-                        {callState.direction === "inbound" ? (
-                          <CallReceived sx={{ fontSize: "0.85rem", color: "success.light" }} />
-                        ) : (
-                          <CallMade sx={{ fontSize: "1rem", color: "#00b894" }} />
-                        )}
-                        <Typography
-                          variant="caption"
-                          sx={{ 
-                            color: callState.direction === "inbound" 
-                              ? "success.light" 
-                              : "warning.light",
-                            fontWeight: 500,
-                            fontSize: "0.9rem",
+                        {callState.remoteIdentity || "Unknown"}
+                      </Typography>
+                      {callState.state === "ringing" && (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                            animation: `${ringingPulse} 1s ease-in-out infinite`,
                           }}
                         >
-                          {callState.direction === "inbound"
-                            ? "Incoming..."
-                            : "Ringing..."}
-                        </Typography>
-                      </Box>
-                    )}
-                    {callState.state === "ongoing" && (
-                      <CallDuration duration={callState.duration} />
-                    )}
-                    {/* CallPopup - Hidden in sticky mode (uses inline buttons instead) */}
-                    {callState.state === "ringing" &&
-                      callState.direction === "inbound" &&
-                      !isStickyAppbarEnabled &&
-                      !isCollapsed && (
-                        <CallPopup
-                          open={true}
-                          call={callState}
-                          client={null}
-                          loading={false}
-                          onAnswer={handleAnswer}
-                          onReject={handleReject}
-                          onOpenRecord={() => {}}
-                        />
+                          {callState.direction === "inbound" ? (
+                            <CallReceived sx={{ fontSize: "0.85rem", color: "success.light" }} />
+                          ) : (
+                            <CallMade sx={{ fontSize: "1rem", color: "#00b894" }} />
+                          )}
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: callState.direction === "inbound"
+                                ? "success.light"
+                                : "warning.light",
+                              fontWeight: 500,
+                              fontSize: "0.9rem",
+                            }}
+                          >
+                            {callState.direction === "inbound"
+                              ? "Incoming..."
+                              : "Ringing..."}
+                          </Typography>
+                        </Box>
                       )}
-                  </Box>
-                ) : isAttendedTransfer ? (
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      {callState.state === "ongoing" && (
+                        <CallDuration duration={callState.duration} />
+                      )}
+                      {/* CallPopup - Hidden in sticky mode (uses inline buttons instead) */}
+                      {callState.state === "ringing" &&
+                        callState.direction === "inbound" &&
+                        !isStickyAppbarEnabled &&
+                        !isCollapsed && (
+                          <CallPopup
+                            open={true}
+                            call={callState}
+                            client={null}
+                            loading={false}
+                            onAnswer={handleAnswer}
+                            onReject={handleReject}
+                            onOpenRecord={() => { }}
+                          />
+                        )}
+                    </Box>
+                  ) : isAttendedTransfer ? (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: "success.main",
+                          display: "flex",
+                          alignItems: "center",
+                          fontSize: "0.75rem",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        Consultation with {transferTarget} - Original caller on
+                        hold
+                      </Typography>
+                      <ConsultationDuration />
+                    </Box>
+                  ) : (
                     <Typography
                       variant="body2"
                       sx={{
-                        color: "success.main",
+                        color: "error.light",
                         display: "flex",
                         alignItems: "center",
                         fontSize: "0.75rem",
@@ -4703,29 +4896,11 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                         textOverflow: "ellipsis",
                       }}
                     >
-                      Consultation with {transferTarget} - Original caller on
-                      hold
+                      {callFeedback}
                     </Typography>
-                    <ConsultationDuration />
-                  </Box>
-                ) : (
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      color: "error.light",
-                      display: "flex",
-                      alignItems: "center",
-                      fontSize: "0.75rem",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {callFeedback}
-                  </Typography>
-                )}
-              </Box>
-            )}
+                  )}
+                </Box>
+              )}
 
             {/* Dialpad functionality moved to center section to avoid duplication */}
           </Box>
@@ -4792,20 +4967,20 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                 minWidth: "180px",
               }}
             >
-              {reconnectionAttempts > 0 &&
-              reconnectionAttempts < maxReconnectionAttempts ? (
+              {/* Network Offline State - highest priority */}
+              {!isNetworkHealthy ? (
                 <>
-                  <CircularProgress
-                    size={12}
+                  <Circle
                     sx={{
                       mr: 1,
-                      color: "#f90",
+                      fontSize: 12,
+                      color: "#f44336",
                     }}
                   />
                   <Typography
                     variant="body2"
                     sx={{
-                      color: "rgba(225, 135, 0, 1)",
+                      color: "#f44336",
                       fontSize: "0.85rem",
                       fontWeight: 500,
                       whiteSpace: "nowrap",
@@ -4813,7 +4988,31 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                       textOverflow: "ellipsis",
                     }}
                   >
-                    Reconnecting...
+                    Network Offline
+                  </Typography>
+                </>
+              ) : sipRegistrationState === "Reconnecting" || sipRegistrationState === "Failed" ||
+                (reconnectionAttempts > 0 && reconnectionAttempts < maxReconnectionAttempts) ? (
+                <>
+                  <CircularProgress
+                    size={12}
+                    sx={{
+                      mr: 1,
+                      color: sipRegistrationState === "Failed" ? "#f44336" : "#f90",
+                    }}
+                  />
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: sipRegistrationState === "Failed" ? "#f44336" : "rgba(225, 135, 0, 1)",
+                      fontSize: "0.85rem",
+                      fontWeight: 500,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {sipRegistrationState === "Failed" ? "Registration Failed" : "Reconnecting..."}
                   </Typography>
                 </>
               ) : (
@@ -4906,8 +5105,8 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                 backgroundColor: registeredAgent
                   ? "#1e2326"
                   : user?.username
-                  ? "#2a1e1e"
-                  : "#4a1e1e", // Green if registered, orange if connecting, red if no user
+                    ? "#2a1e1e"
+                    : "#4a1e1e", // Green if registered, orange if connecting, red if no user
                 borderRadius: 1,
                 padding: "4px 8px",
                 maxWidth: "260px",
@@ -4915,8 +5114,8 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                 border: !user?.username
                   ? "1px solid #f44336"
                   : registeredAgent
-                  ? "1px solid #4caf50"
-                  : "1px solid #ff9800",
+                    ? "1px solid #4caf50"
+                    : "1px solid #ff9800",
                 flexShrink: 0,
               }}
             >
@@ -4926,8 +5125,8 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                   color: !user?.username
                     ? "#f44336"
                     : registeredAgent
-                    ? "#4caf50"
-                    : "#ff9800",
+                      ? "#4caf50"
+                      : "#ff9800",
                 }}
               />
               <Box sx={{ minWidth: 0 }}>
@@ -4942,8 +5141,8 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                     color: !user?.username
                       ? "#f44336"
                       : registeredAgent
-                      ? "#4caf50"
-                      : "#ff9800",
+                        ? "#4caf50"
+                        : "#ff9800",
                   }}
                 >
                   {registeredAgent ? (
@@ -4990,8 +5189,8 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                     color: !user?.username
                       ? "#f44336"
                       : registeredAgent
-                      ? "#4caf50"
-                      : "#ff9800",
+                        ? "#4caf50"
+                        : "#ff9800",
                     fontSize: "0.6rem",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
@@ -5006,6 +5205,82 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                           • WS: Live
                         </span>
                       )}
+                      {/* Auto-Answer Switch with Tooltip */}
+                      <Tooltip
+                        title={autoAnswerEnabled
+                          ? `Auto-Answer is ON: Incoming calls will be answered automatically${autoAnswerDelay > 0 ? ` after ${autoAnswerDelay} second${autoAnswerDelay !== 1 ? 's' : ''}` : ' immediately'}`
+                          : "Auto-Answer is OFF: You must manually answer calls"}
+                        arrow
+                        placement="bottom"
+                      >
+                        <Box
+                          sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            ml: 1.5,
+                            mt: -0.5,
+                            px: 0.8,
+                            py: 0.3,
+                            borderRadius: '12px',
+                            backgroundColor: autoAnswerEnabled ? 'rgba(76, 175, 80, 0.15)' : 'rgba(244, 67, 54, 0.1)',
+                            border: `1px solid ${autoAnswerEnabled ? 'rgba(76, 175, 80, 0.3)' : 'rgba(207, 16, 32, 1)'}`,
+                            transition: 'all 0.3s ease',
+                          }}
+                        >
+                          <Switch
+                            size="small"
+                            checked={autoAnswerEnabled}
+                            disabled
+                            sx={{
+                              width: 28,
+                              height: 16,
+                              padding: 0,
+                              '& .MuiSwitch-thumb': {
+                                width: 12,
+                                height: 12,
+                                boxShadow: autoAnswerEnabled
+                                  ? '0 0 6px rgba(76, 175, 80, 0.8)'
+                                  : '0 0 4px rgba(201, 0, 0, 0.6)',
+                                backgroundColor: autoAnswerEnabled ? '#4caf50' : '#f44336',
+                              },
+                              '& .MuiSwitch-switchBase': {
+                                padding: '2px',
+                                '&.Mui-checked': {
+                                  transform: 'translateX(12px)',
+                                  color: '#4caf50',
+                                  '& + .MuiSwitch-track': {
+                                    backgroundColor: '#4caf50',
+                                    opacity: 0.5,
+                                  },
+                                },
+                                '&.Mui-disabled': {
+                                  '& .MuiSwitch-thumb': {
+                                    backgroundColor: autoAnswerEnabled ? '#4caf50' : '#f44336',
+                                  },
+                                },
+                              },
+                              '& .MuiSwitch-track': {
+                                borderRadius: 8,
+                                backgroundColor: autoAnswerEnabled ? '#4caf50' : '#f44336',
+                                opacity: autoAnswerEnabled ? 0.3 : 0.25,
+                              },
+                            }}
+                          />
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              ml: 0.5,
+                              fontSize: '0.65rem',
+                              fontWeight: 600,
+                              letterSpacing: '0.3px',
+                              textTransform: 'capitalize',
+                              color: autoAnswerEnabled ? '#4caf50' : '#f44336',
+                            }}
+                          >
+                            Auto
+                          </Typography>
+                        </Box>
+                      </Tooltip>
                     </>
                   ) : (
                     "❌ Not Registered 🛑"
@@ -5051,9 +5326,9 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
 
         <List sx={{ p: 1 }}>
           {filteredMenuItems.map((item) => (
-            <Tooltip 
-              key={item.id} 
-              title={item.isLocked ? item.lockedReason : item.text} 
+            <Tooltip
+              key={item.id}
+              title={item.isLocked ? item.lockedReason : item.text}
               placement="right"
             >
               <ListItemButton
@@ -5079,7 +5354,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                     color:
                       activeSection === item.id
                         ? "#fff"
-                        : item.isLocked 
+                        : item.isLocked
                           ? "rgba(255,255,255,0.4)"
                           : "rgba(255,255,255,0.7)",
                     minWidth: "auto",
@@ -5089,14 +5364,14 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                 >
                   {item.icon}
                   {item.isLocked && (
-                    <LockIcon 
-                      sx={{ 
-                        position: "absolute", 
-                        bottom: -4, 
-                        right: -4, 
+                    <LockIcon
+                      sx={{
+                        position: "absolute",
+                        bottom: -4,
+                        right: -4,
                         fontSize: 12,
                         color: "rgba(255,255,255,0.6)",
-                      }} 
+                      }}
                     />
                   )}
                 </ListItemIcon>
@@ -5173,14 +5448,14 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                   >
                     {item.icon}
                     {item.isLocked && (
-                      <LockIcon 
-                        sx={{ 
-                          position: "absolute", 
-                          bottom: -2, 
-                          right: 8, 
+                      <LockIcon
+                        sx={{
+                          position: "absolute",
+                          bottom: -2,
+                          right: 8,
                           fontSize: 14,
                           color: "rgba(255,255,255,0.6)",
-                        }} 
+                        }}
                       />
                     )}
                   </ListItemIcon>

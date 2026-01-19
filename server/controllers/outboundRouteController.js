@@ -5,6 +5,10 @@ import {
   OutboundRouteApplication,
 } from "../models/outboundRouteModel.js";
 import VoiceExtension from "../models/voiceExtensionModel.js";
+
+// Recording base directory for MixMonitor (same as usersController)
+const RECORDING_BASE_DIR =
+  process.env.RECORDING_BASE_DIR || "/var/spool/asterisk/monitor";
 // import { updateDialplanConfig } from "../utils/asteriskConfigWriter.js";
 
 // Helper function to generate voice extensions from applications
@@ -52,7 +56,12 @@ export const createOutboundRoute = async (req, res) => {
     // Save the route to the database
     const route = await OutboundRoute.create(mainRouteData, { transaction });
 
-    // Create default CDR extensions
+    // Recording path template for outbound calls
+    const recordingDir = `${RECORDING_BASE_DIR}/\${STRFTIME(\${EPOCH},,%Y)}/\${STRFTIME(\${EPOCH},,%m)}/\${STRFTIME(\${EPOCH},,%d)}`;
+    const enableRecording = mainRouteData.enableRecording !== false; // Default to true
+    const recordingFormat = mainRouteData.recordingFormat || "wav";
+
+    // Create default CDR extensions with outbound recording support
     const defaultExtensions = [
       {
         context: mainRouteData.context,
@@ -76,13 +85,63 @@ export const createOutboundRoute = async (req, res) => {
         isGenerated: true,
         description: "Set CDR destination",
       },
-      {
-        context: mainRouteData.context,
-        exten: "h",
-        priority: 1,
-        app: "Hangup",
-      },
     ];
+
+    // Add recording entries if enabled for this route
+    if (enableRecording && recordingFormat !== "inactive") {
+      defaultExtensions.push(
+        // Create recording directory
+        {
+          context: mainRouteData.context,
+          exten: mainRouteData.phoneNumber,
+          priority: 3,
+          app: "System",
+          appdata: `mkdir -p "${recordingDir}"`,
+          type: "outbound",
+          outboundRouteId: route.id,
+          isGenerated: true,
+          description: "Create recording directory",
+          record: true,
+          recordingFormat: recordingFormat,
+        },
+        // Start MixMonitor for outbound recording
+        {
+          context: mainRouteData.context,
+          exten: mainRouteData.phoneNumber,
+          priority: 4,
+          app: "MixMonitor",
+          appdata: `${recordingDir}/outbound-\${CALLERID(num)}-\${UNIQUEID}.${recordingFormat},bW`,
+          type: "outbound",
+          outboundRouteId: route.id,
+          isGenerated: true,
+          description: "Start outbound call recording",
+          record: true,
+          recordingFormat: recordingFormat,
+        },
+        // Set CDR recording file
+        {
+          context: mainRouteData.context,
+          exten: mainRouteData.phoneNumber,
+          priority: 5,
+          app: "Set",
+          appdata: `CDR(recordingfile)=${recordingDir}/outbound-\${CALLERID(num)}-\${UNIQUEID}.${recordingFormat}`,
+          type: "outbound",
+          outboundRouteId: route.id,
+          isGenerated: true,
+          description: "Set CDR recording file path",
+          record: true,
+          recordingFormat: recordingFormat,
+        }
+      );
+    }
+
+    // Add hangup handler
+    defaultExtensions.push({
+      context: mainRouteData.context,
+      exten: "h",
+      priority: 1,
+      app: "Hangup",
+    });
 
     await VoiceExtension.bulkCreate(defaultExtensions, { transaction });
 
@@ -229,11 +288,22 @@ export const getOutboundRouteById = async (req, res) => {
       (ext) => ext.isGenerated
     );
 
+    // Get ALL dialplan entries for this route's context and exten (sorted by priority)
+    const allDialplanEntries = await VoiceExtension.findAll({
+      where: {
+        type: 'outbound',
+        exten: route.phoneNumber,
+        context: route.context,
+      },
+      order: [['priority', 'ASC']],
+    });
+
     // Create a new response object with separated extensions
     const responseRoute = {
       ...route.toJSON(),
       voiceExtensions: manualExtensions, // Keep only manual extensions in the main array
       generatedExtensions: generatedExtensions, // Add generated extensions separately
+      dialplanEntries: allDialplanEntries, // All dialplan entries for display
     };
 
     res.status(200).json({

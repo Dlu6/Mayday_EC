@@ -8,10 +8,10 @@ import {
   Paper,
   LinearProgress,
   Stack,
-  Chip,
   IconButton,
   Tooltip,
   Badge,
+  Chip,
 } from "@mui/material";
 import TalkIcon from "@mui/icons-material/Forum";
 import AnswerIcon from "@mui/icons-material/QuestionAnswer";
@@ -21,62 +21,45 @@ import PhoneForwardedIcon from "@mui/icons-material/PhoneForwarded";
 import TimerIcon from "@mui/icons-material/Timer";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import TrendingUpIcon from "@mui/icons-material/TrendingUp";
-import TrendingDownIcon from "@mui/icons-material/TrendingDown";
-import TrendingFlatIcon from "@mui/icons-material/TrendingFlat";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import SpeedIcon from "@mui/icons-material/Speed";
 import ShowChartIcon from "@mui/icons-material/ShowChart";
-import { useState, useEffect } from "react";
+import TrendingDownIcon from "@mui/icons-material/TrendingDown";
+import { useState, useEffect, useRef } from "react";
 import callStatsService from "../services/callStatsService";
 import AgentAvailability from "./AgentAvailability";
 import { connectWebSocket } from "../services/websocketService";
 
-const StatCard = ({ title, value, icon, color, trend, isLoading }) => {
-  const getTrendIcon = (trend) => {
-    if (trend > 0) return <TrendingUpIcon sx={{ fontSize: 16 }} />;
-    if (trend < 0) return <TrendingDownIcon sx={{ fontSize: 16 }} />;
-    return <TrendingFlatIcon sx={{ fontSize: 16 }} />;
-  };
-
-  const getTrendColor = (trend) => {
-    if (trend > 0) return "success.main";
-    if (trend < 0) return "error.main";
-    return "text.secondary";
-  };
-
+const StatCard = ({ title, value, icon, color, tooltip, isLoading }) => {
   return (
-    <Card
-      sx={{
-        p: 0,
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        position: "relative",
-        overflow: "hidden",
-        borderRadius: 3,
-        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.95)",
-        border: "1px solid rgba(0,0,0,0.06)",
-        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        "&:hover": {
-          transform: "translateY(-4px)",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-          borderColor: alpha(color, 0.3),
-        },
-      }}
-    >
-      {/* Header with colored background */}
-      <Box
+    <Tooltip title={tooltip || ""} arrow placement="top">
+      <Card
         sx={{
-          p: 2.5,
-          backgroundColor: alpha(color, 0.08),
-          borderBottom: `1px solid ${alpha(color, 0.1)}`,
+          p: 0,
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: 3,
+          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.95)",
+          border: "1px solid rgba(0,0,0,0.06)",
+          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          cursor: "help",
+          "&:hover": {
+            transform: "translateY(-4px)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+            borderColor: alpha(color, 0.3),
+          },
         }}
       >
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
+        {/* Header with colored background */}
+        <Box
+          sx={{
+            p: 2.5,
+            backgroundColor: alpha(color, 0.08),
+            borderBottom: `1px solid ${alpha(color, 0.1)}`,
+          }}
         >
           <Box
             sx={{
@@ -85,73 +68,56 @@ const StatCard = ({ title, value, icon, color, trend, isLoading }) => {
               backgroundColor: "white",
               color: color,
               boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
-              display: "flex",
+              display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
             {icon}
           </Box>
+        </Box>
 
-          {trend !== null && (
-            <Chip
-              icon={getTrendIcon(trend)}
-              label={`${Math.abs(trend)}%`}
-              size="small"
-              sx={{
-                backgroundColor: alpha(getTrendColor(trend), 0.1),
-                color: getTrendColor(trend),
-                fontWeight: 600,
-                fontSize: "0.75rem",
-                "& .MuiChip-icon": {
-                  color: getTrendColor(trend),
-                },
-              }}
-            />
-          )}
-        </Stack>
-      </Box>
+        {/* Content */}
+        <Box sx={{ p: 2.5, flex: 1, display: "flex", flexDirection: "column" }}>
+          <Typography
+            variant="h3"
+            sx={{
+              mb: 1,
+              fontWeight: 700,
+              color: "text.primary",
+              letterSpacing: "-0.02em",
+              transition: "all 0.3s ease",
+              opacity: isLoading ? 0.7 : 1,
+            }}
+          >
+            {value}
+          </Typography>
+          <Typography
+            variant="body2"
+            sx={{
+              color: "text.secondary",
+              textTransform: "uppercase",
+              fontWeight: 600,
+              letterSpacing: "0.5px",
+              fontSize: "0.75rem",
+              transition: "all 0.3s ease",
+              opacity: isLoading ? 0.7 : 1,
+            }}
+          >
+            {title}
+          </Typography>
+        </Box>
 
-      {/* Content */}
-      <Box sx={{ p: 2.5, flex: 1, display: "flex", flexDirection: "column" }}>
-        <Typography
-          variant="h3"
+        {/* Bottom accent */}
+        <Box
           sx={{
-            mb: 1,
-            fontWeight: 700,
-            color: "text.primary",
-            letterSpacing: "-0.02em",
-            transition: "all 0.3s ease",
-            opacity: isLoading ? 0.7 : 1,
+            height: 4,
+            backgroundColor: color,
+            opacity: 0.8,
           }}
-        >
-          {value}
-        </Typography>
-        <Typography
-          variant="body2"
-          sx={{
-            color: "text.secondary",
-            textTransform: "uppercase",
-            fontWeight: 600,
-            letterSpacing: "0.5px",
-            fontSize: "0.75rem",
-            transition: "all 0.3s ease",
-            opacity: isLoading ? 0.7 : 1,
-          }}
-        >
-          {title}
-        </Typography>
-      </Box>
-
-      {/* Bottom accent */}
-      <Box
-        sx={{
-          height: 4,
-          backgroundColor: color,
-          opacity: 0.8,
-        }}
-      />
-    </Card>
+        />
+      </Card>
+    </Tooltip>
   );
 };
 
@@ -183,12 +149,6 @@ const formatWaitTime = (seconds) => {
   }
 };
 
-// Helper function to calculate trend percentage
-const calculateTrend = (current, previous) => {
-  if (!previous || previous === 0) return null;
-  const trend = ((current - previous) / previous) * 100;
-  return Math.round(trend);
-};
 
 const Dashboard = () => {
   const theme = useTheme();
@@ -196,210 +156,175 @@ const Dashboard = () => {
   const [stats, setStats] = useState([]);
   const [queueActivity, setQueueActivity] = useState({ serviceLevel: 0 });
   const [abandonRateStats, setAbandonRateStats] = useState(null);
-  const [previousStats, setPreviousStats] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isConnected, setIsConnected] = useState(false);
 
-  // Initialize WebSocket connection for Live status
+  // Reference to socket for refresh functionality
+  const socketRef = useRef(null);
+
+  // Helper to format stats array for display
+  const formatStatsForDisplay = (callStats) => {
+    return [
+      {
+        title: "WAITING",
+        value: callStats.waiting || 0,
+        icon: <PhoneCallbackIcon />,
+        color: theme.palette.info.main,
+        tooltip: "Number of callers currently waiting in queue to be connected to an agent",
+      },
+      {
+        title: "TALKING",
+        value: callStats.talking || 0,
+        icon: <TalkIcon />,
+        color: theme.palette.warning.main,
+        tooltip: "Number of calls currently being handled by agents",
+      },
+      {
+        title: "ANSWERED",
+        value: callStats.answered || 0,
+        icon: <AnswerIcon />,
+        color: theme.palette.success.main,
+        tooltip: "Total number of calls answered by agents today",
+      },
+      {
+        title: "ABANDONED",
+        value: callStats.abandoned || 0,
+        icon: <PhoneMissedIcon />,
+        color: theme.palette.error.main,
+        tooltip: "Total number of calls where the caller hung up before being answered today",
+      },
+      {
+        title: "TOTAL OFFERED",
+        value: callStats.totalOffered || 0,
+        icon: <PhoneForwardedIcon />,
+        color: theme.palette.primary.main,
+        tooltip: "Total number of calls received today (Answered + Abandoned)",
+      },
+      {
+        title: "AVERAGE HOLD TIME",
+        value: formatTime(callStats.avgHoldTime),
+        icon: <TimerIcon />,
+        color: "#6b7280",
+        tooltip: "Average time callers waited in queue before being answered today",
+      },
+    ];
+  };
+
+  // Initialize WebSocket connection and subscribe to real-time callStats
   useEffect(() => {
     const socket = connectWebSocket();
     if (!socket) return;
 
+    // Store socket reference for refresh functionality
+    socketRef.current = socket;
     setIsConnected(socket.connected);
 
-    const onConnect = () => setIsConnected(true);
+    const onConnect = () => {
+      setIsConnected(true);
+      // Subscribe to call stats updates like the Electron softphone does
+      socket.emit("subscribeToCallStats");
+    };
     const onDisconnect = () => setIsConnected(false);
+
+    // Handle real-time callStats updates from server
+    const onCallStats = (data) => {
+      // Extract waiting/talking from activeCallsList if available
+      const activeCallsList = data.activeCallsList || [];
+      const waiting = activeCallsList.filter(
+        (call) => call.status === "waiting" || call.status === "queued" || call.status === "ringing"
+      ).length;
+      const talking = activeCallsList.filter(
+        (call) => call.status === "answered" || call.status === "in-progress"
+      ).length;
+
+      // Build callStats object from real-time data
+      const callStats = {
+        waiting: waiting,
+        talking: talking,
+        answered: data.totalCalls - data.abandonedCalls || 0,
+        abandoned: data.abandonedCalls || 0,
+        totalOffered: data.totalCalls || 0,
+        avgHoldTime: 0, // Would need to be calculated from queue data
+      };
+
+      // Update stats for display
+      const formattedStats = formatStatsForDisplay(callStats);
+      setStats(formattedStats);
+
+      // Update queue activity from real-time data
+      if (data.queueStatus && data.queueStatus.length > 0) {
+        const queue = data.queueStatus[0];
+        setQueueActivity({
+          serviceLevel: queue.sla || 0,
+          waitTime: 0,
+          abandonRate: queue.abandonRate || 0,
+        });
+      }
+
+      setLastUpdated(new Date());
+      setIsLoading(false);
+    };
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
+    socket.on("callStats", onCallStats);
+
+    // If already connected, subscribe immediately
+    if (socket.connected) {
+      socket.emit("subscribeToCallStats");
+    }
 
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
+      socket.off("callStats", onCallStats);
     };
-  }, []);
+  }, [theme]);
 
-  // Fetch call statistics
+  // Initial fetch for queue activity and abandon rate (one-time, not polling)
+  // Call stats come exclusively from WebSocket to prevent flickering
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
+    const fetchInitialData = async () => {
       try {
-        // Fetch current stats
-        const callStats = await callStatsService.getCallStats();
         const queueData = await callStatsService.getQueueActivity();
         const abandonStats = await callStatsService.getAbandonRateStats();
-
-        if (callStats) {
-          // Store previous stats for trend calculation
-          setPreviousStats(
-            stats.length > 0
-              ? {
-                  waiting: stats[0]?.value || 0,
-                  talking: stats[1]?.value || 0,
-                  answered: stats[2]?.value || 0,
-                  abandoned: stats[3]?.value || 0,
-                  totalOffered: stats[4]?.value || 0,
-                  avgHoldTime: stats[5]?.value || "00:00",
-                }
-              : null
-          );
-
-          // Format the stats for display
-          const formattedStats = [
-            {
-              title: "WAITING",
-              value: callStats.waiting || 0,
-              icon: <PhoneCallbackIcon />,
-              color: theme.palette.info.main,
-              trend: previousStats
-                ? calculateTrend(callStats.waiting, previousStats.waiting)
-                : null,
-            },
-            {
-              title: "TALKING",
-              value: callStats.talking || 0,
-              icon: <TalkIcon />,
-              color: theme.palette.warning.main,
-              trend: previousStats
-                ? calculateTrend(callStats.talking, previousStats.talking)
-                : null,
-            },
-            {
-              title: "ANSWERED",
-              value: callStats.answered || 0,
-              icon: <AnswerIcon />,
-              color: theme.palette.success.main,
-              trend: previousStats
-                ? calculateTrend(callStats.answered, previousStats.answered)
-                : null,
-            },
-            {
-              title: "ABANDONED",
-              value: callStats.abandoned || 0,
-              icon: <PhoneMissedIcon />,
-              color: theme.palette.error.main,
-              trend: previousStats
-                ? calculateTrend(callStats.abandoned, previousStats.abandoned)
-                : null,
-            },
-            {
-              title: "TOTAL OFFERED",
-              value: callStats.totalOffered || 0,
-              icon: <PhoneForwardedIcon />,
-              color: theme.palette.primary.main,
-              trend: previousStats
-                ? calculateTrend(
-                    callStats.totalOffered,
-                    previousStats.totalOffered
-                  )
-                : null,
-            },
-            {
-              title: "AVERAGE HOLD TIME",
-              value: formatTime(callStats.avgHoldTime),
-              icon: <TimerIcon />,
-              color: "#6b7280",
-              trend: null, // No trend for time values
-            },
-          ];
-
-          setStats(formattedStats);
-          setQueueActivity(queueData);
-          setAbandonRateStats(abandonStats);
-          setLastUpdated(new Date());
-        }
+        setQueueActivity(queueData);
+        setAbandonRateStats(abandonStats);
       } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setIsLoading(false);
+        console.error("Error fetching initial dashboard data:", error);
       }
     };
 
-    fetchData();
-
-    // Set up polling every 30 seconds
-    const intervalId = setInterval(fetchData, 30000);
-
-    // Clean up interval on component unmount
-    return () => clearInterval(intervalId);
+    fetchInitialData();
+    // No polling - WebSocket is the single source of truth for stats
   }, []);
 
-  const handleRefresh = async () => {
+  // Refresh handler - triggers WebSocket re-subscription for fresh data
+  const handleRefresh = () => {
+    if (!socketRef.current) {
+      console.warn("Cannot refresh: WebSocket not connected");
+      return;
+    }
+
     setIsLoading(true);
-    try {
-      const callStats = await callStatsService.getCallStats();
-      const queueData = await callStatsService.getQueueActivity();
-      const abandonStats = await callStatsService.getAbandonRateStats();
 
-      if (callStats) {
-        const formattedStats = [
-          {
-            title: "WAITING",
-            value: callStats.waiting || 0,
-            icon: <PhoneCallbackIcon />,
-            color: theme.palette.info.main,
-            trend: previousStats
-              ? calculateTrend(callStats.waiting, previousStats.waiting)
-              : null,
-          },
-          {
-            title: "TALKING",
-            value: callStats.talking || 0,
-            icon: <TalkIcon />,
-            color: theme.palette.warning.main,
-            trend: previousStats
-              ? calculateTrend(callStats.talking, previousStats.talking)
-              : null,
-          },
-          {
-            title: "ANSWERED",
-            value: callStats.answered || 0,
-            icon: <AnswerIcon />,
-            color: theme.palette.success.main,
-            trend: previousStats
-              ? calculateTrend(callStats.answered, previousStats.answered)
-              : null,
-          },
-          {
-            title: "ABANDONED",
-            value: callStats.abandoned || 0,
-            icon: <PhoneMissedIcon />,
-            color: theme.palette.error.main,
-            trend: previousStats
-              ? calculateTrend(callStats.abandoned, previousStats.abandoned)
-              : null,
-          },
-          {
-            title: "TOTAL OFFERED",
-            value: callStats.totalOffered || 0,
-            icon: <PhoneForwardedIcon />,
-            color: theme.palette.primary.main,
-            trend: previousStats
-              ? calculateTrend(
-                  callStats.totalOffered,
-                  previousStats.totalOffered
-                )
-              : null,
-          },
-          {
-            title: "AVERAGE HOLD TIME",
-            value: formatTime(callStats.avgHoldTime),
-            icon: <TimerIcon />,
-            color: "#6b7280",
-            trend: null,
-          },
-        ];
+    // Re-subscribe to get fresh stats from server
+    socketRef.current.emit("subscribeToCallStats");
 
-        setStats(formattedStats);
+    // Also refresh queue activity and abandon stats
+    (async () => {
+      try {
+        const queueData = await callStatsService.getQueueActivity();
+        const abandonStats = await callStatsService.getAbandonRateStats();
         setQueueActivity(queueData);
         setAbandonRateStats(abandonStats);
-        setLastUpdated(new Date());
+      } catch (error) {
+        console.error("Error refreshing queue data:", error);
       }
-    } catch (error) {
-      console.error("Error refreshing dashboard data:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    })();
+
+    // Loading will be set to false when callStats event arrives
+    setTimeout(() => setIsLoading(false), 1000);
   };
 
   return (
@@ -457,14 +382,14 @@ const Dashboard = () => {
               </Typography>
               <Badge
                 variant="dot"
-                sx={{ 
+                sx={{
                   mt: 0.5,
-                  "& .MuiBadge-badge": { 
-                    width: 12, 
-                    height: 12, 
+                  "& .MuiBadge-badge": {
+                    width: 12,
+                    height: 12,
                     borderRadius: "50%",
                     backgroundColor: isConnected ? "#00ff04ff" : undefined
-                  } 
+                  }
                 }}
                 color={isConnected ? "success" : "error"}
               >
@@ -473,10 +398,10 @@ const Dashboard = () => {
                   size="small"
                   variant="filled"
                   sx={{
-                    backgroundColor: isLoading 
+                    backgroundColor: isLoading
                       ? alpha(theme.palette.warning.main, 0.1)
                       : isConnected ? "#00ff04ff" : undefined,
-                    color: isLoading 
+                    color: isLoading
                       ? theme.palette.warning.main
                       : isConnected ? "#000" : undefined,
                     fontWeight: 500

@@ -226,12 +226,26 @@ class WebSocketService extends EventEmitter {
       return;
     }
 
+    // Handle user settings updates (for real-time auto-answer sync)
+    if (data.type === "user:settings_updated") {
+      console.log("[WebSocket] User settings update received:", data);
+      const currentData = JSON.parse(localStorage.getItem("userData") || "{}");
+      if (currentData.user && data.settings) {
+        // Merge the updated settings
+        currentData.user = { ...currentData.user, ...data.settings };
+        localStorage.setItem("userData", JSON.stringify(currentData));
+        console.log("[WebSocket] User settings updated in storage:", currentData.user);
+        this.emit("user:settings_updated", data.settings);
+      }
+      return;
+    }
+
     // Emit message event
     this.emit("message", data);
   }
 
   // Authenticate with server (handled at connect via auth headers)
-  authenticate() {}
+  authenticate() { }
 
   // Subscribe to services
   subscribeToServices() {
@@ -512,8 +526,8 @@ try {
   logoutManager.registerService("websocketService", async () => {
     try {
       websocketService.destroy();
-    } catch (_) {}
+    } catch (_) { }
   });
-} catch (_) {}
+} catch (_) { }
 
 export default websocketService;

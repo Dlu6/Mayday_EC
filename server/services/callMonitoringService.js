@@ -683,7 +683,7 @@ const handleHangup = async (event) => {
     const cause = event.Cause || event.cause;
     const isNormalClearing = cause === "16";
     const disposition = isNormalClearing ? "NORMAL" : "NO ANSWER";
-    
+
     // Debug: Log the disposition decision for trunk channels
     const dcontext = event.Context || event.context;
     if (dcontext === "from-voip-provider") {
@@ -700,17 +700,30 @@ const handleHangup = async (event) => {
       // The CDR might have the DID as src, but ConnectedLineNum has the actual caller
       const connectedLineNum = event.ConnectedLineNum || event.connectedlinenum;
       const context = event.Context || event.context || cdrRecord.dcontext;
-      
-      // Build update object
+
+      // CRITICAL FIX: Preserve Asterisk's authoritative values
+      // Only update disposition if not already set to ANSWERED
+      // (Asterisk's Cdr event has the authoritative disposition)
+      const finalDisposition = (cdrRecord.disposition === "ANSWERED")
+        ? "ANSWERED"
+        : disposition;
+
+      // Only recalculate billsec if record doesn't already have a value
+      // (Asterisk's Cdr event has the authoritative billsec)
+      const finalBillsec = cdrRecord.billsec > 0
+        ? cdrRecord.billsec
+        : cdrRecord.answer
+          ? Math.ceil((endTime - new Date(cdrRecord.answer)) / 1000)
+          : 0;
+
+      // Build update object with preserved values
       const updateData = {
         end: endTime,
-        disposition: disposition,
+        disposition: finalDisposition,
         duration: durationSeconds,
-        billsec: cdrRecord.answer
-          ? Math.ceil((endTime - new Date(cdrRecord.answer)) / 1000)
-          : 0,
+        billsec: finalBillsec,
       };
-      
+
       // If this is an inbound call to an extension (from-internal context) and
       // ConnectedLineNum has a valid external number, update src and clid
       if (context === "from-internal" && connectedLineNum && connectedLineNum.length >= 7 && /^\d+$/.test(connectedLineNum)) {
@@ -727,7 +740,7 @@ const handleHangup = async (event) => {
       log.success(
         `CDR record updated for call: ${uniqueid}, disposition: ${disposition}`
       );
-      
+
       // Emit call history update to notify clients
       // Fetch the updated record and format it for the client
       const updatedRecord = await CDR.findOne({ where: { uniqueid: uniqueid } });
@@ -736,7 +749,7 @@ const handleHangup = async (event) => {
         const channel = event.Channel || event.channel || "";
         const extensionMatch = channel.match(/PJSIP\/(\d+)-/);
         const extension = extensionMatch ? extensionMatch[1] : null;
-        
+
         if (extension) {
           const formattedRecord = formatCdrRecord(updatedRecord, extension);
           socketService.emitCallHistoryUpdate(formattedRecord);
@@ -760,7 +773,7 @@ const handleHangup = async (event) => {
       const connectedLineNum = event.ConnectedLineNum || event.connectedlinenum;
       const callerIdNum = event.CallerIDNum || event.calleridnum;
       const context = callData.dcontext || event.Context || event.context || "from-voip-provider";
-      
+
       // Determine the actual caller number for inbound calls
       // If context is from-internal and ConnectedLineNum looks like an external number, use it
       let actualCaller = callData.src || callerIdNum || "unknown";
@@ -770,9 +783,31 @@ const handleHangup = async (event) => {
       }
 
       // Determine call type based on channel and context
+      // Determine call type based on phone number patterns (Robust Match)
+      const src = (actualCaller || "").toString().trim();
+      const dst = (callData.dst || event.Exten || event.exten || "").toString().trim();
+
+      // Clean numbers (remove non-digits for length check)
+      const srcClean = src.replace(/\D/g, '');
+      const dstClean = dst.replace(/\D/g, '');
+
+      const srcIsExternal = srcClean.length >= 7;
+      const dstIsExternal = dstClean.length >= 7;
+      const srcIsExtension = srcClean.length >= 3 && srcClean.length <= 4;
+      const dstIsExtension = dstClean.length >= 3 && dstClean.length <= 4;
+
+      let callType = "inbound"; // default
+      if (srcIsExternal && dstIsExtension) {
+        callType = "inbound";
+      } else if (srcIsExtension && dstIsExternal) {
+        callType = "outbound";
+      } else if (srcIsExtension && dstIsExtension) {
+        callType = "internal";
+      }
+
       const channel = callData.channel || event.Channel || event.channel || "";
-      const isOutbound = channel.match(/^PJSIP\/\d{4}-/) && context === "from-internal";
-      const callType = isOutbound ? "outbound" : "inbound";
+      // const isOutbound = channel.match(/^PJSIP\/\d{4}-/) && context === "from-internal";
+      // const callType = isOutbound ? "outbound" : "inbound";
 
       await CDR.create({
         uniqueid: uniqueid,
@@ -1085,15 +1120,15 @@ function processUserResultsWithAMI(users, extensionStatuses) {
       lastSeen: lastSeen,
       currentCall: currentCall
         ? {
-            uniqueId: currentCall.uniqueId || currentCall.uniqueid,
-            callerId:
-              currentCall.callerId ||
-              currentCall.callerid ||
-              currentCall.src ||
-              null,
-            startTime: currentCall.startTime,
-            duration: currentCall.duration || 0,
-          }
+          uniqueId: currentCall.uniqueId || currentCall.uniqueid,
+          callerId:
+            currentCall.callerId ||
+            currentCall.callerid ||
+            currentCall.src ||
+            null,
+          startTime: currentCall.startTime,
+          duration: currentCall.duration || 0,
+        }
         : null,
       paused: user.paused || false,
       // Add AMI-specific data for debugging
@@ -1146,12 +1181,12 @@ const handleQueueMember = async (event) => {
     memberStatus === "1"
       ? "Not in use"
       : memberStatus === "2"
-      ? "In use"
-      : memberStatus === "3"
-      ? "Busy"
-      : memberStatus === "6"
-      ? "Unavailable"
-      : "Unknown";
+        ? "In use"
+        : memberStatus === "3"
+          ? "Busy"
+          : memberStatus === "6"
+            ? "Unavailable"
+            : "Unknown";
 
   const memberData = {
     name: memberName,
@@ -1227,16 +1262,40 @@ const handleCdr = async (event) => {
 
     // Also save to database for persistence
     try {
-      // Determine call type based on channel
-      const channel = event.channel || "";
-      const isOutbound = channel.match(/^PJSIP\/\d{4}-/);
-      const callType = isOutbound ? "outbound" : "inbound";
+      // Determine call type based on phone number patterns
+      // External numbers are typically 7+ digits, internal extensions are 3-4 digits
+      const src = (event.src || "").toString().trim();
+      const dst = (event.dst || "").toString().trim();
+
+      // Clean numbers (remove non-digits for length check)
+      const srcClean = src.replace(/\D/g, '');
+      const dstClean = dst.replace(/\D/g, '');
+
+      const srcIsExternal = srcClean.length >= 7;
+      const dstIsExternal = dstClean.length >= 7;
+      const srcIsExtension = srcClean.length >= 3 && srcClean.length <= 4;
+      const dstIsExtension = dstClean.length >= 3 && dstClean.length <= 4;
+
+      // Debug logging for direction detection
+      // console.log(`Direction check: src=${src}(${srcClean}), dst=${dst}(${dstClean})`);
+
+      // Inbound: external src calling internal dst
+      // Outbound: internal src calling external dst
+      let callType = "inbound"; // default
+      if (srcIsExternal && dstIsExtension) {
+        callType = "inbound";
+      } else if (srcIsExtension && dstIsExternal) {
+        callType = "outbound";
+      } else if (srcIsExtension && dstIsExtension) {
+        // Internal call - use dcontext to determine from whose perspective
+        callType = "internal";
+      }
 
       await CDR.create({
         uniqueid: event.uniqueid,
         calldate: new Date(),
-        src: event.src,
-        dst: event.dst,
+        src: src, // save original
+        dst: dst, // save original
         disposition: event.disposition,
         duration: event.duration || 0,
         billsec: event.billsec || 0,

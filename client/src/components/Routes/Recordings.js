@@ -46,9 +46,9 @@ import { LocalizationProvider, DatePicker } from "@mui/x-date-pickers";
 import { toast } from "react-toastify";
 import {
   fetchRecordingDates,
-  fetchRecordings,
+  fetchRecordingsByRange,
   rateRecording,
-  setSelectedDate,
+  setDateRange,
 } from "../../features/recordings/recordingsSlice";
 
 // Enhanced Audio Player Component (Adapted from AudioManager.js)
@@ -252,7 +252,7 @@ const EnhancedAudioPlayer = ({ src, title, onClose }) => {
 const Recordings = () => {
   // Redux
   const dispatch = useDispatch();
-  const { dates, recordings, selectedDate, loading, error } = useSelector(
+  const { recordings, startDate, endDate, loading, error } = useSelector(
     (state) => state.recordings
   );
 
@@ -275,14 +275,14 @@ const Recordings = () => {
     dispatch(fetchRecordingDates());
   }, [dispatch]);
 
-  // Effect to load recordings when date changes
+  // Effect to load recordings when date range changes
   useEffect(() => {
-    if (selectedDate) {
-      dispatch(fetchRecordings(selectedDate));
-      setActivePlayerSrc(null); // Close player when date changes
+    if (startDate && endDate) {
+      dispatch(fetchRecordingsByRange({ startDate, endDate }));
+      setActivePlayerSrc(null);
       setActivePlayerTitle("");
     }
-  }, [selectedDate, dispatch]);
+  }, [startDate, endDate, dispatch]);
 
   // Effect to show error notifications
   useEffect(() => {
@@ -291,12 +291,30 @@ const Recordings = () => {
     }
   }, [error]);
 
-  // Handle date change
-  const handleDateChange = (date) => {
-    dispatch(
-      setSelectedDate(date ? date.toISOString() : new Date().toISOString())
-    );
-    // Player will be closed by the useEffect for selectedDate change
+  // Handle start date change
+  const handleStartDateChange = (date) => {
+    if (date) {
+      const newStartDate = date.toISOString();
+      // If start date is after end date, adjust end date
+      if (new Date(date) > new Date(endDate)) {
+        dispatch(setDateRange({ startDate: newStartDate, endDate: newStartDate }));
+      } else {
+        dispatch(setDateRange({ startDate: newStartDate }));
+      }
+    }
+  };
+
+  // Handle end date change
+  const handleEndDateChange = (date) => {
+    if (date) {
+      const newEndDate = date.toISOString();
+      // If end date is before start date, adjust start date
+      if (new Date(date) < new Date(startDate)) {
+        dispatch(setDateRange({ startDate: newEndDate, endDate: newEndDate }));
+      } else {
+        dispatch(setDateRange({ endDate: newEndDate }));
+      }
+    }
   };
 
   // Play/pause audio with the new player
@@ -347,7 +365,7 @@ const Recordings = () => {
 
     dispatch(
       rateRecording({
-        date: selectedDate,
+        date: selectedRecordingForModal.date || startDate,
         filename: selectedRecordingForModal.filename,
         rating: ratingValue,
         notes: ratingNotes,
@@ -393,17 +411,17 @@ const Recordings = () => {
 
   // Handle refresh
   const handleRefresh = () => {
-    if (selectedDate) {
-      dispatch(fetchRecordings(selectedDate));
+    if (startDate && endDate) {
+      dispatch(fetchRecordingsByRange({ startDate, endDate }));
     } else {
-      toast.info("Please select a date first.");
+      toast.info("Please select a date range first.");
     }
   };
 
   return (
     <Box sx={{ padding: 3 }}>
       <Typography variant="h4" gutterBottom>
-        Inbound Call Recordings
+        Call Recordings
       </Typography>
 
       {activePlayerSrc && (
@@ -417,43 +435,48 @@ const Recordings = () => {
 
       <Paper sx={{ p: 2, mb: 3 }}>
         <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={4}>
+          <Grid item xs={12} md={3}>
             <LocalizationProvider dateAdapter={AdapterDateFns}>
               <DatePicker
-                label="Select Date"
-                value={selectedDate ? new Date(selectedDate) : null}
-                onChange={handleDateChange}
+                label="Start Date"
+                value={startDate ? new Date(startDate) : null}
+                onChange={handleStartDateChange}
                 format="yyyy-MM-dd"
-                slotProps={{ textField: { fullWidth: true } }}
-                minDate={
-                  dates.length > 0
-                    ? new Date(
-                        Math.min(...dates.map((d) => new Date(d).getTime()))
-                      )
-                    : undefined
-                }
-                maxDate={
-                  dates.length > 0
-                    ? new Date(
-                        Math.max(...dates.map((d) => new Date(d).getTime()))
-                      )
-                    : undefined
-                }
+                slotProps={{ textField: { fullWidth: true, size: "small" } }}
+                maxDate={endDate ? new Date(endDate) : new Date()}
               />
             </LocalizationProvider>
           </Grid>
-          <Grid item xs={12} md={8}>
-            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          <Grid item xs={12} md={3}>
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <DatePicker
+                label="End Date"
+                value={endDate ? new Date(endDate) : null}
+                onChange={handleEndDateChange}
+                format="yyyy-MM-dd"
+                slotProps={{ textField: { fullWidth: true, size: "small" } }}
+                minDate={startDate ? new Date(startDate) : undefined}
+                maxDate={new Date()}
+              />
+            </LocalizationProvider>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
               {loading ? (
                 <CircularProgress size={24} />
               ) : (
-                <Button
-                  variant="outlined"
-                  startIcon={<CalendarToday />}
-                  onClick={handleRefresh}
-                >
-                  Refresh
-                </Button>
+                <>
+                  <Button
+                    variant="outlined"
+                    startIcon={<CalendarToday />}
+                    onClick={handleRefresh}
+                  >
+                    Refresh
+                  </Button>
+                  <Typography variant="body2" color="text.secondary">
+                    {recordings.length} recording{recordings.length !== 1 ? "s" : ""} found
+                  </Typography>
+                </>
               )}
             </Box>
           </Grid>
@@ -472,6 +495,12 @@ const Recordings = () => {
                     Type
                   </TableCell>
                   <TableCell sx={{ fontWeight: "bold", color: "white" }}>
+                    Agent
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: "white" }}>
+                    Date
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: "bold", color: "white" }}>
                     Time
                   </TableCell>
                   <TableCell sx={{ fontWeight: "bold", color: "white" }}>
@@ -481,7 +510,7 @@ const Recordings = () => {
                     Size
                   </TableCell>
                   <TableCell sx={{ fontWeight: "bold", color: "white" }}>
-                    Caller/Queue
+                    Caller/Destination
                   </TableCell>
                   <TableCell sx={{ fontWeight: "bold", color: "white" }}>
                     Rating
@@ -503,6 +532,20 @@ const Recordings = () => {
                               size="small"
                               color="primary"
                               label="Inbound Queue"
+                              sx={{ mr: 1 }}
+                            />
+                          ) : recording.type === "agent" ? (
+                            <Chip
+                              size="small"
+                              color="info"
+                              label={`Agent ${recording.identifier}`}
+                              sx={{ mr: 1 }}
+                            />
+                          ) : recording.type === "outbound" ? (
+                            <Chip
+                              size="small"
+                              color="warning"
+                              label="Outbound"
                               sx={{ mr: 1 }}
                             />
                           ) : (
@@ -533,6 +576,20 @@ const Recordings = () => {
                         </Box>
                       </TableCell>
                       <TableCell>
+                        {recording.agentName ? (
+                          <Tooltip title={`Extension: ${recording.agentExtension || recording.identifier}`}>
+                            <span>{recording.agentName}</span>
+                          </Tooltip>
+                        ) : recording.type === "agent" || recording.type === "outbound" ? (
+                          `Ext. ${recording.identifier}`
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {recording.date || new Date(recording.created).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
                         {recording.callDetails?.calldate
                           ? new Date(
                               recording.callDetails.calldate
@@ -546,6 +603,10 @@ const Recordings = () => {
                       <TableCell>
                         {recording.type === "queue"
                           ? recording.identifier
+                          : recording.type === "agent"
+                          ? recording.callDetails?.src || "-"
+                          : recording.type === "outbound"
+                          ? recording.callDetails?.dst || "-"
                           : recording.callDetails?.src || "-"}
                       </TableCell>
                       <TableCell>
@@ -650,6 +711,10 @@ const Recordings = () => {
                 <Typography variant="body1" fontWeight="medium">
                   {selectedRecordingForModal.type === "queue"
                     ? "Inbound Queue Call"
+                    : selectedRecordingForModal.type === "agent"
+                    ? `Agent Extension Call (${selectedRecordingForModal.agentName || selectedRecordingForModal.identifier})`
+                    : selectedRecordingForModal.type === "outbound"
+                    ? `Outbound Call (${selectedRecordingForModal.agentName || `Ext: ${selectedRecordingForModal.identifier}`})`
                     : "Inbound Call"}
                 </Typography>
               </Grid>
@@ -821,9 +886,16 @@ const Recordings = () => {
                 Recording:{" "}
                 {selectedRecordingForModal.type === "queue"
                   ? "Inbound Queue Call"
+                  : selectedRecordingForModal.type === "agent"
+                  ? `Agent Extension Call (${selectedRecordingForModal.agentName || selectedRecordingForModal.identifier})`
+                  : selectedRecordingForModal.type === "outbound"
+                  ? `Outbound Call (${selectedRecordingForModal.agentName || `Ext: ${selectedRecordingForModal.identifier}`})`
                   : "Inbound Call"}
-                {selectedRecordingForModal.callDetails?.src &&
-                  ` from ${selectedRecordingForModal.callDetails.src}`}
+                {selectedRecordingForModal.type === "outbound" && selectedRecordingForModal.callDetails?.dst
+                  ? ` to ${selectedRecordingForModal.callDetails.dst}`
+                  : selectedRecordingForModal.callDetails?.src
+                  ? ` from ${selectedRecordingForModal.callDetails.src}`
+                  : ""}
               </Typography>
 
               <Typography variant="body2" sx={{ mb: 1 }}>

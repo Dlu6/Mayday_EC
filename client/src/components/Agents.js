@@ -12,8 +12,12 @@ import {
   Checkbox,
   Divider,
   Alert,
+  TextField,
+  InputAdornment,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import SearchIcon from "@mui/icons-material/Search";
+import ClearIcon from "@mui/icons-material/Clear";
 import { useDispatch, useSelector } from "react-redux";
 import IconButton from "@mui/material/IconButton";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -65,8 +69,22 @@ const AgentsComponent = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const { enqueueSnackbar } = useSnackbar();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const navigate = useNavigate();
+
+  // Filter agents based on search query
+  const filteredAgents = agents.filter((agent) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      agent.fullName?.toLowerCase().includes(query) ||
+      agent.username?.toLowerCase().includes(query) ||
+      agent.email?.toLowerCase().includes(query) ||
+      agent.extension?.toString().includes(query) ||
+      agent.typology?.toLowerCase().includes(query)
+    );
+  });
 
   useEffect(() => {
     dispatch(fetchAgents())
@@ -241,6 +259,18 @@ const AgentsComponent = () => {
           </MenuItem>
           <MenuItem
             onClick={() => {
+              navigate(`/agents/edit/${agent.id}`, {
+                state: { extension: agent.extension, openSecurityTab: true }
+              });
+              handleMenuClose();
+            }}
+            role="menuitem"
+            sx={{ fontStyle: "italic", fontSize: "14px", color: "#1976d2" }}
+          >
+            Reset Password
+          </MenuItem>
+          <MenuItem
+            onClick={() => {
               showDeleteConfirmation(agent.id);
               handleMenuClose();
             }}
@@ -270,109 +300,158 @@ const AgentsComponent = () => {
             No agents found. Create one using the + button below.
           </Alert>
         ) : (
-          <Paper sx={{ width: "100%", overflowX: "auto" }}>
-            <Table stickyHeader aria-label="agents table">
-              <TableHead>
-                <TableRow>
-                  <TableCell padding="checkbox">
-                    <Checkbox
-                      indeterminate={
-                        selectedAgents.length > 0 &&
-                        selectedAgents.length < agents.length
-                      }
-                      checked={isAllSelected}
-                      onChange={handleSelectAllClick}
-                    />
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      backgroundColor: "rgba(255, 255, 255, 0.1)",
-                      color: "rgba(0, 0, 0, 0.54)",
-                    }}
-                  >
-                    Avatar
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      backgroundColor: "rgba(255, 255, 255, 0.1)",
-                      color: "rgba(0, 0, 0, 0.54)",
-                    }}
-                  >
-                    Full Name
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      backgroundColor: "rgba(255, 255, 255, 0.1)",
-                      color: "rgba(0, 0, 0, 0.54)",
-                    }}
-                  >
-                    Username
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      backgroundColor: "rgba(255, 255, 255, 0.1)",
-                      color: "rgba(0, 0, 0, 0.54)",
-                    }}
-                  >
-                    Typology
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      backgroundColor: "rgba(255, 255, 255, 0.1)",
-                      color: "rgba(0, 0, 0, 0.54)",
-                    }}
-                  >
-                    Email
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      backgroundColor: "rgba(255, 255, 255, 0.1)",
-                      color: "rgba(0, 0, 0, 0.54)",
-                    }}
-                  >
-                    Internal Number
-                  </TableCell>
-                  <TableCell
-                    sx={{
-                      backgroundColor: "rgba(255, 255, 255, 0.1)",
-                      color: "rgba(0, 0, 0, 0.54)",
-                    }}
-                  >
-                    Actions
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {agents.map((agent) => {
-                  const isSelected = selectedAgents.indexOf(agent.id) !== -1;
+          <>
+            {/* Search Bar */}
+            <Paper sx={{ p: 2, mb: 2 }}>
+              <TextField
+                fullWidth
+                placeholder="Search agents by name, username, email, extension, or typology..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                size="small"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon color="action" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: searchQuery && (
+                    <InputAdornment position="end">
+                      <IconButton
+                        size="small"
+                        onClick={() => setSearchQuery("")}
+                        edge="end"
+                      >
+                        <ClearIcon fontSize="small" />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: '#f5f5f5',
+                    '&:hover': {
+                      backgroundColor: '#eeeeee',
+                    },
+                    '&.Mui-focused': {
+                      backgroundColor: '#fff',
+                    },
+                  },
+                }}
+              />
+              {searchQuery && (
+                <Box sx={{ mt: 1 }}>
+                  <span style={{ fontSize: '0.875rem', color: '#666' }}>
+                    Found {filteredAgents.length} of {agents.length} agents
+                  </span>
+                </Box>
+              )}
+            </Paper>
 
-                  return (
-                    <TableRow key={agent.id} selected={isSelected} hover>
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          checked={isSelected}
-                          onChange={() => handleCheckboxChange(agent.id)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Avatar>
-                          {typeof agent.fullName === "string"
-                            ? agent.fullName[0]
-                            : "?"}
-                        </Avatar>
-                      </TableCell>
-                      <TableCell>{agent.fullName || "N/A"}</TableCell>
-                      <TableCell>{agent.username}</TableCell>
-                      <TableCell>{agent.typology}</TableCell>
-                      <TableCell>{agent.email}</TableCell>
-                      <TableCell>{agent?.extension}</TableCell>
-                      <TableCell>{renderAgentMenu(agent)}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </Paper>
+            <Paper sx={{ width: "100%", overflowX: "auto" }}>
+              <Table stickyHeader aria-label="agents table">
+                <TableHead>
+                  <TableRow>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        indeterminate={
+                          selectedAgents.length > 0 &&
+                          selectedAgents.length < agents.length
+                        }
+                        checked={isAllSelected}
+                        onChange={handleSelectAllClick}
+                      />
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        backgroundColor: "rgba(255, 255, 255, 0.1)",
+                        color: "rgba(0, 0, 0, 0.54)",
+                      }}
+                    >
+                      Avatar
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        backgroundColor: "rgba(255, 255, 255, 0.1)",
+                        color: "rgba(0, 0, 0, 0.54)",
+                      }}
+                    >
+                      Full Name
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        backgroundColor: "rgba(255, 255, 255, 0.1)",
+                        color: "rgba(0, 0, 0, 0.54)",
+                      }}
+                    >
+                      Username
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        backgroundColor: "rgba(255, 255, 255, 0.1)",
+                        color: "rgba(0, 0, 0, 0.54)",
+                      }}
+                    >
+                      Typology
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        backgroundColor: "rgba(255, 255, 255, 0.1)",
+                        color: "rgba(0, 0, 0, 0.54)",
+                      }}
+                    >
+                      Email
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        backgroundColor: "rgba(255, 255, 255, 0.1)",
+                        color: "rgba(0, 0, 0, 0.54)",
+                      }}
+                    >
+                      Internal Number
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        backgroundColor: "rgba(255, 255, 255, 0.1)",
+                        color: "rgba(0, 0, 0, 0.54)",
+                      }}
+                    >
+                      Actions
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredAgents.map((agent) => {
+                    const isSelected = selectedAgents.indexOf(agent.id) !== -1;
+
+                    return (
+                      <TableRow key={agent.id} selected={isSelected} hover>
+                        <TableCell padding="checkbox">
+                          <Checkbox
+                            checked={isSelected}
+                            onChange={() => handleCheckboxChange(agent.id)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Avatar>
+                            {typeof agent.fullName === "string"
+                              ? agent.fullName[0]
+                              : "?"}
+                          </Avatar>
+                        </TableCell>
+                        <TableCell>{agent.fullName || "N/A"}</TableCell>
+                        <TableCell>{agent.username}</TableCell>
+                        <TableCell>{agent.typology}</TableCell>
+                        <TableCell>{agent.email}</TableCell>
+                        <TableCell>{agent?.extension}</TableCell>
+                        <TableCell>{renderAgentMenu(agent)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </Paper>
+          </>
         )}
         <Fab
           color="primary"

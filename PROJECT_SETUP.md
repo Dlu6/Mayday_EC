@@ -36,13 +36,219 @@ Mayday EC is a comprehensive customer relationship management system with Asteri
 - Git
 - SSH key configured for on-prem server access (`~/.ssh/id_ed25519`)
 
-### On-Prem Server Requirements (192.168.1.14)
+### Dell Server - Primary Production (192.168.1.14)
 
+| Setting | Value |
+|---------|-------|
+| IP Address | 192.168.1.14 |
+| Hardware | Dell PowerEdge |
+| Purpose | Primary production server with Cloud SIP trunk |
+| SSH User | `medhi` |
+| Project Path | `/home/medhi/Mayday_EC` |
+
+**Requirements:**
 - Debian/Ubuntu server with Asterisk
 - Node.js 18.x
 - PM2 for process management
 - MariaDB 10.11+
-- SSH user: `medhi`
+
+### HPE Server - PBX/Asterisk (192.168.1.15)
+
+| Setting | Value |
+|---------|-------|
+| IP Address | 192.168.1.15 |
+| Hardware | HPE ProLiant DL380 Gen11 |
+| Purpose | Asterisk/MySQL server (MTN SIP trunk via leased line) |
+| SSH User | `mayday` |
+| Project Path | `/home/mayday/Mayday_EC` |
+
+**Requirements:**
+- Debian 12 (Bookworm) - Minimal installation
+- Asterisk 20.x (for MTN leased line SIP trunk)
+- MariaDB 10.11+
+- Node.js 18.x
+- PM2 for process management
+
+> [!WARNING]
+> **No sudo installed**: HPE uses minimal Debian 12 without sudo. Use `su -` to elevate to root instead.
+
+**Root Access Pattern (HPE):**
+```bash
+# SSH as mayday, then switch to root
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15
+su -
+# Password: Pasword@1759
+
+# For automated commands via SSH:
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c '<command>'"
+```
+
+**Cloning the Repository (as root):**
+```bash
+git clone https://github.com/Dlu6/Mayday_EC.git /home/mayday/Mayday_EC
+cd /home/mayday/Mayday_EC
+git checkout development
+chown -R mayday:mayday /home/mayday/Mayday_EC
+```
+
+**HPE Server Services (systemd):**
+
+Unlike the Dell server, the HPE server requires manual systemd service setup for Asterisk (compiled from source) and PM2.
+
+| Service | Status | Purpose |
+|---------|--------|---------|
+| `asterisk.service` | enabled | Starts Asterisk PBX on boot |
+| `pm2-root.service` | enabled | Resurrects PM2 processes (Node.js) on boot |
+| `mariadb.service` | enabled | Database server |
+
+**Boot Order:** `mariadb` → `asterisk` → `pm2-root` (PM2 depends on Asterisk being up)
+
+**Asterisk Service Setup (if not already configured):**
+
+The HPE server runs Asterisk compiled from source (`/usr/sbin/asterisk`). If the `asterisk.service` doesn't exist:
+
+```bash
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'cat > /etc/systemd/system/asterisk.service << EOF
+[Unit]
+Description=Asterisk PBX and telephony daemon.
+After=network.target mariadb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=HOME=/var/lib/asterisk
+WorkingDirectory=/var/lib/asterisk
+User=asterisk
+Group=asterisk
+ExecStart=/usr/sbin/asterisk -f -C /etc/asterisk/asterisk.conf
+ExecReload=/usr/sbin/asterisk -rx \"core reload\"
+RuntimeDirectory=asterisk
+RuntimeDirectoryMode=0755
+LimitCORE=infinity
+Restart=always
+RestartSec=4
+StandardOutput=null
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload && systemctl enable asterisk && systemctl start asterisk'"
+```
+
+> [!NOTE]
+> The `RuntimeDirectory=asterisk` directive automatically creates `/var/run/asterisk` with correct permissions on each boot, solving the "asterisk.ctl does not exist" issue.
+
+**PM2 Depends on Asterisk (drop-in config):**
+
+To ensure PM2 starts *after* Asterisk is ready (so AMI connections succeed):
+
+```bash
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'mkdir -p /etc/systemd/system/pm2-root.service.d && cat > /etc/systemd/system/pm2-root.service.d/after-asterisk.conf << EOF
+[Unit]
+After=asterisk.service mariadb.service
+Wants=asterisk.service
+EOF
+systemctl daemon-reload'"
+```
+
+**Verify Services Are Enabled:**
+
+```bash
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'systemctl is-enabled asterisk pm2-root mariadb'"
+# Should output: enabled enabled enabled
+```
+
+**Quick Service Management (HPE):**
+
+```bash
+# Check Asterisk status
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'systemctl status asterisk --no-pager'"
+
+# Restart Asterisk
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'systemctl restart asterisk'"
+
+# Connect to Asterisk CLI
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'asterisk -rvv'"
+
+# View Asterisk logs
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c 'journalctl -u asterisk -f'"
+```
+
+**HPE Server ecosystem.config.cjs:**
+
+The HPE server requires specific environment variables for license server and AMI connectivity:
+
+```javascript
+// /home/mayday/Mayday_EC/ecosystem.config.cjs
+module.exports = {
+  apps: [
+    {
+      name: "mayday",
+      script: "server/server.js",
+      exec_mode: "fork",
+      instances: 1,
+      watch: false,
+      env: {
+        NODE_ENV: "production",
+        PORT: 8004,
+        PUBLIC_IP: "192.168.1.15",
+        ASTERISK_CONFIG_PATH: "/etc/asterisk",
+        LICENSE_MGMT_API_URL: "https://mayday-website-backend-c2abb923fa80.herokuapp.com/api",
+        LICENSE_MGMT_API_KEY: "maydayLicMgmtApiKey1759_production",
+        SECRET_INTERNAL_API_KEY: "aVeryLongAndRandomSecretStringForInternalComms_987654321_production",
+      },
+    },
+  ],
+};
+```
+
+**HPE Server .env Configuration:**
+
+> [!CAUTION]
+> Use literal IP values, not variable substitution (dotenv doesn't support `${VAR}` syntax).
+
+```env
+# /home/mayday/Mayday_EC/server/.env
+NODE_ENV=production
+PORT=8004
+SERVER_IP=192.168.1.15
+
+# Use 127.0.0.1 for local services (Asterisk/DB run on same server)
+PUBLIC_IP=192.168.1.15
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=mayday_user
+DB_PASSWORD=Pasword@1759
+DB_NAME=asterisk
+
+AMI_HOST=127.0.0.1
+AMI_PORT=5038
+ASTERISK_AMI_USERNAME=mayday_ami_user
+AMI_PASSWORD=mayday_ami_password
+
+ASTERISK_HOST=127.0.0.1
+ARI_URL=http://127.0.0.1:8088
+ARI_USERNAME=asterisk
+ARI_PASSWORD=Pasword@256ari
+
+JWT_SECRET=your_jwt_secret_here
+```
+
+**HPE Server Deployment Command:**
+
+```bash
+# Full deployment on HPE server
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 "echo 'Pasword@1759' | su - -c '
+export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh
+cd /home/mayday/Mayday_EC
+git pull origin development
+npm install
+cd client && npm install && npm run build && cd ..
+pm2 delete mayday 2>/dev/null
+pm2 start ecosystem.config.cjs
+pm2 save
+'"
+```
 
 ## Project Structure
 
@@ -583,12 +789,24 @@ npm run electron:dev
 ### Building for Production
 
 ```powershell
+# Navigate to electron-softphone directory
+cd electron-softphone
+
 # Build Windows installer (NSIS)
 npm run electron:build:win
 
-# Output location: electron-softphone/release/{version}/
-# Creates: MHU Appbar Setup {version}.exe
+# Build output location
+# electron-softphone/release/5.1.5/
 ```
+
+**Build Artifacts Created:**
+
+| File | Path | Description |
+|------|------|-------------|
+| **Installer** | `release/5.1.5/Mayday Appbar Setup 5.1.5.exe` | Windows NSIS installer (distributable) |
+| **Update Manifest** | `release/5.1.5/latest.yml` | Auto-update configuration file |
+| **Unpacked App** | `release/5.1.5/win-unpacked/` | Unpacked application files (for testing) |
+| **Debug Info** | `release/5.1.5/builder-debug.yml` | Build configuration debug info |
 
 ### Build Scripts Reference
 
@@ -618,16 +836,40 @@ The softphone includes these Windows-specific features that require native compi
 
 ### Environment Configuration
 
-Create `.env.production` before building:
+**Production Server Configuration:**
+
+The following files must be configured with the production server IP (`192.168.1.14`):
+
+| File | Variable | Current Value |
+|------|----------|---------------|
+| `src/config/serverConfig.js` | `DEFAULT_SERVER_HOST` | `192.168.1.14` |
+| `vite.config.js` | `DEFAULT_SERVER_HOST` | `192.168.1.14` |
+| `electron/main.js` | `DEFAULT_SERVER_HOST` | `192.168.1.14` |
+| `.env.production` | `VITE_SERVER_HOST` | `192.168.1.14` |
+
+**Example `.env.production`:**
 
 ```env
-VITE_API_URL=https://your-production-server.com
-VITE_WS_URL=wss://your-production-server.com
+# Server Configuration
+VITE_SERVER_HOST=192.168.1.14
+VITE_PUBLIC_IP=192.168.1.14
+VITE_PORT=8004
+VITE_SIP_PORT=8088
+
+# API URLs
+VITE_API_URL=http://192.168.1.14
+VITE_WS_URL=ws://192.168.1.14:8088
+VITE_BASE_URL=http://192.168.1.14
+
+# Environment
+NODE_ENV=production
 ```
 
-### Updating the Auto-Update Server
+### Deploying Updates to Production
 
-The softphone checks for updates from the URL configured in `package.json`:
+The softphone uses **electron-updater** to automatically check for and install updates from the configured server.
+
+**Auto-Update Configuration** (`package.json`):
 
 ```json
 "publish": {
@@ -636,11 +878,70 @@ The softphone checks for updates from the URL configured in `package.json`:
 }
 ```
 
-To deploy updates:
-1. Build the installer: `npm run electron:build:win`
-2. Copy files from `release/{version}/` to your update server:
-   - `MHU Appbar Setup {version}.exe`
-   - `latest.yml`
+**Deployment Steps:**
+
+#### Option 1: Manual Deployment (Recommended for Production)
+
+```powershell
+# 1. Build the installer on Windows
+cd electron-softphone
+npm run electron:build:win
+
+# 2. Verify build artifacts exist
+dir release\5.1.5\
+
+# 3. Copy to production server (192.168.1.14)
+# Using SCP or file transfer tool, copy these files to /var/www/html/downloads/:
+# - release/5.1.5/Mayday Appbar Setup 5.1.5.exe
+# - release/5.1.5/latest.yml
+```
+
+**Using SCP (if SSH access available):**
+
+```bash
+# From Windows (using Git Bash or WSL)
+scp "release/5.1.5/Mayday Appbar Setup 5.1.5.exe" \
+    "release/5.1.5/latest.yml" \
+    medhi@192.168.1.14:/var/www/html/downloads/
+
+# Or using PowerShell with pscp (PuTTY)
+pscp "release\5.1.5\Mayday Appbar Setup 5.1.5.exe" medhi@192.168.1.14:/var/www/html/downloads/
+pscp "release\5.1.5\latest.yml" medhi@192.168.1.14:/var/www/html/downloads/
+```
+
+#### Option 2: Deploy via Git (Development/Testing)
+
+```powershell
+# 1. Add build files to git (normally ignored)
+git add -f "release/5.1.5/latest.yml" "release/5.1.5/Mayday Appbar Setup 5.1.5.exe"
+git commit -m "Add Windows build v5.1.5"
+git push origin development
+
+# 2. On server, pull and copy to nginx directory
+ssh medhi@192.168.1.14
+cd ~/Mayday_EC
+git pull origin development
+sudo cp electron-softphone/release/5.1.5/*.exe /var/www/html/downloads/
+sudo cp electron-softphone/release/5.1.5/latest.yml /var/www/html/downloads/
+```
+
+**Verify Deployment:**
+
+```bash
+# Check files are accessible
+curl -I http://192.168.1.14/downloads/latest.yml
+curl -I http://192.168.1.14/downloads/Mayday%20Appbar%20Setup%205.1.5.exe
+
+# Should return HTTP 200 OK
+```
+
+**Auto-Update Behavior:**
+
+- Installed apps check for updates on startup
+- Update check interval: 5 seconds after app launch
+- If new version found in `latest.yml`, download starts automatically
+- User is prompted to install and restart
+- Silent background download, no interruption to active calls
 
 ### Troubleshooting Windows Build
 
@@ -819,6 +1120,71 @@ git log --oneline -5
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+### PM2 Auto-Startup on Boot
+
+PM2 can automatically restart saved processes after a server reboot. This requires two things:
+1. **Startup script** — A systemd service that runs `pm2 resurrect` on boot
+2. **Saved process list** — A dump file (`/root/.pm2/dump.pm2`) with processes to restore
+
+#### Setup Commands (Run Once Per Server)
+
+**Dell Server (192.168.1.14):**
+```bash
+ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
+  "echo 'Pasword@1759' | sudo -S bash -c 'export NVM_DIR=/root/.nvm && source /root/.nvm/nvm.sh && pm2 startup systemd -u root --hp /root && pm2 save'"
+```
+
+**HPE Server (192.168.1.15):**
+```bash
+ssh -i ~/.ssh/id_ed25519 mayday@192.168.1.15 \
+  "echo 'Pasword@1759' | su - -c 'source /root/.nvm/nvm.sh && pm2 startup systemd -u root --hp /root && pm2 save'"
+```
+
+#### What This Creates
+
+| Component | Path | Purpose |
+|-----------|------|---------|
+| Systemd Service | `/etc/systemd/system/pm2-root.service` | Runs `pm2 resurrect` on boot |
+| Process Dump | `/root/.pm2/dump.pm2` | List of processes to restore |
+
+#### How It Works
+
+1. Server boots → `systemd` starts `pm2-root.service`
+2. Service runs `pm2 resurrect`
+3. PM2 reads `/root/.pm2/dump.pm2` and starts all saved processes
+4. The `mayday` app is now running without manual intervention
+
+#### Important: Always Save After Changes
+
+After starting, stopping, or modifying PM2 processes, run `pm2 save` to update the dump file:
+
+```bash
+# After any PM2 process changes:
+pm2 save
+
+# If PM2 has no processes but you want to force save (rare):
+pm2 save --force
+```
+
+#### Verify Startup Configuration
+
+```bash
+# Check if systemd service is enabled
+systemctl is-enabled pm2-root
+
+# Check service status
+systemctl status pm2-root
+
+# Manual test: simulate boot resurrection
+pm2 kill && pm2 resurrect
+```
+
+#### Remove Auto-Startup (If Needed)
+
+```bash
+pm2 unstartup systemd
+```
+
 ### PM2 Environment Variables (IMPORTANT)
 
 PM2 caches environment variables when a process is first started. If you update environment variables in `.env` or `ecosystem.config.cjs`, you **must** delete and restart the process for changes to take effect.
@@ -854,6 +1220,26 @@ ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
 1. `ecosystem.config.cjs` - Primary source for PM2 environment
 2. `server/.env` - Loaded by dotenv at runtime (supplements ecosystem config)
 
+> [!CAUTION]
+> **Node.js dotenv does NOT support bash-style variable substitution!**
+> 
+> The `.env` file cannot use `${VARIABLE}` syntax. This will cause connection failures:
+> ```env
+> # ❌ WRONG - dotenv reads this as literal string "${SERVER_IP}"
+> SERVER_IP=192.168.1.15
+> AMI_HOST=${SERVER_IP}
+> DB_HOST=${SERVER_IP}
+> ```
+> 
+> ```env
+> # ✅ CORRECT - use actual IP values
+> AMI_HOST=127.0.0.1
+> DB_HOST=127.0.0.1
+> PUBLIC_IP=192.168.1.15
+> ```
+> 
+> **If you see "AMI connection timeout" errors, check that `.env` uses literal IP values.**
+
 **Key environment variables for CORS:**
 
 | Variable | Location | Purpose |
@@ -873,9 +1259,16 @@ The on-prem server acts as a **slave** that syncs licenses from the **master** (
 ```javascript
 env: {
   LICENSE_MGMT_API_URL: "https://mayday-website-backend-c2abb923fa80.herokuapp.com/api",
+  LICENSE_MGMT_API_KEY: "maydayLicMgmtApiKey1759_production",
   SECRET_INTERNAL_API_KEY: "aVeryLongAndRandomSecretStringForInternalComms_987654321_production",
 }
 ```
+
+> [!IMPORTANT]
+> **All three variables are required for license server connection:**
+> - `LICENSE_MGMT_API_URL` - The master license server API endpoint
+> - `LICENSE_MGMT_API_KEY` - API key for license management authentication
+> - `SECRET_INTERNAL_API_KEY` - Internal API key (must match Heroku config)
 
 **Important: The `SECRET_INTERNAL_API_KEY` must match the key on the Heroku provisioning server.**
 
@@ -900,14 +1293,17 @@ ssh -i ~/.ssh/id_ed25519 medhi@192.168.1.14 \
 |-------|-------|----------|
 | "No license found on master server" | Fingerprint not registered on master | Copy fingerprint from slave, create license on master with that fingerprint |
 | "Invalid internal API key" | API key mismatch | Ensure `SECRET_INTERNAL_API_KEY` in ecosystem.config.cjs matches Heroku's config |
-| "Failed to connect to master license server" | Network/CORS issue | Add slave's origin to Heroku's `ALLOWED_ORIGINS` config var |
+| "Failed to connect to master license server" | Missing `LICENSE_MGMT_API_KEY` or wrong `PUBLIC_IP` | Add `LICENSE_MGMT_API_KEY` to ecosystem.config.cjs and verify `PUBLIC_IP` matches server IP |
+| "Failed to connect to master license server" (websocket) | Network/CORS issue | Add slave's origin to Heroku's `ALLOWED_ORIGINS` config var |
 | License sync returns 404 | URL encoding issue | Fixed in licenseService.js - fingerprint is now URL-encoded |
 
 #### Heroku Provisioning Server Config Vars
 
 Required config vars on Heroku for slave communication:
 - `SECRET_INTERNAL_API_KEY` - Must match slave's key
-- `ALLOWED_ORIGINS` - Must include `https://192.168.1.14,http://192.168.1.14`
+- `ALLOWED_ORIGINS` - Must include all slave server origins:
+  - Dell: `https://192.168.1.14,http://192.168.1.14`
+  - HPE: `https://192.168.1.15,http://192.168.1.15`
 
 ### Client Environment Variables
 
@@ -1490,7 +1886,7 @@ npm run build
 npm run electron:build:win
 
 # Commit build files to GitHub
-git add -f "release/5.1.5/latest.yml" "release/5.1.5/MHU Appbar Setup 5.1.5.exe"
+git add -f "release/5.1.5/latest.yml" "release/5.1.5/Mayday Appbar Setup 5.1.5.exe"
 git commit -m "Add Windows build v5.1.5 with native appbar module"
 git push origin feature/enhanced-transfer-system
 ```
@@ -1504,12 +1900,12 @@ git pull origin feature/enhanced-transfer-system
 
 # Delete previous version from server
 ssh -i ~/Downloads/MHU_Debian_Mumb.pem admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com \
-  "rm -f /var/www/html/downloads/latest.yml /var/www/html/downloads/'MHU Appbar Setup'*.exe"
+  "rm -f /var/www/html/downloads/latest.yml /var/www/html/downloads/'MaydayAppbar Setup'*.exe"
 
 # Upload new version
 scp -i ~/Downloads/MHU_Debian_Mumb.pem \
   "electron-softphone/release/5.1.5/latest.yml" \
-  "electron-softphone/release/5.1.5/MHU Appbar Setup 5.1.5.exe" \
+  "electron-softphone/release/5.1.5/MaydayAppbar Setup 5.1.5.exe" \
   admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com:/var/www/html/downloads/
 
 # Verify
@@ -1521,10 +1917,10 @@ curl -s http://192.168.1.14/downloads/latest.yml
 cd ~/Downloads/Mayday-CRM-Scracth && \
 git pull origin feature/enhanced-transfer-system && \
 ssh -i ~/Downloads/MHU_Debian_Mumb.pem admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com \
-  "rm -f /var/www/html/downloads/latest.yml /var/www/html/downloads/'MHU Appbar Setup'*.exe" && \
+  "rm -f /var/www/html/downloads/latest.yml /var/www/html/downloads/'MaydayAppbar Setup'*.exe" && \
 scp -i ~/Downloads/MHU_Debian_Mumb.pem \
   "electron-softphone/release/5.1.5/latest.yml" \
-  "electron-softphone/release/5.1.5/MHU Appbar Setup 5.1.5.exe" \
+  "electron-softphone/release/5.1.5/MaydayAppbar Setup 5.1.5.exe" \
   admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com:/var/www/html/downloads/ && \
 curl -s http://192.168.1.14/downloads/latest.yml
 ```
@@ -1537,7 +1933,7 @@ npm run build && \
 npm run electron:build:win && \
 scp -i ~/Downloads/MHU_Debian_Mumb.pem \
   "release/X.X.X/latest.yml" \
-  "release/X.X.X/MHU Appbar Setup X.X.X.exe" \
+  "release/X.X.X/MaydayAppbar Setup X.X.X.exe" \
   admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com:/var/www/html/downloads/ && \
 curl -s http://192.168.1.14/downloads/latest.yml
 ```
@@ -1560,8 +1956,8 @@ location /downloads/ {
 
 **Required files on server** (`/var/www/html/downloads/`):
 - `latest.yml` - Version metadata (auto-generated by electron-builder)
-- `MHU Appbar Setup X.X.X.exe` - The installer (~85 MB)
-- `MHU Appbar Setup X.X.X.exe.blockmap` - Delta updates (optional, only if differential packages enabled)
+- `MaydayAppbar Setup X.X.X.exe` - The installer (~85 MB)
+- `MaydayAppbar Setup X.X.X.exe.blockmap` - Delta updates (optional, only if differential packages enabled)
 
 **Verify deployment**:
 ```bash
@@ -1575,9 +1971,9 @@ To clean up old versions and free server space:
 **Delete specific versions:**
 ```bash
 ssh -i ~/Downloads/MHU_Debian_Mumb.pem admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com \
-  "rm -f /var/www/html/downloads/'MHU Appbar Setup 5.1.4.exe' \
-         /var/www/html/downloads/'MHU Appbar Setup 5.1.3.exe' \
-         /var/www/html/downloads/'MHU Appbar Setup 5.1.3.exe.blockmap'"
+  "rm -f /var/www/html/downloads/'MaydayAppbar Setup 5.1.4.exe' \
+         /var/www/html/downloads/'MaydayAppbar Setup 5.1.3.exe' \
+         /var/www/html/downloads/'MaydayAppbar Setup 5.1.3.exe.blockmap'"
 ```
 
 **List all versions on server:**
@@ -1594,7 +1990,7 @@ ssh -i ~/Downloads/MHU_Debian_Mumb.pem admin@ec2-65-1-149-92.ap-south-1.compute.
 
 # Delete all exe files except the latest version
 ssh -i ~/Downloads/MHU_Debian_Mumb.pem admin@ec2-65-1-149-92.ap-south-1.compute.amazonaws.com \
-  "cd /var/www/html/downloads && rm -f 'MHU Appbar Setup 5.0.'*.exe 'MHU Appbar Setup 5.0.'*.blockmap"
+  "cd /var/www/html/downloads && rm -f 'MaydayAppbar Setup 5.0.'*.exe 'MaydayAppbar Setup 5.0.'*.blockmap"
 ```
 
 **Note**: Always keep `latest.yml` and the current version's `.exe` file. The auto-updater reads `latest.yml` to determine the current version.
@@ -1640,7 +2036,7 @@ Users can manually check for updates via:
   - Added AppUpdater component to Login screen for checking updates before login
   - Fixed URL preference switch clearing auth state (no longer clears localStorage)
   - Fixed "Remember Me" functionality race condition (credentials were being cleared on load)
-  - Fixed Windows auto-update "MHU Appbar cannot be closed" error
+  - Fixed Windows auto-update "Mayday Appbar cannot be closed" error
   - Improved update installer to use silent mode and proper window cleanup
   - Added NSIS elevation and runAfterFinish options for smoother updates
 
@@ -1862,3 +2258,37 @@ cd client && npm test -- --testPathPattern="licenseFeatures.test.js" --watchAll=
 - ✅ **PM2 Auto-Restart**: Configured to restart after Asterisk restarts
 - ✅ **Static IP**: Configured server with static IP 192.168.1.14
 - ✅ **Removed MongoDB**: Removed all MongoDB dependencies from usersController.js
+
+## Troubleshooting & Known Issues History
+
+### 1. Missed Call Bug (Resolved Jan 2026)
+
+**Issue**: Outbound calls answered by the recipient were incorrectly appearing as "Missed" in Call History.
+
+**Root Cause**:
+A race condition existed between two AMI event handlers in `server/services/callMonitoringService.js`:
+- `handleCdr()`: Processes Asterisk's native `Cdr` event (Authoritative).
+- `handleHangup()`: Processes `Hangup` event (Custom logic).
+
+Since `handleHangup` often triggered first or concurrently, it overwrote the authoritative `disposition` with "NORMAL" and calculated `billsec` manually. If `cdrRecord.answer` timestamp was missing (due to timing), `billsec` became 0.
+The `cdrController` then classified `disposition="NORMAL"` + `billsec=0` as "Missed".
+
+**Fix**:
+- **Preserve Data**: Modified `callMonitoringService.js` to only update `disposition` and `billsec` in `handleHangup` if they are not already set to "ANSWERED"/valid values.
+- **Status Logic**: Updated `cdrController.js` to treat `disposition="NORMAL"` with `billsec > 0` as Completed.
+
+### 2. Direction Display Bug (Resolved Jan 2026)
+
+**Issue**: Inbound calls from external numbers were consistently displaying as "Outgoing".
+
+**Root Cause**:
+- **Unreliable Detection**: The system relied on matching channel names (`PJSIP/xxxx-`) to determine direction.
+- **Race Condition**: `handleHangup` created the initial CDR record with this flawed logic, often incorrectly marking it "Outbound" before `handleCdr` could correct it.
+- **Regex Failure**: Telephony numbers often contain non-digits (e.g. `+256...`) which caused simple regex checks (`^\d+$`) to fail.
+
+**Fix**:
+- **Robust Pattern Matching**: Replaced channel-based logic with Phone Number Pattern Matching in both `callMonitoringService.js` and `cdrController.js`.
+  - **External**: 7+ digits (stripping non-digits)
+  - **Extension**: 3-4 digits
+- **Logic**: If `Src` is External AND `Dst` is Extension → **Inbound**.
+- **Consistency**: Applied this logic to both `handleCdr` and `handleHangup` handlers to ensure consistency regardless of which event processes first.

@@ -1,7 +1,7 @@
 //electron-softphone/src/hooks/useCallState.js
 import { SessionState } from "sip.js";
 import { useState, useEffect, useCallback, useRef } from "react";
-import ringtoneMp3 from "../assets/sounds/promise.mp3";
+import { ringtoneService } from "../services/ringtoneService";
 // import ringbackMp3 from "../assets/sounds/ringback.mp3";
 import { storageService, isLoggingOut } from "../services/storageService";
 // Centralized call states
@@ -45,6 +45,8 @@ export const useCallState = (sipService, sipCallService) => {
   const ringToneRef = useRef(new Audio());
   // Centralized playback controller to avoid play/pause race conditions
   const playbackRef = useRef({ desired: false, playing: false, requestId: 0 });
+  // Auto-answer timer ref for cleanup
+  const autoAnswerTimerRef = useRef(null);
 
   // Add a safe audio play function to avoid race conditions
   const safePlayAudio = useCallback((audioSrc, volume = 0.5) => {
@@ -83,7 +85,7 @@ export const useCallState = (sipService, sipCallService) => {
             );
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // If already playing and we still desire playback, do nothing
     if (!audio.paused) {
@@ -296,12 +298,23 @@ export const useCallState = (sipService, sipCallService) => {
       ringToneRef.current.loop = true;
       ringToneRef.current.volume = 0.8;
       ringToneRef.current.muted = false;
-      ringToneRef.current.src = ringtoneMp3; // Default to ringtone
+      ringToneRef.current.src = ringtoneService.getSelectedRingtoneUrl(); // Use selected ringtone
       ringToneRef.current.load(); // Preload the audio
     }
 
+    // Listen for ringtone changes and update the audio source
+    const handleRingtoneChange = (ringtone) => {
+      if (ringToneRef.current) {
+        ringToneRef.current.src = ringtone.file;
+        ringToneRef.current.load();
+      }
+    };
+
+    ringtoneService.events.on("ringtoneChanged", handleRingtoneChange);
+
     // Cleanup
     return () => {
+      ringtoneService.events.off("ringtoneChanged", handleRingtoneChange);
       if (ringToneRef.current) {
         ringToneRef.current.pause();
         ringToneRef.current.currentTime = 0;
@@ -395,7 +408,7 @@ export const useCallState = (sipService, sipCallService) => {
           // For inbound calls, always use local ringtone
           if (currentDirection === "inbound") {
             console.log("INBOUND CALL - Using ringtone");
-            safePlayAudio(ringtoneMp3, 0.8);
+            safePlayAudio(ringtoneService.getSelectedRingtoneUrl(), 0.8);
           }
           // For outbound calls, we'll play ringback when we get 180/183 response
           // This is now handled in the progress event
@@ -473,6 +486,12 @@ export const useCallState = (sipService, sipCallService) => {
 
         console.log("Incoming call detected", data);
 
+        // Clear any existing auto-answer timer
+        if (autoAnswerTimerRef.current) {
+          clearTimeout(autoAnswerTimerRef.current);
+          autoAnswerTimerRef.current = null;
+        }
+
         // Set call state first
         updateCallState({
           state: CALL_STATES.RINGING,
@@ -483,7 +502,34 @@ export const useCallState = (sipService, sipCallService) => {
         });
 
         // Use safe audio play for inbound ringtone
-        safePlayAudio(ringtoneMp3, 0.8);
+        safePlayAudio(ringtoneService.getSelectedRingtoneUrl(), 0.8);
+
+        // Auto-answer logic: Check user settings from storage
+        const userData = storageService.getUserData();
+        console.log("[Auto-Answer] User data from storage:", JSON.stringify(userData, null, 2));
+
+        const autoAnswerEnabled = userData?.user?.phoneBarAutoAnswer;
+        const autoAnswerDelay = userData?.user?.phoneBarAutoAnswerDelay || 0;
+
+        console.log(`[Auto-Answer] Settings - enabled: ${autoAnswerEnabled}, delay: ${autoAnswerDelay}s`);
+
+        if (autoAnswerEnabled) {
+          console.log(`[Auto-Answer] Enabled with ${autoAnswerDelay}s delay - will auto-answer incoming call`);
+          const delayMs = autoAnswerDelay * 1000;
+
+          autoAnswerTimerRef.current = setTimeout(async () => {
+            try {
+              console.log("[Auto-Answer] Auto-answering incoming call...");
+              safeStopAudio();
+              await sipCallService.answerCall();
+              console.log("[Auto-Answer] Call answered successfully");
+            } catch (error) {
+              console.error("[Auto-Answer] Failed to auto-answer:", error);
+            }
+          }, delayMs);
+        } else {
+          console.log("[Auto-Answer] Disabled - call will ring normally");
+        }
       },
       progress: (response) => {
         // Prevent call progress during logout
@@ -554,6 +600,12 @@ export const useCallState = (sipService, sipCallService) => {
 
         console.error("Call failed, disconnecting:", error);
 
+        // Clear auto-answer timer if pending
+        if (autoAnswerTimerRef.current) {
+          clearTimeout(autoAnswerTimerRef.current);
+          autoAnswerTimerRef.current = null;
+        }
+
         // Stop any playing audio
         if (!isLoggingOut()) {
           safeStopAudio();
@@ -597,6 +649,12 @@ export const useCallState = (sipService, sipCallService) => {
       },
       "call:ended": () => {
         console.log("Call ended");
+
+        // Clear auto-answer timer if pending
+        if (autoAnswerTimerRef.current) {
+          clearTimeout(autoAnswerTimerRef.current);
+          autoAnswerTimerRef.current = null;
+        }
 
         // Stop any playing audio
         safeStopAudio();

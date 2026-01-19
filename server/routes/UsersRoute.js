@@ -14,6 +14,7 @@ import {
   updateAgentPresence,
   getAgentDialplan,
   regenerateAgentDialplan,
+  resetAgentPassword,
 } from "../controllers/usersController.js";
 import { sipAuthMiddleware } from "../middleware/sipAuth.js";
 
@@ -381,6 +382,40 @@ router.put("/agents/:id", updateAgentDetails);
  *         description: Agent not found
  */
 router.delete("/agents/:id", deleteAgent);
+
+/**
+ * @swagger
+ * /api/users/agents/{id}/reset-password:
+ *   post:
+ *     summary: Reset an agent's password
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - newPassword
+ *             properties:
+ *               newPassword:
+ *                 type: string
+ *                 description: New password for the agent
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       400:
+ *         description: Invalid password
+ *       404:
+ *         description: Agent not found
+ */
+router.post("/agents/:id/reset-password", resetAgentPassword);
 
 /**
  * @swagger

@@ -168,7 +168,7 @@ const setupRealtimeUpdates = (callback) => {
   socket.on("cdr-update", (data) => callback && callback(data));
   // Listen for call history updates (emitted after CDR is updated with correct caller number)
   socket.on("call_history_update", (data) => {
-    console.log("Received call_history_update:", data);
+    // console.log("Received call_history_update:", data);
     callback && callback(data);
   });
   socket.on("connect_error", (err) =>

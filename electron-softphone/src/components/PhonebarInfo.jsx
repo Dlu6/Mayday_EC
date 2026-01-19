@@ -42,6 +42,8 @@ import {
   Error as ErrorIcon,
 } from "@mui/icons-material";
 import LanguageIcon from "@mui/icons-material/Language";
+import MusicNoteIcon from "@mui/icons-material/MusicNote";
+import { ringtoneService, AVAILABLE_RINGTONES } from "../services/ringtoneService";
 
 const PhonebarInfo = ({ open, onClose }) => {
   // You can load these from your package.json or environment variables
@@ -68,7 +70,12 @@ const PhonebarInfo = ({ open, onClose }) => {
   const [micLevel, setMicLevel] = useState(0);
   const [audioError, setAudioError] = useState(null);
   const [permissionStatus, setPermissionStatus] = useState("unknown");
-  
+
+  // ========== Ringtone Settings State ==========
+  const [selectedRingtone, setSelectedRingtone] = useState(ringtoneService.getSelectedRingtoneId());
+  const [isPreviewingRingtone, setIsPreviewingRingtone] = useState(false);
+  const ringtonePreviewRef = useRef(null);
+
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const micStreamRef = useRef(null);
@@ -81,7 +88,7 @@ const PhonebarInfo = ({ open, onClose }) => {
     const savedOutput = localStorage.getItem("preferredAudioOutput");
     const savedInputVolume = localStorage.getItem("audioInputVolume");
     const savedOutputVolume = localStorage.getItem("audioOutputVolume");
-    
+
     if (savedInput) setSelectedInputDevice(savedInput);
     if (savedOutput) setSelectedOutputDevice(savedOutput);
     if (savedInputVolume) setInputVolume(parseInt(savedInputVolume, 10));
@@ -92,7 +99,7 @@ const PhonebarInfo = ({ open, onClose }) => {
   const refreshDevices = useCallback(async () => {
     try {
       setAudioError(null);
-      
+
       // Request permission first
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -104,15 +111,15 @@ const PhonebarInfo = ({ open, onClose }) => {
           return;
         }
       }
-      
+
       const devices = await navigator.mediaDevices.enumerateDevices();
-      
+
       const inputs = devices.filter((d) => d.kind === "audioinput");
       const outputs = devices.filter((d) => d.kind === "audiooutput");
-      
+
       setAudioInputDevices(inputs);
       setAudioOutputDevices(outputs);
-      
+
       // Set default devices if none selected
       if (!selectedInputDevice && inputs.length > 0) {
         const defaultInput = inputs.find((d) => d.deviceId === "default") || inputs[0];
@@ -132,7 +139,7 @@ const PhonebarInfo = ({ open, onClose }) => {
   useEffect(() => {
     if (open) {
       refreshDevices();
-      
+
       // Listen for device changes
       navigator.mediaDevices.addEventListener("devicechange", refreshDevices);
       return () => {
@@ -162,7 +169,7 @@ const PhonebarInfo = ({ open, onClose }) => {
   const handleOutputVolumeChange = (event, newValue) => {
     setOutputVolume(newValue);
     localStorage.setItem("audioOutputVolume", newValue.toString());
-    
+
     // Apply volume to test audio if playing
     if (testAudioRef.current) {
       testAudioRef.current.volume = newValue / 100;
@@ -174,37 +181,37 @@ const PhonebarInfo = ({ open, onClose }) => {
     try {
       setAudioError(null);
       setIsTestingMic(true);
-      
+
       const constraints = {
-        audio: selectedInputDevice 
+        audio: selectedInputDevice
           ? { deviceId: { exact: selectedInputDevice } }
           : true
       };
-      
+
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       micStreamRef.current = stream;
-      
+
       // Create audio context and analyser
       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
       analyserRef.current = audioContextRef.current.createAnalyser();
       analyserRef.current.fftSize = 256;
-      
+
       const source = audioContextRef.current.createMediaStreamSource(stream);
       source.connect(analyserRef.current);
-      
+
       // Start visualizing
       const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-      
+
       const updateLevel = () => {
         if (!isTestingMic) return;
-        
+
         analyserRef.current.getByteFrequencyData(dataArray);
         const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
         setMicLevel(Math.min(100, (average / 128) * 100 * (inputVolume / 100)));
-        
+
         animationFrameRef.current = requestAnimationFrame(updateLevel);
       };
-      
+
       updateLevel();
     } catch (error) {
       console.error("Error testing microphone:", error);
@@ -216,16 +223,16 @@ const PhonebarInfo = ({ open, onClose }) => {
   const stopMicTest = () => {
     setIsTestingMic(false);
     setMicLevel(0);
-    
+
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
-    
+
     if (micStreamRef.current) {
       micStreamRef.current.getTracks().forEach((track) => track.stop());
       micStreamRef.current = null;
     }
-    
+
     if (audioContextRef.current) {
       audioContextRef.current.close();
       audioContextRef.current = null;
@@ -237,19 +244,19 @@ const PhonebarInfo = ({ open, onClose }) => {
     try {
       setAudioError(null);
       setIsTestingOutput(true);
-      
+
       // Create a test tone
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
-      
+
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // A4 note
       gainNode.gain.setValueAtTime(outputVolume / 100 * 0.3, audioContext.currentTime); // Reduce volume
-      
+
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
-      
+
       // Try to set output device if supported
       if (audioContext.setSinkId && selectedOutputDevice) {
         try {
@@ -258,9 +265,9 @@ const PhonebarInfo = ({ open, onClose }) => {
           console.warn("Could not set output device:", e);
         }
       }
-      
+
       oscillator.start();
-      
+
       // Play for 1 second
       setTimeout(() => {
         oscillator.stop();
@@ -274,10 +281,81 @@ const PhonebarInfo = ({ open, onClose }) => {
     }
   };
 
+  // Handle ringtone selection change
+  const handleRingtoneChange = (event) => {
+    const ringtoneId = event.target.value;
+    setSelectedRingtone(ringtoneId);
+    ringtoneService.setSelectedRingtone(ringtoneId);
+  };
+
+  // Preview ringtone
+  const previewRingtone = async () => {
+    try {
+      setAudioError(null);
+
+      // Stop any existing preview
+      if (ringtonePreviewRef.current) {
+        ringtonePreviewRef.current.pause();
+        ringtonePreviewRef.current.currentTime = 0;
+      }
+
+      setIsPreviewingRingtone(true);
+
+      // Create audio element for preview
+      const audio = new Audio(ringtoneService.getRingtoneUrl(selectedRingtone));
+      ringtonePreviewRef.current = audio;
+      audio.volume = outputVolume / 100;
+      audio.loop = false;
+
+      // Try to set output device if supported
+      if (audio.setSinkId && selectedOutputDevice) {
+        try {
+          await audio.setSinkId(selectedOutputDevice);
+        } catch (e) {
+          console.warn("Could not set output device for ringtone preview:", e);
+        }
+      }
+
+      audio.play();
+
+      // Stop after 3 seconds
+      setTimeout(() => {
+        if (ringtonePreviewRef.current) {
+          ringtonePreviewRef.current.pause();
+          ringtonePreviewRef.current.currentTime = 0;
+        }
+        setIsPreviewingRingtone(false);
+      }, 3000);
+
+      // Also stop when audio ends naturally
+      audio.onended = () => {
+        setIsPreviewingRingtone(false);
+      };
+    } catch (error) {
+      console.error("Error previewing ringtone:", error);
+      setAudioError("Failed to preview ringtone: " + error.message);
+      setIsPreviewingRingtone(false);
+    }
+  };
+
+  // Stop ringtone preview
+  const stopRingtonePreview = () => {
+    if (ringtonePreviewRef.current) {
+      ringtonePreviewRef.current.pause();
+      ringtonePreviewRef.current.currentTime = 0;
+    }
+    setIsPreviewingRingtone(false);
+  };
+
   // Cleanup on unmount or close
   useEffect(() => {
     return () => {
       stopMicTest();
+      // Stop ringtone preview on cleanup
+      if (ringtonePreviewRef.current) {
+        ringtonePreviewRef.current.pause();
+        ringtonePreviewRef.current.currentTime = 0;
+      }
     };
   }, []);
 
@@ -415,7 +493,7 @@ const PhonebarInfo = ({ open, onClose }) => {
                       <Mic fontSize="small" color="primary" />
                       Microphone (Input)
                     </Typography>
-                    
+
                     <FormControl fullWidth size="small" sx={{ mb: 2 }}>
                       <InputLabel>Select Microphone</InputLabel>
                       <Select
@@ -458,7 +536,7 @@ const PhonebarInfo = ({ open, onClose }) => {
                       >
                         {isTestingMic ? "Stop Test" : "Test Microphone"}
                       </Button>
-                      
+
                       {isTestingMic && (
                         <Box sx={{ flex: 1, display: "flex", alignItems: "center", gap: 1 }}>
                           <Box
@@ -493,7 +571,7 @@ const PhonebarInfo = ({ open, onClose }) => {
                       <VolumeUp fontSize="small" color="primary" />
                       Speaker (Output)
                     </Typography>
-                    
+
                     <FormControl fullWidth size="small" sx={{ mb: 2 }}>
                       <InputLabel>Select Speaker</InputLabel>
                       <Select
@@ -535,6 +613,48 @@ const PhonebarInfo = ({ open, onClose }) => {
                     >
                       {isTestingOutput ? "Playing..." : "Test Speaker"}
                     </Button>
+                  </Box>
+                </Grid>
+
+                {/* Ringtone Settings */}
+                <Grid item xs={12}>
+                  <Divider sx={{ my: 2 }} />
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle2" sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                      <MusicNoteIcon fontSize="small" color="primary" />
+                      Ringtone
+                    </Typography>
+
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <FormControl size="small" sx={{ minWidth: 200 }}>
+                        <InputLabel>Select Ringtone</InputLabel>
+                        <Select
+                          value={selectedRingtone}
+                          onChange={handleRingtoneChange}
+                          label="Select Ringtone"
+                        >
+                          {AVAILABLE_RINGTONES.map((ringtone) => (
+                            <MenuItem key={ringtone.id} value={ringtone.id}>
+                              {ringtone.name}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+
+                      <Button
+                        variant={isPreviewingRingtone ? "contained" : "outlined"}
+                        color={isPreviewingRingtone ? "error" : "primary"}
+                        size="small"
+                        startIcon={isPreviewingRingtone ? <Stop /> : <PlayArrow />}
+                        onClick={isPreviewingRingtone ? stopRingtonePreview : previewRingtone}
+                      >
+                        {isPreviewingRingtone ? "Stop" : "Preview"}
+                      </Button>
+                    </Box>
+
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+                      This ringtone will play when you receive incoming calls.
+                    </Typography>
                   </Box>
                 </Grid>
               </Grid>

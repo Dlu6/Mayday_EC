@@ -16,7 +16,7 @@ import {
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useSnackbar } from "notistack";
 import useAuth from "../hooks/useAuth";
-import maydaylogo from "../assets/images/mayday_logo.png";
+import maydaylogo from "../assets/images/mayday_logo_simi.png";
 const LoginForm = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -91,7 +91,7 @@ const LoginForm = () => {
     >
       <Grid item xs={12} sm={6} md={4}>
         <Paper elevation={6} style={{ padding: "1.5rem" }}>
-          <Box textAlign="center" 
+          <Box textAlign="center"
           // mb={2}
           >
             <img

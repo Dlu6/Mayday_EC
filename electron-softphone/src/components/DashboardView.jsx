@@ -48,6 +48,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { callMonitoringService } from "../services/callMonitoringServiceElectron";
+import { sipService } from "../services/sipService";
 import { agentService } from "../services/agentService";
 import { getAgentPerformanceData } from "../api/reportsApi"; // Import the API function
 import callHistoryService from "../services/callHistoryService";
@@ -126,8 +127,8 @@ const StatCard = ({ title, value, icon, color, subtitle, trend }) => (
               trend > 0
                 ? "success.main"
                 : trend < 0
-                ? "error.main"
-                : "text.secondary",
+                  ? "error.main"
+                  : "text.secondary",
             display: "flex",
             alignItems: "center",
             gap: 0.5,
@@ -239,8 +240,8 @@ const ActiveCallsList = ({ calls }) => {
             call.status === "answered"
               ? "success"
               : call.status === "ringing"
-              ? "warning"
-              : "info";
+                ? "warning"
+                : "info";
 
           // Determine direction color and icon
           const directionColor =
@@ -640,21 +641,54 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
 
   // Add notification hook
   const { showNotification } = useNotification();
-  
+
   // Get WebSocket connection status for Live badge
-  const { isConnected, isReconnecting } = useWebSocket();
+  const { isConnected: isWsConnected, isReconnecting } = useWebSocket();
+
+  // ========== SIP Registration State for Live Badge ==========
+  const [isSipRegistered, setIsSipRegistered] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleRegistered = () => setIsSipRegistered(true);
+    const handleUnregistered = () => setIsSipRegistered(false);
+    const handleRegistrationLost = () => setIsSipRegistered(false);
+
+    // Subscribe to SIP service events
+    sipService.events.on("registered", handleRegistered);
+    sipService.events.on("unregistered", handleUnregistered);
+    sipService.events.on("registration_lost", handleRegistrationLost);
+    sipService.events.on("registration:state", (newState) => {
+      setIsSipRegistered(newState === "Registered");
+    });
+
+    // Set initial state
+    try {
+      if (sipService.state?.registerer?.state === "Registered" || sipService.isConnected) {
+        setIsSipRegistered(true);
+      }
+    } catch (_) { }
+
+    return () => {
+      sipService.events.off("registered", handleRegistered);
+      sipService.events.off("unregistered", handleUnregistered);
+      sipService.events.off("registration_lost", handleRegistrationLost);
+    };
+  }, []);
+
+  // "Live" means both SIP registered AND WebSocket connected
+  const isConnected = isSipRegistered && isWsConnected;
 
   // CRITICAL: Add loading timeout to prevent stuck loading state
   useEffect(() => {
     if (!isLoading) return;
-    
+
     const loadingTimeout = setTimeout(() => {
       if (isLoading) {
         console.warn("⏰ Dashboard loading timeout - forcing loading state to complete");
         setIsLoading(false);
       }
     }, 10000); // 10 second timeout
-    
+
     return () => clearTimeout(loadingTimeout);
   }, [isLoading]);
 
@@ -788,7 +822,7 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
           if (response.ok) {
             const result = await response.json();
             if (result.success && result.data?.length > 0) {
-              console.log("[Dashboard] Restoring pause status for agents:", result.data);
+              // console.log("[Dashboard] Restoring pause status for agents:", result.data);
               // Update pausedAgents state (source of truth)
               const pausedMap = {};
               result.data.forEach((pausedAgent) => {
@@ -825,8 +859,8 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
           abandonRate:
             stats.totalCalls > 0
               ? Math.round(
-                  (stats.abandonedCalls / stats.totalCalls) * 100 * 10
-                ) / 10
+                (stats.abandonedCalls / stats.totalCalls) * 100 * 10
+              ) / 10
               : 0,
         };
       case 1: // Week
@@ -838,10 +872,10 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
           abandonRate:
             stats.weeklyTotalCalls > 0
               ? Math.round(
-                  (stats.weeklyAbandonedCalls / stats.weeklyTotalCalls) *
-                    100 *
-                    10
-                ) / 10
+                (stats.weeklyAbandonedCalls / stats.weeklyTotalCalls) *
+                100 *
+                10
+              ) / 10
               : 0,
         };
       case 2: // Month
@@ -853,10 +887,10 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
           abandonRate:
             stats.monthlyTotalCalls > 0
               ? Math.round(
-                  (stats.monthlyAbandonedCalls / stats.monthlyTotalCalls) *
-                    100 *
-                    10
-                ) / 10
+                (stats.monthlyAbandonedCalls / stats.monthlyTotalCalls) *
+                100 *
+                10
+              ) / 10
               : 0,
         };
       default:
@@ -870,8 +904,8 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
           abandonRate:
             stats.totalCalls > 0
               ? Math.round(
-                  (stats.abandonedCalls / stats.totalCalls) * 100 * 10
-                ) / 10
+                (stats.abandonedCalls / stats.totalCalls) * 100 * 10
+              ) / 10
               : 0,
         };
     }
@@ -937,13 +971,13 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
     (async () => {
       try {
         await agentService.connect();
-      } catch (_) {}
+      } catch (_) { }
     })();
 
     const normalizeStatus = (payload) => {
       // Check for explicit "Paused" status first (from our pause events)
       if (payload?.status === "Paused") return "Paused";
-      
+
       const raw = (payload?.status || "").toString().toLowerCase();
       if (
         raw.includes("oncall") ||
@@ -967,17 +1001,17 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
 
       const idx = list.findIndex((a) => String(a.extension) === ext);
       const existingAgent = idx >= 0 ? list[idx] : null;
-      
+
       // Check if the incoming status is explicitly "Paused" or if agent is currently paused
       const incomingStatus = normalizeStatus(payload);
       const isCurrentlyPaused = existingAgent?.status === "Paused";
       const isIncomingPaused = incomingStatus === "Paused" || payload?.status === "Paused";
-      
+
       // Preserve pause status unless explicitly unpaused
       // This prevents AMI ContactStatus events from overwriting pause state
       let finalStatus = incomingStatus;
       let preservePauseInfo = false;
-      
+
       if (isCurrentlyPaused && !isIncomingPaused) {
         // Agent is paused but incoming status is not pause-related
         // Only update if it's a definitive status change (Available, On Call)
@@ -989,7 +1023,7 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
           console.log(`[Dashboard] Preserving pause status for ${ext}, ignoring ${incomingStatus}`);
         }
       }
-      
+
       const name =
         payload?.name || existingAgent?.name || `Agent ${ext}`;
 
@@ -1003,7 +1037,7 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
         extension: ext,
         status: finalStatus,
       };
-      
+
       // Handle pause info based on status
       if (finalStatus === "Paused") {
         // If paused, preserve or set pause info
@@ -1200,7 +1234,7 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
                   name: a.name || `Agent ${a.extension}`,
                 });
             });
-          } catch (_) {}
+          } catch (_) { }
 
           const callStatsMap = {};
 
@@ -1381,7 +1415,7 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
             // Missed/abandoned: disposition is "NO ANSWER"
             const disposition = data.disposition || data.status;
             const isAnswered = disposition && disposition !== "NO ANSWER" && disposition !== "missed";
-            
+
             if (isAnswered) {
               currentStats.answeredCalls =
                 (currentStats.answeredCalls || 0) + 1;
@@ -1452,7 +1486,7 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
           }
         });
       });
-    } catch (_) {}
+    } catch (_) { }
     return map;
   }, [queueStatus]);
 
@@ -1523,9 +1557,9 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
         callStats:
           handledCounts[String(agent.extension)] != null
             ? {
-                ...callStats,
-                answeredCalls: handledCounts[String(agent.extension)],
-              }
+              ...callStats,
+              answeredCalls: handledCounts[String(agent.extension)],
+            }
             : callStats,
         // Use formatted average call duration
         avgHandleTime: formattedAvgDuration,
@@ -1832,13 +1866,13 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
           </Tooltip>
           <Badge
             variant="dot"
-            sx={{ 
-              "& .MuiBadge-badge": { 
-                width: 12, 
-                height: 12, 
+            sx={{
+              "& .MuiBadge-badge": {
+                width: 12,
+                height: 12,
                 borderRadius: "50%",
                 backgroundColor: isConnected ? "#00ff04ff" : isReconnecting ? "#ff9800" : undefined
-              } 
+              }
             }}
             color={isConnected ? "success" : "error"}
           >
@@ -1922,8 +1956,8 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
                 {timeRange === 0
                   ? "Stats reset at midnight"
                   : timeRange === 1
-                  ? "Weekly stats (since Sunday)"
-                  : "Monthly stats (current month)"}
+                    ? "Weekly stats (since Sunday)"
+                    : "Monthly stats (current month)"}
               </Typography>
             </Box>
           </Box>
@@ -1949,9 +1983,9 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
                 trend={
                   previousStats
                     ? calculateTrend(
-                        getTimeRangeStats.abandonedCalls,
-                        previousStats.abandonedCalls
-                      )
+                      getTimeRangeStats.abandonedCalls,
+                      previousStats.abandonedCalls
+                    )
                     : null
                 }
               />
@@ -1962,15 +1996,14 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
                 value={getTimeRangeStats.totalCalls}
                 icon={<QueryStats sx={{ color: "#4caf50" }} />}
                 color="#4caf50"
-                subtitle={`${getTimeRangeStats.subtitle} (In: ${
-                  getTimeRangeStats.inboundCalls || 0
-                } • Out: ${getTimeRangeStats.outboundCalls || 0})`}
+                subtitle={`${getTimeRangeStats.subtitle} (In: ${getTimeRangeStats.inboundCalls || 0
+                  } • Out: ${getTimeRangeStats.outboundCalls || 0})`}
                 trend={
                   previousStats
                     ? calculateTrend(
-                        getTimeRangeStats.totalCalls,
-                        previousStats.totalCalls
-                      )
+                      getTimeRangeStats.totalCalls,
+                      previousStats.totalCalls
+                    )
                     : null
                 }
               />

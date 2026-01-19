@@ -33,14 +33,22 @@ import {
   Tabs,
   Tab,
   TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
+  InputAdornment,
 } from "@mui/material";
 
 import { alpha, styled } from "@mui/material/styles";
 import { blue } from "@mui/material/colors";
 import SaveIcon from "@mui/icons-material/Save";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import VpnKeyIcon from "@mui/icons-material/VpnKey";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import apiClient from "../api/apiClient";
-// import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -48,19 +56,31 @@ import { useSnackbar } from "notistack";
 import {
   fetchAgentDetailsByExtension,
   updateAgentDetails,
+  resetAgentPassword,
 } from "../features/agents/agentsSlice.js";
 
 const AgentEdit = () => {
   const { agentId } = useParams();
   const { state } = useLocation();
-  const { extension } = state || {};
+  const { extension, openSecurityTab } = state || {};
 
   const agentDetails = useSelector((state) => state.agents.currentAgent);
   const loading = useSelector((state) => state.agents.loading);
 
-  const [currentTab, setCurrentTab] = useState("account");
+  const [currentTab, setCurrentTab] = useState(openSecurityTab ? "security" : "account");
 
   const [formAgentDetails, setFormAgentDetails] = useState({});
+
+  // Password reset state
+  const [passwordResetState, setPasswordResetState] = useState({
+    showPasswordDialog: false,
+    newPassword: "",
+    confirmPassword: "",
+    passwordError: "",
+    isSubmitting: false,
+    showNewPassword: false,
+    showConfirmPassword: false,
+  });
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -89,12 +109,12 @@ const AgentEdit = () => {
       const allowedArray =
         typeof allowRaw === "string"
           ? allowRaw
-              .split(",")
-              .map((c) => c.trim())
-              .filter(Boolean)
+            .split(",")
+            .map((c) => c.trim())
+            .filter(Boolean)
           : Array.isArray(allowRaw)
-          ? allowRaw
-          : ["ulaw", "alaw", "opus"]; // audio-only sensible default
+            ? allowRaw
+            : ["ulaw", "alaw", "opus"]; // audio-only sensible default
 
       setFormAgentDetails({
         ...agentDetails,
@@ -198,6 +218,9 @@ const AgentEdit = () => {
           dtls_enabled: formAgentDetails.dtls_enabled === true, // Explicitly use boolean
           dtls_setup: formAgentDetails.dtls_setup || "actpass",
           avpf: formAgentDetails.avpf || "yes",
+          // Phonebar settings - Auto Answer
+          phoneBarAutoAnswer: formAgentDetails.phoneBarAutoAnswer || false,
+          phoneBarAutoAnswerDelay: formAgentDetails.phoneBarAutoAnswerDelay || 0,
         },
         pjsipData: {
           // Convert string values to integers for boolean fields
@@ -260,6 +283,87 @@ const AgentEdit = () => {
 
   const handleBack = () => {
     navigate(-1); // Navigates back to the previous page
+  };
+
+  // Password reset handlers
+  const handlePasswordReset = () => {
+    setPasswordResetState({
+      showPasswordDialog: true,
+      newPassword: "",
+      confirmPassword: "",
+      passwordError: "",
+      isSubmitting: false,
+      showNewPassword: false,
+      showConfirmPassword: false,
+    });
+  };
+
+  const handlePasswordDialogClose = () => {
+    setPasswordResetState((prev) => ({
+      ...prev,
+      showPasswordDialog: false,
+      newPassword: "",
+      confirmPassword: "",
+      passwordError: "",
+    }));
+  };
+
+  const handlePasswordChange = (field, value) => {
+    setPasswordResetState((prev) => ({
+      ...prev,
+      [field]: value,
+      passwordError: "", // Clear error when user types
+    }));
+  };
+
+  const validatePassword = (password, confirmPassword) => {
+    if (!password || password.length < 6) {
+      return "Password must be at least 6 characters long";
+    }
+    if (password !== confirmPassword) {
+      return "Passwords do not match";
+    }
+    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+      return "Password must contain at least one uppercase letter, one lowercase letter, and one number";
+    }
+    return "";
+  };
+
+  const handlePasswordSubmit = async () => {
+    const { newPassword, confirmPassword } = passwordResetState;
+
+    const validationError = validatePassword(newPassword, confirmPassword);
+    if (validationError) {
+      setPasswordResetState((prev) => ({
+        ...prev,
+        passwordError: validationError,
+      }));
+      return;
+    }
+
+    setPasswordResetState((prev) => ({ ...prev, isSubmitting: true }));
+
+    try {
+      const result = await dispatch(
+        resetAgentPassword({
+          agentId,
+          newPassword,
+        })
+      ).unwrap();
+
+      enqueueSnackbar(result.message || "Password reset successfully", {
+        variant: "success",
+      });
+
+      handlePasswordDialogClose();
+    } catch (error) {
+      console.error("Password reset error:", error);
+      setPasswordResetState((prev) => ({
+        ...prev,
+        passwordError: error || "Failed to reset password",
+        isSubmitting: false,
+      }));
+    }
   };
 
   const handleSwitchChange = (event) => {
@@ -372,7 +476,7 @@ const AgentEdit = () => {
         <Tab label="Other Channels" value="otherChannels" />
         <Tab label="Phonebar" value="phonebar" />
         <Tab label="Dialplan" value="dialplan" />
-        {/* ...other tabs */}
+        <Tab label="Security" value="security" />
         {/* Tab Content */}
       </Tabs>
       {/* Content Card */}
@@ -416,10 +520,141 @@ const AgentEdit = () => {
               extension={formAgentDetails?.extension}
             />
           )}
+          {currentTab === "security" && (
+            <SecurityTabContent
+              agentDetails={agentDetails}
+              onPasswordReset={handlePasswordReset}
+            />
+          )}
 
           {/* ...other tab contents */}
         </CardContent>
       </Card>
+
+      {/* Password Reset Dialog */}
+      <Dialog
+        open={passwordResetState.showPasswordDialog}
+        onClose={handlePasswordDialogClose}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <VpnKeyIcon />
+          Reset Password for {agentDetails?.username}
+        </DialogTitle>
+        <DialogContent>
+          {passwordResetState.passwordError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {passwordResetState.passwordError}
+            </Alert>
+          )}
+
+          <TextField
+            autoFocus
+            margin="dense"
+            label="New Password"
+            type={passwordResetState.showNewPassword ? "text" : "password"}
+            fullWidth
+            variant="outlined"
+            value={passwordResetState.newPassword}
+            onChange={(e) =>
+              handlePasswordChange("newPassword", e.target.value)
+            }
+            sx={{ mb: 2, mt: 1 }}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() =>
+                      setPasswordResetState((prev) => ({
+                        ...prev,
+                        showNewPassword: !prev.showNewPassword,
+                      }))
+                    }
+                    edge="end"
+                  >
+                    {passwordResetState.showNewPassword ? (
+                      <VisibilityOffIcon />
+                    ) : (
+                      <VisibilityIcon />
+                    )}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          <TextField
+            margin="dense"
+            label="Confirm New Password"
+            type={passwordResetState.showConfirmPassword ? "text" : "password"}
+            fullWidth
+            variant="outlined"
+            value={passwordResetState.confirmPassword}
+            onChange={(e) =>
+              handlePasswordChange("confirmPassword", e.target.value)
+            }
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() =>
+                      setPasswordResetState((prev) => ({
+                        ...prev,
+                        showConfirmPassword: !prev.showConfirmPassword,
+                      }))
+                    }
+                    edge="end"
+                  >
+                    {passwordResetState.showConfirmPassword ? (
+                      <VisibilityOffIcon />
+                    ) : (
+                      <VisibilityIcon />
+                    )}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2" color="text.secondary">
+              Password requirements:
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+              • At least 6 characters long
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+              • Contains uppercase and lowercase letters
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+              • Contains at least one number
+            </Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={handlePasswordDialogClose}
+            disabled={passwordResetState.isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handlePasswordSubmit}
+            variant="contained"
+            disabled={
+              passwordResetState.isSubmitting ||
+              !passwordResetState.newPassword ||
+              !passwordResetState.confirmPassword
+            }
+            startIcon={passwordResetState.isSubmitting ? null : <VpnKeyIcon />}
+          >
+            {passwordResetState.isSubmitting
+              ? "Resetting..."
+              : "Reset Password"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
@@ -497,7 +732,7 @@ const AccountTabContent = ({ formAgentDetails, handleFormChange, loading }) => {
           onChange={handleFormChange}
           autoComplete="phone"
           required
-          // disabled={loading}
+        // disabled={loading}
         />
       </FormControl>
       {/* Mobile */}
@@ -510,7 +745,7 @@ const AccountTabContent = ({ formAgentDetails, handleFormChange, loading }) => {
           onChange={handleFormChange}
           autoComplete="mobile"
           required
-          // disabled={loading}
+        // disabled={loading}
         />
       </FormControl>
     </Box>
@@ -1450,7 +1685,7 @@ const DialplanTabContent = ({ extension }) => {
 
   const fetchDialplan = async () => {
     if (!extension) return;
-    
+
     setLoading(true);
     try {
       const response = await apiClient.get(`/users/agents/${extension}/dialplan`);
@@ -1467,7 +1702,7 @@ const DialplanTabContent = ({ extension }) => {
 
   const handleRegenerate = async () => {
     if (!extension) return;
-    
+
     setRegenerating(true);
     try {
       const response = await apiClient.post(`/users/agents/${extension}/dialplan/regenerate`);
@@ -1633,6 +1868,103 @@ const DialplanTabContent = ({ extension }) => {
           Click &quot;Regenerate Dialplan&quot; to update with the latest configuration including pause status checks.
         </Typography>
       </Box>
+    </Box>
+  );
+};
+
+// Security Tab Content
+const SecurityTabContent = ({ agentDetails, onPasswordReset }) => {
+  return (
+    <Box p={3}>
+      <Typography variant="h6" gutterBottom>
+        Security Settings
+      </Typography>
+
+      <Card variant="outlined" sx={{ mt: 2 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Password Management
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Reset the agent&apos;s login password. This will update both the
+            dashboard login and SIP authentication password.
+          </Typography>
+
+          <Stack spacing={2}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "50%",
+                  backgroundColor: "primary.light",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Typography variant="h4" color="primary.contrastText">
+                  🔐
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="body1">
+                  Current User: <strong>{agentDetails?.username}</strong>
+                </Typography>
+                {/* Email */}
+                <Typography>
+                  Email/ User account: <strong>
+                    {agentDetails?.email}
+                  </strong>
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Extension: {agentDetails?.extension}
+                </Typography>
+              </Box>
+            </Box>
+
+            <Button
+              variant="contained"
+              onClick={onPasswordReset}
+              sx={{
+                alignSelf: "flex-start",
+                backgroundColor: "#1976d2",
+                "&:hover": {
+                  backgroundColor: "#1565c0",
+                  boxShadow: "0 4px 8px rgba(25, 118, 210, 0.3)",
+                },
+                boxShadow: "0 2px 4px rgba(25, 118, 210, 0.2)",
+              }}
+            >
+              Reset Password
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Card variant="outlined" sx={{ mt: 2 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Account Information
+          </Typography>
+          <Stack spacing={1}>
+            <Typography variant="body2">
+              <strong>Email:</strong> {agentDetails?.email}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Role:</strong> {agentDetails?.role}
+            </Typography>
+            <Typography variant="body2">
+              <strong>Typology:</strong> {agentDetails?.typology}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              Password reset will affect both dashboard login and SIP
+              registration. Ensure the agent updates their password in any
+              client applications.
+            </Typography>
+          </Stack>
+        </CardContent>
+      </Card>
     </Box>
   );
 };

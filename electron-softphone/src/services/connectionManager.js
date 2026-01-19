@@ -1,6 +1,7 @@
 // services/connectionManager.js
 import { EventEmitter } from "events";
 import { sipService } from "./sipService";
+import networkService from "./networkService";
 // Remove direct import of callMonitoringService to avoid circular dependency
 // import { callMonitoringService } from './callMonitoringServiceElectron';
 import logoutManager from "./logoutManager";
@@ -47,7 +48,7 @@ let healthState = {
 const eventEmitter = new EventEmitter();
 try {
   eventEmitter.setMaxListeners(50);
-} catch (_) {}
+} catch (_) { }
 
 // Event handlers
 const boundHandlers = {
@@ -86,8 +87,7 @@ function updateConnectionState(type, connected, health = "unknown") {
   // Log state change
   if (wasConnected !== connected) {
     console.log(
-      `🔌 ${type.toUpperCase()} connection ${
-        connected ? "established" : "lost"
+      `🔌 ${type.toUpperCase()} connection ${connected ? "established" : "lost"
       }`
     );
   }
@@ -150,6 +150,12 @@ function scheduleReconnection() {
     return;
   }
 
+  // CRITICAL: Check network availability before scheduling reconnection
+  if (!navigator.onLine) {
+    console.log("🌐 Network offline, waiting for connectivity before reconnection");
+    return;
+  }
+
   if (reconnectState.isReconnecting) {
     console.log("🔄 Reconnection already in progress, skipping");
     return;
@@ -190,6 +196,13 @@ async function attemptReconnection() {
     console.log(
       "🔐 Authentication in progress, canceling reconnection attempt"
     );
+    resetReconnectionState();
+    return;
+  }
+
+  // CRITICAL: Check network availability before attempting reconnection
+  if (!navigator.onLine) {
+    console.log("🌐 Network offline, canceling reconnection attempt");
     resetReconnectionState();
     return;
   }
@@ -614,6 +627,40 @@ function initialize() {
       console.warn("⚠️ Could not bind WebSocket event handlers:", error);
     }
 
+    // ========== Network-Aware Reconnection ==========
+    // Listen for network recovery events to trigger reconnection
+    try {
+      networkService.on("network:recovered", () => {
+        console.log("🌐 Network recovered - triggering reconnection from connectionManager");
+        // Reset reconnection attempts since network just recovered
+        resetReconnectionState();
+        scheduleReconnection();
+      });
+
+      networkService.on("network:online", () => {
+        console.log("🌐 Network online event received");
+        // Only schedule if we have disconnected services
+        if (!states.sip.connected || !states.websocket.connected) {
+          resetReconnectionState();
+          scheduleReconnection();
+        }
+      });
+
+      networkService.on("network:offline", () => {
+        console.log("🌐 Network offline - canceling any pending reconnection");
+        // Cancel any pending reconnection attempts
+        if (reconnectState.timeout) {
+          clearTimeout(reconnectState.timeout);
+          reconnectState.timeout = null;
+        }
+        reconnectState.isReconnecting = false;
+      });
+
+      console.log("🌐 Network recovery listeners bound");
+    } catch (error) {
+      console.warn("⚠️ Could not bind network event handlers:", error);
+    }
+
     // Start health monitoring
     startHealthMonitoring();
 
@@ -632,7 +679,7 @@ console.log("🔌 Connection Manager: Initialization complete");
 logoutManager.registerService("ConnectionManager", async () => {
   try {
     destroy();
-  } catch (_) {}
+  } catch (_) { }
 });
 
 // Export the public API

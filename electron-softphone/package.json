@@ -1,6 +1,6 @@
 {
   "name": "mayday-appbar",
-  "version": "5.1.5",
+  "version": "6.0.2",
   "description": "Softphone Appbar Client",
   "main": "electron/main.js",
   "engines": {
@@ -22,7 +22,7 @@
     "deploy:update": "bash scripts/deploy-update.sh",
     "clean": "rimraf dist",
     "prebuild": "npm run clean",
-    "postinstall": "electron-builder install-app-deps && npm run build:native",
+    "postinstall": "electron-builder install-app-deps && (node -e \"process.platform === 'win32' && process.exit(0) || process.exit(1)\" && npm run build:native || true)",
     "build:native": "cd native/win-appbar && npm install && npm run build",
     "rebuild:native": "cd native/win-appbar && npm run build",
     "check:native": "node scripts/check-native-prerequisites.js",
@@ -43,7 +43,7 @@
   },
   "build": {
     "appId": "com.mayday.appbar",
-    "productName": "MHU Appbar",
+    "productName": "Mayday Appbar",
     "directories": {
       "output": "release/${version}"
     },
@@ -64,7 +64,9 @@
           ]
         }
       ],
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "forceCodeSigning": false
     },
     "linux": {
       "target": [
@@ -78,28 +80,21 @@
       "**/*.node",
       "**/node_modules/electron/**/*"
     ],
-    "extraResources": [
-      {
-        "from": "assets/",
-        "to": "assets"
-      }
-    ],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "MHU Appbar",
+      "shortcutName": "Mayday Appbar",
       "allowElevation": true,
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": true,
-      "uninstallDisplayName": "MHU Appbar",
-      "include": "build/installer.nsh",
+      "uninstallDisplayName": "Mayday Appbar",
       "differentialPackage": false
     },
     "publish": {
       "provider": "generic",
-      "url": "http://192.168.1.14/downloads/"
+      "url": "http://192.168.1.15/downloads/"
     }
   },
   "dependencies": {

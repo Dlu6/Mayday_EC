@@ -3,6 +3,7 @@ import { Inviter, Registerer, SessionState, UserAgent, Web } from "sip.js";
 import { storageService } from "./storageService";
 import { EventEmitter } from "events";
 import serverConfig from "../config/serverConfig";
+import networkService from "./networkService";
 
 const state = {
   userAgent: null,
@@ -24,7 +25,153 @@ const state = {
   consultationCall: null, // For attended transfers
   transferState: "idle", // idle, transferring, consulting, completed
   registerRefreshTimer: null,
+  networkRecoveryTimer: null, // Timer for network recovery re-registration
+  wasOffline: false, // Track if we went offline
 };
+
+// ========== Network-Aware Registration Recovery ==========
+// Listen for network recovery events
+function setupNetworkRecoveryListeners() {
+  // Handle network recovery - attempt re-registration
+  networkService.on("network:recovered", handleNetworkRecovery);
+  networkService.on("network:online", handleNetworkOnline);
+  networkService.on("network:offline", handleNetworkOffline);
+  networkService.on("network:server_unreachable", handleServerUnreachable);
+
+  // Also listen for browser online/offline directly as backup
+  window.addEventListener("online", handleBrowserOnline);
+  window.addEventListener("offline", handleBrowserOffline);
+
+  console.log("🌐 SIP Service: Network recovery listeners registered");
+}
+
+function handleNetworkRecovery() {
+  console.log("🌐 SIP Service: Network recovered - scheduling re-registration");
+  scheduleNetworkRecoveryRegistration();
+}
+
+function handleNetworkOnline() {
+  if (state.wasOffline) {
+    console.log("🌐 SIP Service: Network online after being offline");
+    scheduleNetworkRecoveryRegistration();
+  }
+}
+
+function handleNetworkOffline(data) {
+  state.wasOffline = true;
+  state.isConnected = false;
+
+  // Clear any pending recovery timer
+  if (state.networkRecoveryTimer) {
+    clearTimeout(state.networkRecoveryTimer);
+    state.networkRecoveryTimer = null;
+  }
+
+  console.log("🌐 SIP Service: Network offline - emitting registration_lost");
+  state.eventEmitter.emit("registration_lost", {
+    reason: "network_offline",
+    detail: data?.reason || "network_offline"
+  });
+}
+
+function handleServerUnreachable(data) {
+  state.isConnected = false;
+  console.warn("🌐 SIP Service: Server unreachable", data?.error);
+  state.eventEmitter.emit("registration_lost", {
+    reason: "server_unreachable",
+    error: data?.error
+  });
+}
+
+function handleBrowserOnline() {
+  if (state.wasOffline) {
+    console.log("🌐 SIP Service: Browser online event - checking connectivity");
+    // Let networkService verify actual connectivity before re-registering
+    networkService.checkConnectivity();
+  }
+}
+
+function handleBrowserOffline() {
+  handleNetworkOffline({ reason: "browser_offline" });
+}
+
+function scheduleNetworkRecoveryRegistration() {
+  // Don't schedule during logout or authentication
+  if (window.isLoggingOut || window.isAuthenticating) {
+    console.log("🌐 SIP Service: Skipping recovery during auth/logout");
+    return;
+  }
+
+  // Don't schedule if no config available
+  if (!state.lastConfig) {
+    console.log("🌐 SIP Service: No config for recovery");
+    return;
+  }
+
+  // Clear existing timer
+  if (state.networkRecoveryTimer) {
+    clearTimeout(state.networkRecoveryTimer);
+  }
+
+  // Schedule re-registration with a small delay to allow network to stabilize
+  state.networkRecoveryTimer = setTimeout(async () => {
+    state.networkRecoveryTimer = null;
+    state.wasOffline = false;
+
+    console.log("🌐 SIP Service: Attempting network recovery re-registration");
+
+    try {
+      // Check if we need full reconnection or just re-registration
+      if (!state.userAgent || !state.registerer) {
+        console.log("🌐 SIP Service: Full reconnection needed");
+        await reconnect();
+      } else {
+        // Try simple re-registration first
+        const registered = await safeRegister();
+        if (!registered) {
+          console.log("🌐 SIP Service: safeRegister failed, attempting full reconnection");
+          await reconnect();
+        }
+      }
+    } catch (error) {
+      console.error("🌐 SIP Service: Network recovery registration failed:", error);
+      // Schedule retry
+      scheduleNetworkRecoveryRetry();
+    }
+  }, 2000); // 2 second delay for network stabilization
+}
+
+let networkRecoveryRetryCount = 0;
+const MAX_NETWORK_RECOVERY_RETRIES = 5;
+
+function scheduleNetworkRecoveryRetry() {
+  if (networkRecoveryRetryCount >= MAX_NETWORK_RECOVERY_RETRIES) {
+    console.error("🌐 SIP Service: Max network recovery retries reached");
+    networkRecoveryRetryCount = 0;
+    state.eventEmitter.emit("registration_failed", {
+      cause: "max_network_recovery_retries",
+      message: "Failed to recover registration after network came back online"
+    });
+    return;
+  }
+
+  networkRecoveryRetryCount++;
+  const delay = Math.min(5000 * Math.pow(1.5, networkRecoveryRetryCount - 1), 30000);
+
+  console.log(`🌐 SIP Service: Scheduling retry ${networkRecoveryRetryCount}/${MAX_NETWORK_RECOVERY_RETRIES} in ${delay}ms`);
+
+  state.networkRecoveryTimer = setTimeout(() => {
+    if (navigator.onLine && networkService.isHealthy()) {
+      scheduleNetworkRecoveryRegistration();
+    } else {
+      console.log("🌐 SIP Service: Network not healthy, waiting...");
+      scheduleNetworkRecoveryRetry();
+    }
+  }, delay);
+}
+
+// Initialize network listeners when this module loads
+setupNetworkRecoveryListeners();
 
 async function fetchStunConfigWithRetry(url, retries = 5, delay = 2000) {
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -151,9 +298,8 @@ async function connect(config) {
         contactParams: {
           transport: "ws",
           "reg-id": 1,
-          "+sip.instance": `"<urn:uuid:${
-            config?.pjsip?.instance_id || Date.now().toString()
-          }>"`,
+          "+sip.instance": `"<urn:uuid:${config?.pjsip?.instance_id || Date.now().toString()
+            }>"`,
         },
       },
       sessionDescriptionHandlerFactoryOptions: {
@@ -169,7 +315,7 @@ async function connect(config) {
       logConfiguration: {
         builtinEnabled: false,
         level: "off",
-        connector: () => {},
+        connector: () => { },
       },
       hackViaTcp: true,
       viaHost: server,
@@ -203,14 +349,12 @@ async function connect(config) {
       contactParams: {
         transport: "ws",
         "reg-id": 1,
-        "+sip.instance": `"<urn:uuid:${
-          config?.pjsip?.instance_id || Date.now().toString()
-        }>"`,
+        "+sip.instance": `"<urn:uuid:${config?.pjsip?.instance_id || Date.now().toString()
+          }>"`,
       },
       // Force a single contact registration
-      contact: `<sip:${extension}@${server};transport=ws;reg-id=1;+sip.instance="<urn:uuid:${
-        config?.pjsip?.instance_id || Date.now().toString()
-      }>">`,
+      contact: `<sip:${extension}@${server};transport=ws;reg-id=1;+sip.instance="<urn:uuid:${config?.pjsip?.instance_id || Date.now().toString()
+        }>">`,
     });
 
     // Set up registration state monitoring
@@ -394,7 +538,16 @@ let _registerInFlight = false;
 
 async function safeRegister() {
   try {
-    if (!state.registerer) return false;
+    if (!state.registerer) {
+      console.log("⚠️ safeRegister skipped: no registerer available");
+      return false;
+    }
+
+    // Check network availability first
+    if (!navigator.onLine) {
+      console.log("⚠️ safeRegister skipped: network offline");
+      return false;
+    }
 
     // Do not register while a call is active to avoid renegotiation drops
     const active =
@@ -418,9 +571,27 @@ async function safeRegister() {
 
     console.log("🔄 safeRegister: sending REGISTER");
     await state.registerer.register();
-    return true;
+
+    // Verify registration succeeded by checking state after a short delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    if (state.registerer.state === 'Registered') {
+      state.isConnected = true;
+      networkRecoveryRetryCount = 0; // Reset retry count on success
+      console.log("✅ safeRegister: Registration confirmed");
+      state.eventEmitter.emit("registered", { source: "safeRegister" });
+      return true;
+    } else {
+      console.warn("⚠️ safeRegister: Registration state is", state.registerer.state);
+      return false;
+    }
   } catch (e) {
     console.warn("safeRegister failed:", e?.message || e);
+
+    // Emit unregistered event on failure
+    state.isConnected = false;
+    state.eventEmitter.emit("unregistered", { reason: "register_failed", error: e?.message });
+
     return false;
   } finally {
     _registerInFlight = false;
@@ -474,7 +645,7 @@ export const sipService = {
 
       // Clear any existing state
       state.isConnected = false;
-      
+
       // CRITICAL: Set lastConfig BEFORE connect so reconnection can work during initialization
       state.lastConfig = config;
 
@@ -1401,11 +1572,11 @@ export const sipCallService = {
             iceServers: state.userAgent?.configuration
               ?.sessionDescriptionHandlerFactoryOptions
               ?.peerConnectionConfiguration?.iceServers || [
-              { urls: ["stun:stun1.l.google.com:19302"] },
-              { urls: ["stun:stun2.l.google.com:19302"] },
-              { urls: ["stun:stun3.l.google.com:19302"] },
-              { urls: ["stun:stun4.l.google.com:19302"] },
-            ],
+                { urls: ["stun:stun1.l.google.com:19302"] },
+                { urls: ["stun:stun2.l.google.com:19302"] },
+                { urls: ["stun:stun3.l.google.com:19302"] },
+                { urls: ["stun:stun4.l.google.com:19302"] },
+              ],
             iceTransportPolicy: "all",
             rtcpMuxPolicy: "require",
             bundlePolicy: "balanced",
@@ -1462,9 +1633,8 @@ export const sipCallService = {
           onReject: (response) => {
             console.log("Call rejected:", response);
             state.eventEmitter.emit("call:failed", {
-              error: `Call rejected - ${
-                response.message?.reasonPhrase || "Unknown reason"
-              }`,
+              error: `Call rejected - ${response.message?.reasonPhrase || "Unknown reason"
+                }`,
               statusCode: response.message?.statusCode,
               reasonPhrase: response.message?.reasonPhrase,
             });
@@ -1528,9 +1698,8 @@ export const sipCallService = {
           onReject: (response) => {
             console.log("Call rejected:", response.message);
             state.eventEmitter.emit("call:failed", {
-              error: `Call rejected - ${
-                response.message.reasonPhrase || "Unknown reason"
-              }`,
+              error: `Call rejected - ${response.message.reasonPhrase || "Unknown reason"
+                }`,
               statusCode: response.message.statusCode,
               reasonPhrase: response.message.reasonPhrase,
             });
@@ -1603,11 +1772,11 @@ export const sipCallService = {
             iceServers: state.userAgent?.configuration
               ?.sessionDescriptionHandlerFactoryOptions
               ?.peerConnectionConfiguration?.iceServers || [
-              { urls: ["stun:stun1.l.google.com:19302"] },
-              { urls: ["stun:stun2.l.google.com:19302"] },
-              { urls: ["stun:stun3.l.google.com:19302"] },
-              { urls: ["stun:stun4.l.google.com:19302"] },
-            ],
+                { urls: ["stun:stun1.l.google.com:19302"] },
+                { urls: ["stun:stun2.l.google.com:19302"] },
+                { urls: ["stun:stun3.l.google.com:19302"] },
+                { urls: ["stun:stun4.l.google.com:19302"] },
+              ],
             iceTransportPolicy: "all",
             rtcpMuxPolicy: "require",
             bundlePolicy: "balanced",
@@ -1908,10 +2077,10 @@ export const sipCallService = {
               const errorMsg = body.includes("503")
                 ? "Service Unavailable"
                 : body.includes("404")
-                ? "Extension Not Found"
-                : body.includes("486")
-                ? "Extension Busy"
-                : "Transfer Cancelled";
+                  ? "Extension Not Found"
+                  : body.includes("486")
+                    ? "Extension Busy"
+                    : "Transfer Cancelled";
               events.emit("call:transfer_failed", {
                 error: errorMsg,
                 targetExtension,
@@ -1954,9 +2123,8 @@ export const sipCallService = {
               });
               state.transferState = "failed";
               events.emit("call:transfer_failed", {
-                error: `Transfer rejected: ${
-                  response.reasonPhrase || "Unknown reason"
-                }`,
+                error: `Transfer rejected: ${response.reasonPhrase || "Unknown reason"
+                  }`,
                 statusCode: response.statusCode,
                 targetExtension,
                 transferType,
@@ -2324,12 +2492,12 @@ export const sipCallService = {
         const originalSession = state.consultationCall.originalSession;
         state.currentSession = originalSession;
         state.callState = "inCall";
-        
+
         // Unhold the original call if it's on hold
         if (originalSession.isOnHold) {
           sipService.unholdCall().catch(console.error);
         }
-        
+
         // Restore audio to original call
         try {
           const remoteStream = originalSession.sessionDescriptionHandler?.remoteMediaStream;
@@ -2345,14 +2513,14 @@ export const sipCallService = {
       // Ensure consultation state is fully cleaned up
       state.consultationCall = null;
       state.transferState = "idle";
-      
+
       // Emit failure event
       events.emit("call:transfer_failed", {
         error: error.message,
         transferType: "attended",
         timestamp: new Date().toISOString(),
       });
-      
+
       throw error;
     }
   },
@@ -2464,22 +2632,22 @@ export const sipCallService = {
         state.currentSession.state === SessionState.Established,
       currentSession: state.currentSession
         ? {
-            id: state.currentSession.id,
-            state: state.currentSession.state,
-            remoteIdentity: state.currentSession.remoteIdentity?.uri?.user,
-            hasDialog: !!state.currentSession.dialog,
-          }
+          id: state.currentSession.id,
+          state: state.currentSession.state,
+          remoteIdentity: state.currentSession.remoteIdentity?.uri?.user,
+          hasDialog: !!state.currentSession.dialog,
+        }
         : null,
       transferState: state.transferState,
       isInConsultation: state.transferState === "consulting",
       consultationCall: state.consultationCall
         ? {
-            transferId: state.consultationCall.transferId,
-            targetExtension: state.consultationCall.targetExtension,
-            startTime: state.consultationCall.startTime,
-            hasSession: !!state.consultationCall.session,
-            hasOriginalSession: !!state.consultationCall.originalSession,
-          }
+          transferId: state.consultationCall.transferId,
+          targetExtension: state.consultationCall.targetExtension,
+          startTime: state.consultationCall.startTime,
+          hasSession: !!state.consultationCall.session,
+          hasOriginalSession: !!state.consultationCall.originalSession,
+        }
         : null,
     };
   },
@@ -2720,8 +2888,7 @@ async function handleAudioTrack(event) {
       const isEstablished =
         state.currentSession?.state === SessionState.Established;
       console.log(
-        `Playing audio (${
-          isEstablished ? "established call" : "possibly early media"
+        `Playing audio (${isEstablished ? "established call" : "possibly early media"
         })`
       );
 

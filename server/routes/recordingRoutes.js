@@ -31,28 +31,37 @@ router.get("/list/:year/:month/:day", async (req, res) => {
       });
     }
 
-    // Get recordings
+    // Get recordings - support multiple formats (wav, mp3, gsm)
     const files = await readdir(recordingDir);
+    const supportedFormats = [".wav", ".mp3", ".gsm"];
     const recordings = await Promise.all(
       files
-        .filter((file) => file.endsWith(".wav"))
+        .filter((file) => supportedFormats.some((ext) => file.endsWith(ext)))
         .map(async (file) => {
           const filePath = path.join(recordingDir, file);
           const fileStat = await stat(filePath);
 
           // Parse filename to extract metadata
+          // Supported patterns:
+          // - queue-{queueName}-{uniqueid}.{format} (queue recordings)
+          // - agent-{extension}-{uniqueid}.{format} (agent extension recordings)
           const parts = file.split("-");
           let type = "unknown";
           let identifier = "";
 
           if (parts.length >= 2) {
-            type = parts[0]; // e.g., "queue"
-            // The last part will contain the uniqueid with .wav extension
-            const uniqueId = parts[parts.length - 1].replace(".wav", "");
+            type = parts[0]; // e.g., "queue", "agent"
+            // The last part will contain the uniqueid with extension
+            const fileExt = supportedFormats.find((ext) => file.endsWith(ext)) || ".wav";
+            const uniqueId = parts[parts.length - 1].replace(fileExt, "");
 
             // For queue recordings, the queue name is the second part
             if (type === "queue" && parts.length >= 3) {
               identifier = parts[1];
+            }
+            // For agent recordings, the extension number is the second part
+            else if (type === "agent" && parts.length >= 3) {
+              identifier = parts[1]; // This is the extension number
             }
           }
 
@@ -60,13 +69,14 @@ router.get("/list/:year/:month/:day", async (req, res) => {
           let callDetails = null;
           let duration = 0;
           try {
+            // Note: CDR table uses 'start' column instead of 'calldate'
             const cdr = await sequelize.query(
-              `SELECT src, dst, disposition, billsec, duration as call_duration, calldate 
+              `SELECT src, dst, disposition, billsec, duration as call_duration, start as calldate 
              FROM cdr 
-             WHERE uniqueid = ? OR recordingfile LIKE ?`,
+             WHERE uniqueid = ? OR userfield LIKE ?`,
               {
                 replacements: [
-                  parts[parts.length - 1].replace(".wav", ""),
+                  parts[parts.length - 1].replace(/\.(wav|mp3|gsm)$/, ""),
                   `%${file}%`,
                 ],
                 type: sequelize.QueryTypes.SELECT,
@@ -168,6 +178,209 @@ router.get("/list/:year/:month/:day", async (req, res) => {
   }
 });
 
+// Helper function to get MIME type based on file extension
+function getAudioMimeType(filename) {
+  if (filename.endsWith(".mp3")) return "audio/mpeg";
+  if (filename.endsWith(".gsm")) return "audio/gsm";
+  return "audio/wav"; // Default to wav
+}
+
+// Helper function to get all dates between start and end date
+function getDateRange(startDate, endDate) {
+  const dates = [];
+  const currentDate = new Date(startDate);
+  const end = new Date(endDate);
+  
+  while (currentDate <= end) {
+    dates.push({
+      year: currentDate.getFullYear().toString(),
+      month: (currentDate.getMonth() + 1).toString().padStart(2, "0"),
+      day: currentDate.getDate().toString().padStart(2, "0"),
+    });
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  return dates;
+}
+
+// Helper function to process recordings from a single directory
+async function getRecordingsFromDir(recordingDir, year, month, day) {
+  const supportedFormats = [".wav", ".mp3", ".gsm"];
+  
+  try {
+    await stat(recordingDir);
+  } catch (error) {
+    return []; // Directory doesn't exist
+  }
+
+  const files = await readdir(recordingDir);
+  const recordings = await Promise.all(
+    files
+      .filter((file) => supportedFormats.some((ext) => file.endsWith(ext)))
+      .map(async (file) => {
+        const filePath = path.join(recordingDir, file);
+        const fileStat = await stat(filePath);
+
+        const parts = file.split("-");
+        let type = "unknown";
+        let identifier = "";
+
+        if (parts.length >= 2) {
+          type = parts[0]; // e.g., "queue", "agent", "outbound"
+          const fileExt = supportedFormats.find((ext) => file.endsWith(ext)) || ".wav";
+
+          if (type === "queue" && parts.length >= 3) {
+            identifier = parts[1]; // Queue name
+          } else if (type === "agent" && parts.length >= 3) {
+            identifier = parts[1]; // Extension number
+          } else if (type === "outbound" && parts.length >= 3) {
+            identifier = parts[1]; // Caller extension number
+          }
+        }
+
+        let callDetails = null;
+        let duration = 0;
+        let queueAgentExtension = null;
+        try {
+          const cdr = await sequelize.query(
+            `SELECT src, dst, dstchannel, disposition, billsec, duration as call_duration, start as calldate 
+             FROM cdr 
+             WHERE uniqueid = ? OR userfield LIKE ?`,
+            {
+              replacements: [
+                parts[parts.length - 1].replace(/\.(wav|mp3|gsm)$/, ""),
+                `%${file}%`,
+              ],
+              type: sequelize.QueryTypes.SELECT,
+            }
+          );
+
+          if (cdr && cdr.length > 0) {
+            callDetails = cdr[0];
+            duration = callDetails.billsec > 0 ? callDetails.billsec : callDetails.call_duration || 0;
+            
+            // For queue calls, extract agent extension from dstchannel (e.g., "PJSIP/1002-00000013" -> "1002")
+            if (type === "queue" && callDetails.dstchannel) {
+              const dstMatch = callDetails.dstchannel.match(/PJSIP\/(\d+)-/);
+              if (dstMatch) {
+                queueAgentExtension = dstMatch[1];
+              }
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching CDR info:", err);
+        }
+
+        if (!duration && fileStat.size > 0) {
+          const estimatedSeconds = Math.round(fileStat.size / (1.42 * 1024));
+          duration = estimatedSeconds > 0 ? estimatedSeconds : 0;
+        }
+
+        let rating = null;
+        let notes = null;
+        try {
+          const ratingRecord = await RecordingRating.findOne({
+            where: {
+              filename: file,
+              path: path.join(year, month, day, file),
+            },
+          });
+
+          if (ratingRecord) {
+            rating = ratingRecord.rating;
+            notes = ratingRecord.notes;
+          }
+        } catch (err) {
+          console.error("Error fetching rating:", err);
+        }
+
+        // Look up agent username from extension number
+        let agentName = null;
+        let agentExtension = identifier;
+        
+        // For queue calls, use the agent extension extracted from dstchannel
+        if (type === "queue" && queueAgentExtension) {
+          agentExtension = queueAgentExtension;
+        }
+        
+        // Look up agent for agent, outbound, or queue calls
+        if ((type === "agent" || type === "outbound" || type === "queue") && agentExtension) {
+          try {
+            const userResult = await sequelize.query(
+              `SELECT username, name, full_name FROM users WHERE extension = ? LIMIT 1`,
+              {
+                replacements: [agentExtension],
+                type: sequelize.QueryTypes.SELECT,
+              }
+            );
+            if (userResult && userResult.length > 0) {
+              const user = userResult[0];
+              agentName = user.full_name || user.name || user.username;
+            }
+          } catch (err) {
+            console.error("Error fetching agent info:", err);
+          }
+        }
+
+        return {
+          filename: file,
+          path: `/api/recordings/play/${year}/${month}/${day}/${file}`,
+          downloadPath: `/api/recordings/download/${year}/${month}/${day}/${file}`,
+          size: fileStat.size,
+          created: fileStat.birthtime,
+          modified: fileStat.mtime,
+          type,
+          identifier,
+          agentName,
+          agentExtension,
+          callDetails,
+          duration,
+          rating,
+          notes,
+          date: `${year}-${month}-${day}`,
+        };
+      })
+  );
+
+  return recordings.filter((r) => r.size > 1024);
+}
+
+// List recordings by date range
+router.get("/list-range", async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "startDate and endDate query parameters are required",
+      });
+    }
+
+    const dateRange = getDateRange(startDate, endDate);
+    const allRecordings = [];
+
+    for (const { year, month, day } of dateRange) {
+      const recordingDir = path.join(RECORDING_BASE_DIR, year, month, day);
+      const recordings = await getRecordingsFromDir(recordingDir, year, month, day);
+      allRecordings.push(...recordings);
+    }
+
+    res.json({
+      success: true,
+      recordings: allRecordings.sort((a, b) => new Date(b.created) - new Date(a.created)),
+      totalCount: allRecordings.length,
+      dateRange: { startDate, endDate },
+    });
+  } catch (error) {
+    console.error("Error listing recordings by range:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve recordings",
+      error: error.message,
+    });
+  }
+});
+
 // Stream recording for playback
 router.get("/play/:year/:month/:day/:filename", async (req, res) => {
   try {
@@ -177,9 +390,9 @@ router.get("/play/:year/:month/:day/:filename", async (req, res) => {
     // Asynchronously get file stats
     const fileStat = await stat(filePath);
 
-    // Set appropriate headers
+    // Set appropriate headers based on file type
     res.setHeader("Content-Length", fileStat.size);
-    res.setHeader("Content-Type", "audio/wav");
+    res.setHeader("Content-Type", getAudioMimeType(filename));
     res.setHeader("Accept-Ranges", "bytes");
 
     // Create read stream and pipe to response
@@ -230,7 +443,7 @@ router.get("/download/:year/:month/:day/:filename", (req, res) => {
 
     // Set headers for download
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Type", "audio/wav");
+    res.setHeader("Content-Type", getAudioMimeType(filename));
 
     // Create read stream and pipe to response
     const fileStream = fs.createReadStream(filePath);

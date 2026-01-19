@@ -30,11 +30,177 @@ import { EventBusService } from "../services/eventBus.js";
 import amiService from "../services/amiService.js";
 import QueueMember from "../models/queueMemberModel.js";
 import VoiceExtension from "../models/voiceExtensionModel.js";
+import { socketService } from "../services/socketService.js";
 // datatool User model removed - not used in this project
 
 dotenv.config();
 
 const router = express.Router();
+
+// Recording base directory for MixMonitor
+const RECORDING_BASE_DIR =
+  process.env.RECORDING_BASE_DIR || "/var/spool/asterisk/monitor";
+
+/**
+ * Helper function to generate voice_extensions dialplan entries for an agent extension
+ * Includes MixMonitor for call recording when enabled
+ * @param {string} extension - The agent's extension number
+ * @param {string} recordingFormat - Recording format: 'wav', 'mp3', 'gsm', or 'inactive'
+ * @returns {Array} Array of voice_extension entries
+ */
+function generateAgentDialplanEntries(extension, recordingFormat = "inactive") {
+  const isRecordingEnabled = recordingFormat && recordingFormat !== "inactive";
+  const format = isRecordingEnabled ? recordingFormat : "wav";
+
+  const entries = [];
+  let priority = 1;
+
+  // Set Caller ID
+  entries.push({
+    context: "from-internal",
+    exten: extension,
+    priority: priority++,
+    app: "Set",
+    appdata: `CALLERID(num)=${extension}`,
+    type: "system",
+  });
+
+  // Set Channel Language
+  entries.push({
+    context: "from-internal",
+    exten: extension,
+    priority: priority++,
+    app: "Set",
+    appdata: `CHANNEL(language)=en`,
+    type: "system",
+  });
+
+  // Set CDR Account Code
+  entries.push({
+    context: "from-internal",
+    exten: extension,
+    priority: priority++,
+    app: "Set",
+    appdata: `CDR(accountcode)=agent-${extension}`,
+    type: "system",
+  });
+
+  // Set Call Timeout
+  entries.push({
+    context: "from-internal",
+    exten: extension,
+    priority: priority++,
+    app: "Set",
+    appdata: `CALL_TIMEOUT=15`,
+    type: "system",
+  });
+
+  // Check if agent is paused
+  entries.push({
+    context: "from-internal",
+    exten: extension,
+    priority: priority++,
+    app: "Set",
+    appdata: `AGENT_PAUSED=\${ODBC_AGENT_PAUSED(${extension})}`,
+    type: "system",
+  });
+
+  // If agent is paused, go to agent-unavailable handler
+  entries.push({
+    context: "from-internal",
+    exten: extension,
+    priority: priority++,
+    app: "GotoIf",
+    appdata: `\${AGENT_PAUSED}?agent-unavailable,s,1`,
+    type: "system",
+  });
+
+  // Add MixMonitor for call recording (if enabled)
+  if (isRecordingEnabled) {
+    const recordingDir = `${RECORDING_BASE_DIR}/\${STRFTIME(\${EPOCH},,%Y)}/\${STRFTIME(\${EPOCH},,%m)}/\${STRFTIME(\${EPOCH},,%d)}`;
+    const recordingFilename = `agent-${extension}-\${UNIQUEID}.${format}`;
+    const recordingPath = `${recordingDir}/${recordingFilename}`;
+
+    // Create recording directory
+    entries.push({
+      context: "from-internal",
+      exten: extension,
+      priority: priority++,
+      app: "System",
+      appdata: `mkdir -p "${recordingDir}"`,
+      type: "system",
+      record: true,
+      recordingFormat: format,
+    });
+
+    // Start MixMonitor recording (b=bridge audio, W=write when answered)
+    entries.push({
+      context: "from-internal",
+      exten: extension,
+      priority: priority++,
+      app: "MixMonitor",
+      appdata: `${recordingPath},bW`,
+      type: "system",
+      record: true,
+      recordingFormat: format,
+    });
+
+    // Set CDR recording file for later retrieval
+    entries.push({
+      context: "from-internal",
+      exten: extension,
+      priority: priority++,
+      app: "Set",
+      appdata: `CDR(recordingfile)=${recordingPath}`,
+      type: "system",
+      record: true,
+      recordingFormat: format,
+    });
+
+    console.log(`[Recording] MixMonitor enabled for extension ${extension} with format ${format}`);
+  }
+
+  // Dial Command
+  entries.push({
+    context: "from-internal",
+    exten: extension,
+    priority: priority++,
+    app: "Dial",
+    appdata: `PJSIP/${extension},15,Tt`,
+    type: "system",
+  });
+
+  // Hangup Command
+  entries.push({
+    context: "from-internal",
+    exten: extension,
+    priority: priority++,
+    app: "Hangup",
+    appdata: "",
+    type: "system",
+  });
+
+  // Handle Call Hangup extension
+  entries.push({
+    context: "from-internal",
+    exten: `hangup-${extension}`,
+    priority: 1,
+    app: "NoOp",
+    appdata: `Call ended for ${extension}`,
+    type: "system",
+  });
+
+  entries.push({
+    context: "from-internal",
+    exten: `hangup-${extension}`,
+    priority: 2,
+    app: "Hangup",
+    appdata: "",
+    type: "system",
+  });
+
+  return entries;
+}
 
 // CREATE PJSIP EXTENSION USING DASHBOARD
 export const createPJSIPUser = async (req, res) => {
@@ -98,100 +264,11 @@ export const createPJSIPUser = async (req, res) => {
       }
     );
 
-    // ✅ Step 3: Create `voice_extensions` Entry
-    await VoiceExtension.bulkCreate(
-      [
-        // ✅ 1️⃣ Set Caller ID
-        {
-          context: "from-internal",
-          exten: extension,
-          priority: 1,
-          app: "Set",
-          appdata: `CALLERID(num)=${extension}`, // ✅ Set Caller ID
-          type: "system",
-        },
-        // ✅ 2️⃣ Set Channel Language
-        {
-          context: "from-internal",
-          exten: extension,
-          priority: 2,
-          app: "Set",
-          appdata: `CHANNEL(language)=en`, // ✅ Set Language
-          type: "system",
-        },
-        // ✅ 3️⃣ Set CDR Account Code (for billing, tracking, and logs)
-        {
-          context: "from-internal",
-          exten: extension,
-          priority: 3,
-          app: "Set",
-          appdata: `CDR(accountcode)=agent-${extension}`, // ✅ Useful for tracking
-          type: "system",
-        },
-        // ✅ 4️⃣ Set Call Timeout
-        {
-          context: "from-internal",
-          exten: extension,
-          priority: 4,
-          app: "Set",
-          appdata: `CALL_TIMEOUT=15`, // ✅ Call timeout before redirecting
-          type: "system",
-        },
-        // ✅ 5️⃣ Check if agent is paused (uses ODBC_AGENT_PAUSED function)
-        {
-          context: "from-internal",
-          exten: extension,
-          priority: 5,
-          app: "Set",
-          appdata: `AGENT_PAUSED=\${ODBC_AGENT_PAUSED(${extension})}`,
-          type: "system",
-        },
-        // ✅ 6️⃣ If agent is paused, go to agent-unavailable handler
-        {
-          context: "from-internal",
-          exten: extension,
-          priority: 6,
-          app: "GotoIf",
-          appdata: `\${AGENT_PAUSED}?agent-unavailable,s,1`, // ✅ Redirect to unavailable context if paused
-          type: "system",
-        },
-        // ✅ 7️⃣ Set Dial Command (only reached if agent is not paused)
-        {
-          context: "from-internal",
-          exten: extension,
-          priority: 7,
-          app: "Dial",
-          appdata: `PJSIP/${extension},15,Tt`, // ✅ 15 seconds ring time, with transfer options (T=caller can transfer, t=callee can transfer)
-        },
-        // ✅ 8️⃣ Set Hangup Command
-        {
-          context: "from-internal",
-          exten: extension,
-          priority: 8,
-          app: "Hangup",
-          appdata: "",
-          type: "system",
-        },
-        // ✅ 7️⃣ Handle Call Hangup (if needed for IVR or CDR tracking)
-        {
-          context: "from-internal",
-          exten: `hangup-${extension}`,
-          priority: 1,
-          app: "NoOp",
-          appdata: `Call ended for ${extension}`,
-          type: "system",
-        },
-        {
-          context: "from-internal",
-          exten: `hangup-${extension}`,
-          priority: 2,
-          app: "Hangup",
-          appdata: "",
-          type: "system",
-        },
-      ],
-      { transaction }
-    );
+    // ✅ Step 3: Create `voice_extensions` Entry using helper function
+    // Recording is inactive by default for new agents
+    const recordingFormat = req.body.recordingToUserExtension || "inactive";
+    const dialplanEntries = generateAgentDialplanEntries(extension, recordingFormat);
+    await VoiceExtension.bulkCreate(dialplanEntries, { transaction });
 
     // ✅ Step 4: Reload Asterisk Dialplan
     // await amiService.executeAction({
@@ -445,11 +522,24 @@ export const getAgentDetailsByExtensionNumber = async (req, res) => {
 export const updateAgentDetails = async (req, res) => {
   const { id } = req.params;
   const { userData, pjsipData } = req.body;
-  // console.log(req.body, "PJSIP DATA 🌶️🌶️🌶️🌶️🌶️");
   let transaction;
 
   try {
     transaction = await sequelize.transaction();
+
+    // Get the current user to check if recording setting changed
+    const currentUser = await UserModel.findByPk(id);
+    if (!currentUser) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Agent not found",
+      });
+    }
+
+    const oldRecordingFormat = currentUser.recordingToUserExtension || "inactive";
+    const newRecordingFormat = userData?.recordingToUserExtension || oldRecordingFormat;
+    const recordingSettingChanged = oldRecordingFormat !== newRecordingFormat;
 
     // Update user data
     const [updated] = await UserModel.update(userData, {
@@ -465,8 +555,36 @@ export const updateAgentDetails = async (req, res) => {
       });
     }
 
-    // Get the user's extension for PJSIP updates
+    // Get the updated user's extension for PJSIP updates
     const user = await UserModel.findByPk(id);
+
+    // Regenerate dialplan if recording setting changed
+    if (recordingSettingChanged && user.extension) {
+      console.log(`📼 Recording setting changed for extension ${user.extension}: ${oldRecordingFormat} → ${newRecordingFormat}`);
+
+      // Delete existing voice_extensions for this agent's extension
+      await VoiceExtension.destroy({
+        where: {
+          context: "from-internal",
+          exten: {
+            [Op.in]: [user.extension, `hangup-${user.extension}`],
+          },
+          type: "system",
+        },
+        transaction,
+      });
+
+      // Generate new dialplan entries with updated recording settings
+      const dialplanEntries = generateAgentDialplanEntries(
+        user.extension,
+        newRecordingFormat
+      );
+
+      // Create new voice_extensions entries
+      await VoiceExtension.bulkCreate(dialplanEntries, { transaction });
+
+      console.log(`✅ Dialplan regenerated for extension ${user.extension} with ${dialplanEntries.length} entries`);
+    }
 
     if (pjsipData) {
       // Format PJSIP data to match createPJSIPUser structure
@@ -482,8 +600,8 @@ export const updateAgentDetails = async (req, res) => {
           pjsipData.dtls_enabled !== undefined
             ? Boolean(pjsipData.dtls_enabled) // Ensure it's a boolean
             : user.dtls_enabled === undefined
-            ? true
-            : user.dtls_enabled, // Default to true
+              ? true
+              : user.dtls_enabled, // Default to true
         dtls_cert_file: pjsipData.dtls_cert_file || user.dtls_cert_file,
         dtls_private_key: pjsipData.dtls_private_key || user.dtls_private_key,
         direct_media: pjsipData.direct_media || user.direct_media || "no",
@@ -572,6 +690,14 @@ export const updateAgentDetails = async (req, res) => {
         },
       ],
     });
+
+    // Emit updated phonebar settings to the agent's softphone in real-time
+    if (userData?.phoneBarAutoAnswer !== undefined && updatedAgent?.extension) {
+      socketService.emitUserSettingsUpdate(updatedAgent.extension, {
+        phoneBarAutoAnswer: userData.phoneBarAutoAnswer,
+        phoneBarAutoAnswerDelay: userData.phoneBarAutoAnswerDelay || 0,
+      });
+    }
 
     return res.json({
       success: true,
@@ -743,6 +869,88 @@ export const deleteAgent = async (req, res) => {
   }
 };
 
+// Reset Agent Password
+export const resetAgentPassword = async (req, res) => {
+  const { id } = req.params;
+  const { newPassword } = req.body;
+  let transaction;
+
+  try {
+    // Validate password
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters long",
+      });
+    }
+
+    transaction = await sequelize.transaction();
+
+    // Find the user
+    const user = await UserModel.findByPk(id);
+    if (!user) {
+      await transaction.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Agent not found",
+      });
+    }
+
+    // Hash the new password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update user password
+    await UserModel.update(
+      { password: hashedPassword },
+      {
+        where: { id },
+        transaction,
+      }
+    );
+
+    // Also update PJSIP authentication password if the agent has an extension
+    if (user.extension) {
+      await PJSIPAuth.update(
+        { password: newPassword }, // PJSIP stores plaintext password
+        {
+          where: { id: user.extension },
+          transaction,
+        }
+      );
+    }
+
+    await transaction.commit();
+
+    // Reload Asterisk PJSIP to apply the new password
+    try {
+      await amiService.executeAction({
+        Action: "Command",
+        Command: "pjsip reload",
+      });
+      console.log(`✅ PJSIP reload triggered after password reset for extension ${user.extension}`);
+    } catch (amiError) {
+      console.error("Failed to reload PJSIP:", amiError);
+      // Non-critical error - password still updated in database
+    }
+
+    console.log(`🔐 Password reset successful for agent ${user.username} (ext: ${user.extension})`);
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successfully",
+    });
+  } catch (error) {
+    if (transaction) await transaction.rollback();
+    console.error("Error resetting agent password:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reset password",
+      error: error.message,
+    });
+  }
+};
+
 // Agent Login to the phonebar
 export const registerAgent = async (req, res) => {
   const { email, password, isSoftphone, name } = req.body;
@@ -850,11 +1058,13 @@ export const registerAgent = async (req, res) => {
           extension: user.extension,
           typology: user.typology,
           wss_port: user.wss_port || 8089,
+          phoneBarAutoAnswer: user.phoneBarAutoAnswer || false,
+          phoneBarAutoAnswerDelay: user.phoneBarAutoAnswerDelay || 0,
           pjsip: {
             type: user.ps_endpoint?.type,
             extension: user.extension,
             password: user.ps_auth?.password,
-            server: process.env.ASTERISK_HOST,
+            server: process.env.SIP_DOMAIN || process.env.PUBLIC_IP,
             transport: user.transport,
             rtp_symmetric: user.ps_endpoint?.rtp_symmetric === "yes" || true,
             media_use_received_transport:

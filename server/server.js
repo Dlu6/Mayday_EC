@@ -2,6 +2,7 @@
 import mongoose from "mongoose";
 import express from "express";
 import dotenv from "dotenv";
+import dotenvExpand from "dotenv-expand";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
@@ -70,7 +71,7 @@ EventEmitter.defaultMaxListeners = 15;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.join(__dirname, ".env") });
+dotenvExpand.expand(dotenv.config({ path: path.join(__dirname, ".env") }));
 
 const app = express();
 const httpServer = createServer(app);
@@ -84,7 +85,7 @@ const corsOptions = {
   origin: function (origin, callback) {
     const publicIp = process.env.PUBLIC_IP || "localhost";
     const port = process.env.PORT || "8004";
-    
+
     const allowedOrigins = [
       // Dynamic origins from PUBLIC_IP env variable
       `http://${publicIp}:${port}`,
@@ -325,6 +326,15 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.get("/", (req, res) => {
   res.send("MAYDAY SERVER/API IS RUNNING....");
+});
+
+// Health check endpoint for network connectivity monitoring
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
 });
 
 app.get("/api/ari-docs", async (req, res) => {
@@ -732,13 +742,13 @@ const recoverableErrors = ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'EPIPE', '
 
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
-  
+
   // Check if this is a recoverable connection error
   if (recoverableErrors.includes(err.code)) {
     console.warn(chalk.yellow(`[Server] Recoverable error detected (${err.code}), NOT shutting down`));
     return; // Don't exit for recoverable errors
   }
-  
+
   // For non-recoverable errors, exit after a delay
   setTimeout(() => {
     console.error("Shutting down due to uncaught exception");
@@ -748,14 +758,14 @@ process.on("uncaughtException", (err) => {
 
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
-  
+
   // Check if this is a recoverable connection error
   const errorCode = reason?.code || reason?.cause?.code;
   if (errorCode && recoverableErrors.includes(errorCode)) {
     console.warn(chalk.yellow(`[Server] Recoverable rejection detected (${errorCode}), NOT shutting down`));
     return; // Don't exit for recoverable errors
   }
-  
+
   // For non-recoverable errors, exit after a delay
   setTimeout(() => {
     console.error("Shutting down due to unhandled rejection");

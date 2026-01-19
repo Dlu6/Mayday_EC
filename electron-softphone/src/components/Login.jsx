@@ -9,7 +9,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { useNotification } from "../contexts/NotificationContext";
 import { storageService, clearLogoutFlag } from "../services/storageService";
-import maydaylogo from "../../../client/src/assets/images/mayday_logo.png";
+import maydaylogo from "../assets/mhu_logo_bazo.png";
 import {
   CircularProgress,
   Switch,
@@ -109,7 +109,7 @@ const clearEncryptedCredentials = () => {
   try {
     localStorage.removeItem("encryptedCredentials");
     localStorage.removeItem("rememberMe");
-    console.log("✅ Encrypted credentials cleared");
+    console.log(" Encrypted credentials cleared");
   } catch (error) {
     console.error("Error clearing encrypted credentials:", error);
   }
@@ -147,7 +147,7 @@ const Login = ({ onLoginSuccess }) => {
         }
       }
     };
-    
+
     disableStickyForLogin();
   }, []);
 
@@ -223,9 +223,8 @@ const Login = ({ onLoginSuccess }) => {
       error: `SIP registration failed: ${error.cause || error.message}`,
     }));
     showNotification({
-      message: `Phone system registration failed: ${
-        error.cause || error.message
-      }`,
+      message: `Phone system registration failed: ${error.cause || error.message
+        }`,
       severity: "error",
       duration: null,
     });
@@ -300,6 +299,9 @@ const Login = ({ onLoginSuccess }) => {
       // Clear logout flag on successful login
       clearLogoutFlag();
 
+      // CRITICAL: Persist the server host and protocol settings
+      // This ensures serverConfig.apiUrl uses the correct protocol (http vs https)
+      serverConfig.setServerHost(state.host);
       // STEP 2: Validate configuration
       setLoginProgress((prev) => ({
         ...prev,
@@ -705,7 +707,11 @@ const Login = ({ onLoginSuccess }) => {
   return (
     <div className="login-container">
       <div className="login-box">
-        <h1 className="title">SIMI VALLEY</h1>
+        <h1 className="title"
+          style={{
+            marginTop: "20px",
+          }}
+        >Bazo Tech</h1>
         <img src={maydaylogo} alt="Mayday Logo" className="logo" />
         <h2 className="subtitle">Sign In</h2>
 

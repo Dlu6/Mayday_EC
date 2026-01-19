@@ -100,6 +100,23 @@ export const deleteAgent = createAsyncThunk(
   }
 );
 
+// Reset Agent Password
+export const resetAgentPassword = createAsyncThunk(
+  "agents/resetAgentPassword",
+  async ({ agentId, newPassword }, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.post(`/users/agents/${agentId}/reset-password`, {
+        newPassword,
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(
+        error.response?.data?.message || "Could not reset password"
+      );
+    }
+  }
+);
+
 const agentsSlice = createSlice({
   name: "agents",
   initialState: {
