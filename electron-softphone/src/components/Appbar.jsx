@@ -109,6 +109,7 @@ import transferHistoryService from "../services/transferHistoryService";
 import { agentService } from "../services/agentService";
 import { pauseService } from "../services/pauseService";
 import websocketService from "../services/websocketService";
+import networkService from "../services/networkService";
 // SessionAnalytics and Clients removed - datatool_server not used in this project
 import ConfirmDialog from "./ConfirmDialog";
 import { useNavigate } from "react-router-dom";
@@ -293,8 +294,11 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
   // Add state to track the currently pressed key
   const [activeKey, setActiveKey] = useState(null);
 
-  // Add this near your other state declarations
-  const [registrationState, setRegistrationState] = useState("Unregistered");
+  // ========== SIP Registration State Tracking ==========
+  // Track actual SIP registration state from sipService events
+  const [sipRegistrationState, setSipRegistrationState] = useState("Unregistered");
+  const [isNetworkHealthy, setIsNetworkHealthy] = useState(true);
+  const sipRegistrationDebounceRef = useRef(null);
 
   // Presence control for pauses
   const [presence, setPresence] = useState("READY");
@@ -342,8 +346,122 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
 
   // Client lookup removed - datatool_server not used in this project
 
-  // Registration status (align with DashboardView): prefer contactUri, fall back to AMI flags
+  // ========== SIP Registration State Effect ==========
+  // Listen to actual SIP registration events for real-time status updates
+  useEffect(() => {
+    const handleRegistered = (data) => {
+      console.log("[Appbar] SIP Registered event:", data);
+      // Clear any pending debounce
+      if (sipRegistrationDebounceRef.current) {
+        clearTimeout(sipRegistrationDebounceRef.current);
+      }
+      // Debounce "good" state to prevent flicker
+      sipRegistrationDebounceRef.current = setTimeout(() => {
+        setSipRegistrationState("Registered");
+      }, 500);
+    };
+
+    const handleUnregistered = (data) => {
+      console.log("[Appbar] SIP Unregistered event:", data);
+      // Clear any pending debounce
+      if (sipRegistrationDebounceRef.current) {
+        clearTimeout(sipRegistrationDebounceRef.current);
+      }
+      // Immediately update to "bad" states
+      setSipRegistrationState("Unregistered");
+    };
+
+    const handleRegistrationLost = (data) => {
+      console.log("[Appbar] SIP Registration lost:", data);
+      // Clear any pending debounce
+      if (sipRegistrationDebounceRef.current) {
+        clearTimeout(sipRegistrationDebounceRef.current);
+      }
+      // Show reconnecting state
+      setSipRegistrationState("Reconnecting");
+    };
+
+    const handleRegistrationFailed = (data) => {
+      console.log("[Appbar] SIP Registration failed:", data);
+      setSipRegistrationState("Failed");
+    };
+
+    // Subscribe to SIP service events
+    sipService.events.on("registered", handleRegistered);
+    sipService.events.on("unregistered", handleUnregistered);
+    sipService.events.on("registration_lost", handleRegistrationLost);
+    sipService.events.on("registration_failed", handleRegistrationFailed);
+    sipService.events.on("registration:state", (newState) => {
+      console.log("[Appbar] SIP registration:state event:", newState);
+      if (newState === "Registered") {
+        handleRegistered({ source: "state_change" });
+      } else if (newState === "Unregistered" || newState === "Terminated") {
+        handleUnregistered({ source: "state_change" });
+      }
+    });
+
+    // Set initial state from current SIP state
+    try {
+      if (sipService.state?.registerer?.state === "Registered") {
+        setSipRegistrationState("Registered");
+      } else if (sipService.isConnected) {
+        setSipRegistrationState("Registered");
+      }
+    } catch (_) { }
+
+    return () => {
+      sipService.events.off("registered", handleRegistered);
+      sipService.events.off("unregistered", handleUnregistered);
+      sipService.events.off("registration_lost", handleRegistrationLost);
+      sipService.events.off("registration_failed", handleRegistrationFailed);
+      if (sipRegistrationDebounceRef.current) {
+        clearTimeout(sipRegistrationDebounceRef.current);
+      }
+    };
+  }, []);
+
+  // ========== Network Health Tracking ==========
+  useEffect(() => {
+    const handleNetworkStatus = (status) => {
+      console.log("[Appbar] Network status:", status);
+      setIsNetworkHealthy(status.isOnline && status.isServerReachable);
+    };
+
+    const handleNetworkOffline = () => {
+      console.log("[Appbar] Network offline");
+      setIsNetworkHealthy(false);
+    };
+
+    const handleNetworkOnline = () => {
+      console.log("[Appbar] Network online");
+      setIsNetworkHealthy(true);
+    };
+
+    networkService.on("network:status", handleNetworkStatus);
+    networkService.on("network:offline", handleNetworkOffline);
+    networkService.on("network:online", handleNetworkOnline);
+    networkService.on("network:recovered", handleNetworkOnline);
+
+    // Set initial state
+    setIsNetworkHealthy(networkService.isHealthy());
+
+    return () => {
+      networkService.off("network:status", handleNetworkStatus);
+      networkService.off("network:offline", handleNetworkOffline);
+      networkService.off("network:online", handleNetworkOnline);
+      networkService.off("network:recovered", handleNetworkOnline);
+    };
+  }, []);
+
+  // Registration status: now based on actual SIP registration state (primary source)
+  // with fallback to registeredAgent API data for additional context
   const isRegistered = useMemo(() => {
+    // Primary: Use actual SIP registration state
+    if (sipRegistrationState === "Registered") {
+      return true;
+    }
+
+    // Secondary fallback: check registeredAgent API data for edge cases
     try {
       if (!registeredAgent) return false;
       const ext = registeredAgent.extension || "";
@@ -363,7 +481,7 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
     } catch (_) {
       return false;
     }
-  }, [registeredAgent]);
+  }, [sipRegistrationState, registeredAgent]);
 
   // Add new state for transfer dialog
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
@@ -4849,20 +4967,20 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                 minWidth: "180px",
               }}
             >
-              {reconnectionAttempts > 0 &&
-                reconnectionAttempts < maxReconnectionAttempts ? (
+              {/* Network Offline State - highest priority */}
+              {!isNetworkHealthy ? (
                 <>
-                  <CircularProgress
-                    size={12}
+                  <Circle
                     sx={{
                       mr: 1,
-                      color: "#f90",
+                      fontSize: 12,
+                      color: "#f44336",
                     }}
                   />
                   <Typography
                     variant="body2"
                     sx={{
-                      color: "rgba(225, 135, 0, 1)",
+                      color: "#f44336",
                       fontSize: "0.85rem",
                       fontWeight: 500,
                       whiteSpace: "nowrap",
@@ -4870,7 +4988,31 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
                       textOverflow: "ellipsis",
                     }}
                   >
-                    Reconnecting...
+                    Network Offline
+                  </Typography>
+                </>
+              ) : sipRegistrationState === "Reconnecting" || sipRegistrationState === "Failed" ||
+                (reconnectionAttempts > 0 && reconnectionAttempts < maxReconnectionAttempts) ? (
+                <>
+                  <CircularProgress
+                    size={12}
+                    sx={{
+                      mr: 1,
+                      color: sipRegistrationState === "Failed" ? "#f44336" : "#f90",
+                    }}
+                  />
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: sipRegistrationState === "Failed" ? "#f44336" : "rgba(225, 135, 0, 1)",
+                      fontSize: "0.85rem",
+                      fontWeight: 500,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {sipRegistrationState === "Failed" ? "Registration Failed" : "Reconnecting..."}
                   </Typography>
                 </>
               ) : (

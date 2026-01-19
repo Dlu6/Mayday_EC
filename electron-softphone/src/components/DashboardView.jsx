@@ -48,6 +48,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { callMonitoringService } from "../services/callMonitoringServiceElectron";
+import { sipService } from "../services/sipService";
 import { agentService } from "../services/agentService";
 import { getAgentPerformanceData } from "../api/reportsApi"; // Import the API function
 import callHistoryService from "../services/callHistoryService";
@@ -642,7 +643,40 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
   const { showNotification } = useNotification();
 
   // Get WebSocket connection status for Live badge
-  const { isConnected, isReconnecting } = useWebSocket();
+  const { isConnected: isWsConnected, isReconnecting } = useWebSocket();
+
+  // ========== SIP Registration State for Live Badge ==========
+  const [isSipRegistered, setIsSipRegistered] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleRegistered = () => setIsSipRegistered(true);
+    const handleUnregistered = () => setIsSipRegistered(false);
+    const handleRegistrationLost = () => setIsSipRegistered(false);
+
+    // Subscribe to SIP service events
+    sipService.events.on("registered", handleRegistered);
+    sipService.events.on("unregistered", handleUnregistered);
+    sipService.events.on("registration_lost", handleRegistrationLost);
+    sipService.events.on("registration:state", (newState) => {
+      setIsSipRegistered(newState === "Registered");
+    });
+
+    // Set initial state
+    try {
+      if (sipService.state?.registerer?.state === "Registered" || sipService.isConnected) {
+        setIsSipRegistered(true);
+      }
+    } catch (_) { }
+
+    return () => {
+      sipService.events.off("registered", handleRegistered);
+      sipService.events.off("unregistered", handleUnregistered);
+      sipService.events.off("registration_lost", handleRegistrationLost);
+    };
+  }, []);
+
+  // "Live" means both SIP registered AND WebSocket connected
+  const isConnected = isSipRegistered && isWsConnected;
 
   // CRITICAL: Add loading timeout to prevent stuck loading state
   useEffect(() => {

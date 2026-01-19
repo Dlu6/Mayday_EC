@@ -71,13 +71,13 @@ const useLicense = () => {
 
       // Debug: Log the received license data to verify features are present
       if (data.licensed && data.license) {
-        console.log('[useLicense] License received:', {
-          organization: data.license.organization_name,
-          status: data.license.status,
-          hasTopLevelFeatures: !!data.license.features,
-          hasNestedFeatures: !!data.license.license_type?.features,
-          features: data.license.features || data.license.license_type?.features,
-        });
+        // console.log('[useLicense] License received:', {
+        //   organization: data.license.organization_name,
+        //   status: data.license.status,
+        //   hasTopLevelFeatures: !!data.license.features,
+        //   hasNestedFeatures: !!data.license.license_type?.features,
+        //   features: data.license.features || data.license.license_type?.features,
+        // });
       }
 
       if (data.licensed && data.license) {

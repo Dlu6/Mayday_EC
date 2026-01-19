@@ -328,6 +328,15 @@ app.get("/", (req, res) => {
   res.send("MAYDAY SERVER/API IS RUNNING....");
 });
 
+// Health check endpoint for network connectivity monitoring
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
 app.get("/api/ari-docs", async (req, res) => {
   try {
     const username = process.env.ARI_USERNAME;
