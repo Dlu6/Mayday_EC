@@ -374,7 +374,7 @@ const TicketFormsView = ({
                             overflow: "auto",
                             display: "flex",
                             flexDirection: "column",
-                            maxWidth: 600,
+                            maxWidth: 1200,
                             mx: "auto",
                             width: "100%",
                         }}

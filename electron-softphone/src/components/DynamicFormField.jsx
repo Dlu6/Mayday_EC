@@ -41,6 +41,9 @@ const DynamicFormField = ({ field, value, onChange, error }) => {
         helperText: error || field.helperText,
         size: "small",
         sx: { mb: 2 },
+        InputLabelProps: {
+            sx: { fontWeight: 600 },
+        },
     };
 
     switch (field.type) {
@@ -91,7 +94,7 @@ const DynamicFormField = ({ field, value, onChange, error }) => {
         case "select":
             return (
                 <FormControl {...commonProps} required={field.required}>
-                    <InputLabel>{field.label}</InputLabel>
+                    <InputLabel sx={{ fontWeight: 600 }}>{field.label}</InputLabel>
                     <Select
                         value={value || ""}
                         onChange={(e) => handleChange(e.target.value)}
@@ -113,7 +116,7 @@ const DynamicFormField = ({ field, value, onChange, error }) => {
         case "radio":
             return (
                 <FormControl {...commonProps} required={field.required} component="fieldset">
-                    <FormLabel component="legend">{field.label}</FormLabel>
+                    <FormLabel component="legend" sx={{ fontWeight: 600 }}>{field.label}</FormLabel>
                     <RadioGroup
                         value={value || ""}
                         onChange={(e) => handleChange(e.target.value)}
@@ -145,7 +148,7 @@ const DynamicFormField = ({ field, value, onChange, error }) => {
 
             return (
                 <FormControl {...commonProps} component="fieldset">
-                    <FormLabel component="legend">{field.label}</FormLabel>
+                    <FormLabel component="legend" sx={{ fontWeight: 600 }}>{field.label}</FormLabel>
                     <FormGroup>
                         {(field.options || []).map((option, idx) => (
                             <FormControlLabel
