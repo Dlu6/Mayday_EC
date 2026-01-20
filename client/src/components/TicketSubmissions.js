@@ -56,7 +56,7 @@ const TicketSubmissions = () => {
     const fetchForm = useCallback(async () => {
         if (!formId) return;
         try {
-            const response = await apiClient.get(`/api/tickets/forms/${formId}`);
+            const response = await apiClient.get(`/tickets/forms/${formId}`);
             setForm(response.data.form);
         } catch (error) {
             console.error("Failed to fetch form:", error);
@@ -75,7 +75,7 @@ const TicketSubmissions = () => {
             });
             if (searchQuery) params.append("callerNumber", searchQuery);
 
-            const response = await apiClient.get(`/api/tickets/submissions?${params}`);
+            const response = await apiClient.get(`/tickets/submissions?${params}`);
             const subs = response.data.submissions || [];
             setSubmissions(subs);
             setTotal(response.data.total || 0);
