@@ -128,7 +128,28 @@ const TicketFormsView = ({
     useEffect(() => {
         if (selectedFormId) {
             const form = forms.find((f) => f.id === parseInt(selectedFormId));
-            setSelectedForm(form || null);
+            if (form) {
+                // Parse schema if it's a JSON string from API
+                let parsedSchema = { fields: [] };
+                if (form.schema) {
+                    if (typeof form.schema === "string") {
+                        try {
+                            parsedSchema = JSON.parse(form.schema);
+                        } catch (e) {
+                            console.error("Failed to parse form schema:", e);
+                        }
+                    } else {
+                        parsedSchema = form.schema;
+                    }
+                }
+                // Ensure fields array exists
+                if (!parsedSchema.fields) {
+                    parsedSchema.fields = [];
+                }
+                setSelectedForm({ ...form, schema: parsedSchema });
+            } else {
+                setSelectedForm(null);
+            }
             setFormValues({});
             setFormErrors({});
             setSubmitStatus(null);
