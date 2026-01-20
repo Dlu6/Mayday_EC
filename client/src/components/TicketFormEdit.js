@@ -113,18 +113,50 @@ const TicketFormEdit = () => {
     // Populate form data when loaded
     useEffect(() => {
         if (currentForm && !isNewForm) {
+            // Parse schema - might be JSON string from database
+            let parsedSchema = { fields: [] };
+            if (currentForm.schema) {
+                if (typeof currentForm.schema === "string") {
+                    try {
+                        parsedSchema = JSON.parse(currentForm.schema);
+                    } catch (e) {
+                        console.error("Failed to parse schema:", e);
+                    }
+                } else {
+                    parsedSchema = currentForm.schema;
+                }
+            }
+            // Ensure fields array exists
+            if (!parsedSchema.fields) {
+                parsedSchema.fields = [];
+            }
+
+            // Parse googleFormFields - might be JSON string from database
+            let parsedGoogleFormFields = null;
+            if (currentForm.googleFormFields) {
+                if (typeof currentForm.googleFormFields === "string") {
+                    try {
+                        parsedGoogleFormFields = JSON.parse(currentForm.googleFormFields);
+                    } catch (e) {
+                        console.error("Failed to parse googleFormFields:", e);
+                    }
+                } else {
+                    parsedGoogleFormFields = currentForm.googleFormFields;
+                }
+            }
+
             setFormData({
                 name: currentForm.name || "",
                 description: currentForm.description || "",
                 isActive: currentForm.isActive !== false,
                 googleSheetId: currentForm.googleSheetId || "",
                 sortOrder: currentForm.sortOrder || 0,
-                schema: currentForm.schema || { fields: [] },
+                schema: parsedSchema,
                 // Google Forms
                 useGoogleForm: currentForm.useGoogleForm || false,
                 googleFormUrl: currentForm.googleFormUrl || "",
                 googleFormId: currentForm.googleFormId || "",
-                googleFormFields: currentForm.googleFormFields || null,
+                googleFormFields: parsedGoogleFormFields,
             });
         }
     }, [currentForm, isNewForm]);
@@ -506,7 +538,7 @@ const TicketFormEdit = () => {
                     <Card sx={{ boxShadow: 2, borderRadius: 2, mb: 3 }}>
                         <CardContent>
                             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
-                                <Typography variant="h6">Form Fields ({formData.schema.fields.length})</Typography>
+                                <Typography variant="h6">Form Fields ({formData.schema?.fields?.length || 0})</Typography>
                                 <Button
                                     variant="contained"
                                     startIcon={<AddIcon />}
@@ -516,7 +548,7 @@ const TicketFormEdit = () => {
                                 </Button>
                             </Box>
 
-                            {formData.schema.fields.length === 0 ? (
+                            {(formData.schema?.fields?.length || 0) === 0 ? (
                                 <Box sx={{ textAlign: "center", py: 4 }}>
                                     <Typography color="text.secondary">
                                         No fields yet. Click &quot;Add Field&quot; to get started.
@@ -524,7 +556,7 @@ const TicketFormEdit = () => {
                                 </Box>
                             ) : (
                                 <List>
-                                    {formData.schema.fields.map((field, index) => {
+                                    {(formData.schema?.fields || []).map((field, index) => {
                                         const FieldIcon = getFieldIcon(field.type);
                                         return (
                                             <Paper key={field.id} sx={{ mb: 2, p: 2 }} elevation={1}>
