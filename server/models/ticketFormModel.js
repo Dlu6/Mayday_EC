@@ -114,18 +114,18 @@ const TicketFormAgent = sequelize.define(
             comment: "Reference to ticket_forms.id",
         },
         agentId: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.STRING(36),
             allowNull: false,
-            comment: "User ID from users table",
+            comment: "User ID (UUID) from users table",
         },
         assignedAt: {
             type: DataTypes.DATE,
             defaultValue: DataTypes.NOW,
         },
         assignedBy: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.STRING(36),
             allowNull: true,
-            comment: "Admin who made assignment",
+            comment: "Admin UUID who made assignment",
         },
     },
     {
@@ -161,9 +161,9 @@ const TicketSubmission = sequelize.define(
             comment: "Form version at time of submission",
         },
         agentId: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.STRING(36),
             allowNull: false,
-            comment: "Agent who submitted the ticket",
+            comment: "Agent UUID who submitted the ticket",
         },
         agentExtension: {
             type: DataTypes.STRING(20),
@@ -200,9 +200,9 @@ const TicketSubmission = sequelize.define(
             comment: "Ticket workflow status",
         },
         reviewedBy: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.STRING(36),
             allowNull: true,
-            comment: "Supervisor who reviewed",
+            comment: "Supervisor UUID who reviewed",
         },
         reviewedAt: {
             type: DataTypes.DATE,
