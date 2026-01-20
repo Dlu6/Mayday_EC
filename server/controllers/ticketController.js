@@ -145,7 +145,18 @@ export const getTicketForm = async (req, res) => {
  */
 export const createTicketForm = async (req, res) => {
     try {
-        const { name, description, schema, isActive, googleSheetId, sortOrder } = req.body;
+        const {
+            name,
+            description,
+            schema,
+            isActive,
+            googleSheetId,
+            sortOrder,
+            useGoogleForm,
+            googleFormUrl,
+            googleFormId,
+            googleFormFields,
+        } = req.body;
         const createdBy = req.user?.id;
 
         if (!name || !schema) {
@@ -164,6 +175,10 @@ export const createTicketForm = async (req, res) => {
             sortOrder: sortOrder || 0,
             createdBy,
             version: 1,
+            useGoogleForm: useGoogleForm || false,
+            googleFormUrl,
+            googleFormId,
+            googleFormFields,
         });
 
         // Emit WebSocket event
@@ -193,7 +208,18 @@ export const createTicketForm = async (req, res) => {
 export const updateTicketForm = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, schema, isActive, googleSheetId, sortOrder } = req.body;
+        const {
+            name,
+            description,
+            schema,
+            isActive,
+            googleSheetId,
+            sortOrder,
+            useGoogleForm,
+            googleFormUrl,
+            googleFormId,
+            googleFormFields,
+        } = req.body;
 
         const form = await TicketForm.findByPk(id);
 
@@ -216,6 +242,10 @@ export const updateTicketForm = async (req, res) => {
             googleSheetId: googleSheetId !== undefined ? googleSheetId : form.googleSheetId,
             sortOrder: sortOrder !== undefined ? sortOrder : form.sortOrder,
             version: newVersion,
+            useGoogleForm: useGoogleForm !== undefined ? useGoogleForm : form.useGoogleForm,
+            googleFormUrl: googleFormUrl !== undefined ? googleFormUrl : form.googleFormUrl,
+            googleFormId: googleFormId !== undefined ? googleFormId : form.googleFormId,
+            googleFormFields: googleFormFields !== undefined ? googleFormFields : form.googleFormFields,
         });
 
         // Emit WebSocket event
