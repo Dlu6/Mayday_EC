@@ -40,6 +40,7 @@ import ReportsAdminView from "./components/ReportsAdminView.js";
 import Realtime from "./components/Realtime.js";
 import ChanSpy from "./components/ChanSpy.jsx";
 import About from "./components/About.js";
+import WikiFAQ from "./components/WikiFAQ.js";
 import IVRBuilder from "./components/ivr/IVRBuilder.jsx";
 import Odbc from "./components/Odbc.js";
 import IVRProjects from "./components/ivr/IVRProjects.js";
@@ -49,6 +50,9 @@ import store from "./store.js";
 import IntervalsComponent from "./components/intervalsComponent.js";
 import Recordings from "./components/Routes/Recordings.js";
 import LicenseManagement from "./components/LicenseManagement.jsx";
+import TicketForms from "./components/TicketForms.js";
+import TicketFormEdit from "./components/TicketFormEdit.js";
+import TicketSubmissions from "./components/TicketSubmissions.js";
 const App = () => {
   useWebSocket();
 
@@ -133,9 +137,13 @@ const App = () => {
                 <Route path="integrations" element={<Integrations />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="support/about" element={<About />} />
+                <Route path="support/wiki" element={<WikiFAQ />} />
                 <Route path="ivr/projects" element={<IVRProjects />} />
                 <Route path="ivr/projects/:id" element={<IVRBuilder />} />
                 <Route path="ivr/odbc" element={<Odbc />} />
+                <Route path="tools/ticket-forms" element={<TicketForms />} />
+                <Route path="tools/ticket-forms/:formId" element={<TicketFormEdit />} />
+                <Route path="ticket-submissions" element={<TicketSubmissions />} />
                 <Route path="whatsapp" element={
                   <FeatureGate feature={FEATURE_KEYS.WHATSAPP}>
                     <WhatsappWebConfig />

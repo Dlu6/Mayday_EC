@@ -75,10 +75,11 @@ import {
   PersonAdd,
   Search,
   StarBorder,
-  Timeline,
+  // Timeline,
   BarChart,
   SystemUpdateAlt,
   Refresh as RefreshIcon,
+  ConfirmationNumber as TicketIcon,
 } from "@mui/icons-material";
 // import { io } from "socket.io-client";
 // import DialPad from "./DialPad";
@@ -98,6 +99,7 @@ import DashboardView from "./DashboardView";
 import PhonebarInfo from "./PhonebarInfo";
 import AgentDirectory from "./AgentDirectory";
 import TransferHistory from "./TransferHistory";
+import TicketFormsView from "./TicketFormsView";
 import { useCallState } from "../hooks/useCallState";
 import { useNotification } from "../contexts/NotificationContext";
 import { useAuthGuard } from "../hooks/useAuthGuard";
@@ -2255,6 +2257,12 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
       text: "Call History",
       action: () => setActiveSection("callHistory"),
       id: "callHistory",
+    },
+    {
+      icon: <TicketIcon />,
+      text: "Tickets",
+      action: () => setActiveSection("tickets"),
+      id: "tickets",
     },
     {
       icon: <PersonAdd />,
@@ -5658,6 +5666,20 @@ const Appbar = ({ onLogout, onToggleCollapse, isCollapsed }) => {
       <AgentStatus
         open={activeSection === "agentStatus"}
         onClose={handleCloseSection}
+      />
+      {/* Tickets - Dynamic Form Builder */}
+      <TicketFormsView
+        open={activeSection === "tickets"}
+        onClose={handleCloseSection}
+        agentId={user?.id}
+        agentExtension={user?.extension}
+        currentCall={callState.state !== "idle" ? {
+          callId: callState.uniqueId,
+          callerNumber: callState.remoteIdentity,
+          timestamp: new Date().toISOString(),
+        } : null}
+        apiHost={serverConfig.apiUrl}
+        authToken={storageService.getAuthToken()}
       />
       {/* <EmailView
         open={activeSection === "email"}

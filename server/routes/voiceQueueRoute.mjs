@@ -9,6 +9,7 @@ import {
   getVoiceQueuesController,
   removeQueueMemberController,
   updateVoiceQueueController,
+  updateQueueMemberPenaltyController,
 } from "../controllers/voiceQueueController.js";
 
 const router = express.Router();
@@ -22,6 +23,7 @@ router.delete("/delete/:queueId", deleteVoiceQueueController);
 // Queue Member Management Routes
 router.post("/members_add/:queueId", addQueueMemberController);
 router.delete("/members_remove/:queueId", removeQueueMemberController);
+router.patch("/members/:queueId/penalty", updateQueueMemberPenaltyController);
 router.get("/available-endpoints", getAvailableEndpointsController);
 router.get("/:queueId/members", getQueueMembersController);
 

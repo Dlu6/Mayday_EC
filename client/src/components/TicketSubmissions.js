@@ -1,0 +1,337 @@
+// client/src/components/TicketSubmissions.js
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import {
+    Box,
+    Paper,
+    Typography,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    TablePagination,
+    Chip,
+    IconButton,
+    Tooltip,
+    TextField,
+    InputAdornment,
+    Button,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Divider,
+    CircularProgress,
+} from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import RefreshIcon from "@mui/icons-material/Refresh";
+
+import apiClient from "../api/apiClient";
+
+const TicketSubmissions = () => {
+    const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
+    const formId = searchParams.get("formId");
+
+    const [submissions, setSubmissions] = useState([]);
+    const [form, setForm] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
+    const [total, setTotal] = useState(0);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [viewDialog, setViewDialog] = useState({ open: false, submission: null });
+
+    // Normalize label to sentence case
+    const normalizeLabel = (label) => {
+        if (!label) return "";
+        return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
+    };
+
+    // Fetch form details
+    const fetchForm = useCallback(async () => {
+        if (!formId) return;
+        try {
+            const response = await apiClient.get(`/tickets/forms/${formId}`);
+            setForm(response.data.form);
+        } catch (error) {
+            console.error("Failed to fetch form:", error);
+        }
+    }, [formId]);
+
+    // Fetch submissions
+    const fetchSubmissions = useCallback(async () => {
+        if (!formId) return;
+        setLoading(true);
+        try {
+            const params = new URLSearchParams({
+                formId,
+                limit: rowsPerPage,
+                offset: page * rowsPerPage,
+            });
+            if (searchQuery) params.append("callerNumber", searchQuery);
+
+            const response = await apiClient.get(`/tickets/submissions?${params}`);
+            const subs = response.data.submissions || [];
+            setSubmissions(subs);
+            setTotal(response.data.total || 0);
+
+            // Use form data from first submission if available
+            if (subs.length > 0 && subs[0].form) {
+                setForm(prevForm => prevForm || subs[0].form);
+            }
+        } catch (error) {
+            console.error("Failed to fetch submissions:", error);
+            setSubmissions([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [formId, page, rowsPerPage, searchQuery]);
+
+    useEffect(() => {
+        fetchForm();
+        fetchSubmissions();
+    }, [fetchForm, fetchSubmissions]);
+
+    // Get status color
+    const getStatusColor = (status) => {
+        switch (status) {
+            case "draft": return "default";
+            case "submitted": return "primary";
+            case "reviewed": return "success";
+            case "closed": return "secondary";
+            default: return "default";
+        }
+    };
+
+    // Parse responses JSON
+    const parseResponses = (responses) => {
+        if (!responses) return {};
+        if (typeof responses === "string") {
+            try { return JSON.parse(responses); } catch (e) { return {}; }
+        }
+        return responses;
+    };
+
+    // Get form schema fields
+    const getFormFields = () => {
+        if (!form?.schema) return [];
+        let schema = form.schema;
+        if (typeof schema === "string") {
+            try { schema = JSON.parse(schema); } catch (e) { return []; }
+        }
+        return schema?.fields || [];
+    };
+
+    const handleViewSubmission = (submission) => {
+        setViewDialog({ open: true, submission });
+    };
+
+    return (
+        <Box sx={{ p: 3 }}>
+
+
+            {/* Header */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
+                <Button
+                    startIcon={<ArrowBackIcon />}
+                    onClick={() => navigate("/tools/ticket-forms")}
+                >
+                    Back to Forms
+                </Button>
+                <Typography variant="h5" sx={{ flex: 1 }}>
+                    {form?.name || "Loading..."}
+                </Typography>
+                <Tooltip title="Refresh">
+                    <IconButton onClick={fetchSubmissions} disabled={loading}>
+                        <RefreshIcon />
+                    </IconButton>
+                </Tooltip>
+            </Box>
+
+            {/* Search */}
+            <Paper sx={{ p: 2, mb: 2 }}>
+                <TextField
+                    size="small"
+                    placeholder="Search by caller number..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    sx={{ width: 300 }}
+                    InputProps={{
+                        startAdornment: (
+                            <InputAdornment position="start">
+                                <SearchIcon fontSize="small" />
+                            </InputAdornment>
+                        ),
+                    }}
+                />
+            </Paper>
+
+            {/* Table */}
+            <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
+                <Table stickyHeader size="small">
+                    <TableHead>
+                        <TableRow>
+                            <TableCell sx={{ fontWeight: 600, backgroundColor: "#f5f5f5" }}>ID</TableCell>
+                            <TableCell sx={{ fontWeight: 600, backgroundColor: "#f5f5f5" }}>Status</TableCell>
+                            <TableCell sx={{ fontWeight: 600, backgroundColor: "#f5f5f5" }}>Submitted</TableCell>
+                            {/* Dynamic columns from form schema */}
+                            {getFormFields().slice(0, 5).map((field) => (
+                                <TableCell key={field.id} sx={{ fontWeight: 600, backgroundColor: "#f5f5f5", minWidth: 150 }}>
+                                    {normalizeLabel(field.label)}
+                                </TableCell>
+                            ))}
+                            {getFormFields().length > 5 && (
+                                <TableCell sx={{ fontWeight: 600, backgroundColor: "#f5f5f5" }}>...</TableCell>
+                            )}
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {loading ? (
+                            <TableRow>
+                                <TableCell colSpan={3 + Math.min(getFormFields().length, 5) + (getFormFields().length > 5 ? 1 : 0)} align="center" sx={{ py: 4 }}>
+                                    <CircularProgress size={24} />
+                                </TableCell>
+                            </TableRow>
+                        ) : submissions.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={3 + Math.min(getFormFields().length, 5) + (getFormFields().length > 5 ? 1 : 0)} align="center" sx={{ py: 4 }}>
+                                    No submissions yet
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            submissions.map((sub) => {
+                                const values = parseResponses(sub.responses);
+                                return (
+                                    <TableRow key={sub.id} hover sx={{ cursor: "pointer" }} onClick={() => handleViewSubmission(sub)}>
+                                        <TableCell>{sub.id}</TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                size="small"
+                                                label={sub.status}
+                                                color={getStatusColor(sub.status)}
+                                            />
+                                        </TableCell>
+                                        <TableCell sx={{ whiteSpace: "nowrap" }}>
+                                            {new Date(sub.createdAt).toLocaleString()}
+                                        </TableCell>
+                                        {/* Dynamic values from responses */}
+                                        {getFormFields().slice(0, 5).map((field) => (
+                                            <TableCell key={field.id} sx={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                {values[field.id] || "-"}
+                                            </TableCell>
+                                        ))}
+                                        {getFormFields().length > 5 && (
+                                            <TableCell>
+                                                <Tooltip title="Click to view all fields">
+                                                    <VisibilityIcon fontSize="small" color="action" />
+                                                </Tooltip>
+                                            </TableCell>
+                                        )}
+                                    </TableRow>
+                                );
+                            })
+                        )}
+                    </TableBody>
+                </Table>
+                <TablePagination
+                    component="div"
+                    count={total}
+                    page={page}
+                    onPageChange={(_, newPage) => setPage(newPage)}
+                    rowsPerPage={rowsPerPage}
+                    onRowsPerPageChange={(e) => {
+                        setRowsPerPage(parseInt(e.target.value, 10));
+                        setPage(0);
+                    }}
+                    rowsPerPageOptions={[10, 25, 50]}
+                />
+            </TableContainer>
+
+            {/* View Dialog */}
+            <Dialog
+                open={viewDialog.open}
+                onClose={() => setViewDialog({ open: false, submission: null })}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>Submission Details</DialogTitle>
+                <DialogContent dividers>
+                    {viewDialog.submission && (
+                        <>
+                            <Box sx={{ display: "flex", gap: 4, mb: 3 }}>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">Status</Typography>
+                                    <Box>
+                                        <Chip
+                                            size="small"
+                                            label={viewDialog.submission.status}
+                                            color={getStatusColor(viewDialog.submission.status)}
+                                        />
+                                    </Box>
+                                </Box>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">Caller</Typography>
+                                    <Typography>{viewDialog.submission.callerNumber || "N/A"}</Typography>
+                                </Box>
+                                <Box>
+                                    <Typography variant="caption" color="text.secondary">Submitted</Typography>
+                                    <Typography>
+                                        {new Date(viewDialog.submission.createdAt).toLocaleString()}
+                                    </Typography>
+                                </Box>
+                            </Box>
+
+                            <Divider sx={{ mb: 2 }} />
+                            <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                                Form Responses
+                            </Typography>
+
+                            <TableContainer component={Paper} variant="outlined">
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
+                                            <TableCell sx={{ fontWeight: 600 }}>Field</TableCell>
+                                            <TableCell sx={{ fontWeight: 600 }}>Value</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {getFormFields().map((field) => {
+                                            const values = parseResponses(viewDialog.submission.responses);
+                                            return (
+                                                <TableRow key={field.id} hover>
+                                                    <TableCell sx={{ color: "text.secondary", width: "40%" }}>
+                                                        {normalizeLabel(field.label)}
+                                                    </TableCell>
+                                                    <TableCell>{values[field.id] || "-"}</TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                        {getFormFields().length === 0 && (
+                                            <TableRow>
+                                                <TableCell colSpan={2} align="center" sx={{ fontStyle: "italic" }}>
+                                                    No form fields available
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setViewDialog({ open: false, submission: null })}>
+                        Close
+                    </Button>
+                </DialogActions>
+            </Dialog>
+        </Box>
+    );
+};
+
+export default TicketSubmissions;

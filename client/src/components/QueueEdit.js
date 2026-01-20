@@ -64,15 +64,13 @@ import apiClient from "../api/apiClient.js";
 import LoadingIndicator from "./common/LoadingIndicator.js";
 
 const QueueEdit = () => {
-  const { agents, loading } = useSelector((state) => state.agents);
+  const { loading } = useSelector((state) => state.agents);
   const { queueId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { enqueueSnackbar } = useSnackbar();
   const [openDialog, setOpenDialog] = useState(false);
-  const [availableAgents, setAvailableAgents] = useState(agents);
-  const [selectedAgents, setSelectedAgents] = useState([]);
   const [asteriskEndpoints, setAsteriskEndpoints] = useState([]);
   const [selectedEndpoints, setSelectedEndpoints] = useState([]);
   const [searchAvailable, setSearchAvailable] = useState("");
@@ -296,6 +294,17 @@ const QueueEdit = () => {
     setOpenDialog(false);
   };
 
+  // Handle individual penalty change for an agent
+  const handlePenaltyChange = (extension, newPenalty) => {
+    setSelectedEndpoints((prev) =>
+      prev.map((endpoint) =>
+        endpoint.extension === extension
+          ? { ...endpoint, penalty: parseInt(newPenalty) || 0 }
+          : endpoint
+      )
+    );
+  };
+
   const handleToggle = (endpoint) => {
     // Check if the endpoint is in the selectedEndpoints list
     const isSelected = selectedEndpoints.some(
@@ -312,9 +321,9 @@ const QueueEdit = () => {
         setAsteriskEndpoints([...asteriskEndpoints, endpoint]);
       }
     } else {
-      // Add to selected and remove from available
+      // Add to selected with default penalty (0) and remove from available
       if (!selectedEndpoints.some((e) => e.extension === endpoint.extension)) {
-        setSelectedEndpoints([...selectedEndpoints, endpoint]);
+        setSelectedEndpoints([...selectedEndpoints, { ...endpoint, penalty: endpoint.penalty || 0 }]);
       }
       setAsteriskEndpoints(
         asteriskEndpoints.filter((e) => e.extension !== endpoint.extension)
@@ -323,8 +332,6 @@ const QueueEdit = () => {
   };
 
   const handleSaveSelectedAgents = async () => {
-    const penalty = document.getElementById("penalty").value || 0;
-
     // Compare with currentQueueMembers to determine changes
     const membersToRemove = currentQueueMembers.filter(
       (member) =>
@@ -340,6 +347,14 @@ const QueueEdit = () => {
         )
     );
 
+    // Detect penalty changes for existing members
+    const membersToUpdate = selectedEndpoints.filter((endpoint) => {
+      const existingMember = currentQueueMembers.find(
+        (member) => member.extension === endpoint.extension
+      );
+      return existingMember && existingMember.penalty !== endpoint.penalty;
+    });
+
     try {
       // Handle removals
       if (membersToRemove.length > 0) {
@@ -347,19 +362,19 @@ const QueueEdit = () => {
           await dispatch(
             removeQueueMember({
               queueId,
-              Interface: member.interface, // Use the full interface string
+              Interface: member.interface,
             })
           ).unwrap();
         }
       }
 
-      // Handle additions with username
+      // Handle additions with individual penalties
       if (membersToAdd.length > 0) {
         const memberData = {
           members: membersToAdd.map((endpoint) => ({
             Interface: `PJSIP/${endpoint.extension}`,
             MemberName: endpoint.username || endpoint.extension,
-            Penalty: parseInt(penalty),
+            Penalty: parseInt(endpoint.penalty) || 0, // Use individual penalty
             Status: endpoint.status,
           })),
         };
@@ -367,11 +382,27 @@ const QueueEdit = () => {
         await dispatch(addQueueMembers({ queueId, memberData })).unwrap();
       }
 
-      const changesMade = membersToAdd.length > 0 || membersToRemove.length > 0;
+      // Handle penalty updates for existing members
+      if (membersToUpdate.length > 0) {
+        for (const endpoint of membersToUpdate) {
+          await apiClient.patch(
+            `/users/voice_queue/members/${queueId}/penalty`,
+            {
+              Interface: `PJSIP/${endpoint.extension}`,
+              Penalty: parseInt(endpoint.penalty) || 0,
+            }
+          );
+        }
+      }
+
+      const changesMade =
+        membersToAdd.length > 0 ||
+        membersToRemove.length > 0 ||
+        membersToUpdate.length > 0;
 
       if (changesMade) {
         enqueueSnackbar(
-          `Queue members updated (${membersToAdd.length} added, ${membersToRemove.length} removed)`,
+          `Queue members updated (${membersToAdd.length} added, ${membersToRemove.length} removed, ${membersToUpdate.length} penalties updated)`,
           { variant: "success" }
         );
         await dispatch(getQueueMembers(queueId)).unwrap();
@@ -387,16 +418,20 @@ const QueueEdit = () => {
     }
   };
 
-  // Adds all agents to the selected list
+  // Adds all agents to the selected list (with default penalty 0)
   const handleAddAllAgents = () => {
-    setSelectedAgents(selectedAgents.concat(availableAgents));
-    setAvailableAgents([]);
+    const endpointsWithPenalty = asteriskEndpoints.map((endpoint) => ({
+      ...endpoint,
+      penalty: endpoint.penalty || 0,
+    }));
+    setSelectedEndpoints([...selectedEndpoints, ...endpointsWithPenalty]);
+    setAsteriskEndpoints([]);
   };
 
   // Removes all agents from the selected list
   const handleRemoveAllAgents = () => {
-    setAvailableAgents(availableAgents.concat(selectedAgents));
-    setSelectedAgents([]);
+    setAsteriskEndpoints([...asteriskEndpoints, ...selectedEndpoints]);
+    setSelectedEndpoints([]);
   };
 
   // Filter lists based on search input
@@ -598,16 +633,9 @@ const QueueEdit = () => {
         </DialogTitle>
 
         <DialogContent sx={{ mt: 2 }}>
-          <TextField
-            autoFocus
-            margin="dense"
-            id="penalty"
-            label="Penalty *"
-            type="number"
-            fullWidth
-            defaultValue={0}
-            style={{ marginTop: "18px" }}
-          />
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2, mb: 1 }}>
+            <strong>Penalty</strong>: Set individual penalties per agent. Lower values (0) are called first, higher values are backup agents.
+          </Typography>
           <Grid container spacing={2}>
             <Grid item xs={5}>
               <TextField
@@ -752,17 +780,16 @@ const QueueEdit = () => {
                       {filteredSelectedEndpoints.map((endpoint) => (
                         <ListItem
                           key={endpoint.id}
-                          button
-                          onClick={() => handleToggle(endpoint)}
                           sx={{
                             backgroundColor:
                               endpoint.status === "online"
                                 ? "success.main"
                                 : "#f9f0f0",
-                            // color: "white",
                             borderRadius: "8px",
                             padding: "8px",
                             margin: "8px",
+                            display: "flex",
+                            alignItems: "center",
                             "&:hover": {
                               backgroundColor:
                                 endpoint.status === "online"
@@ -771,7 +798,7 @@ const QueueEdit = () => {
                             },
                           }}
                         >
-                          <ListItemIcon>
+                          <ListItemIcon onClick={() => handleToggle(endpoint)}>
                             <Checkbox
                               checked={selectedEndpoints.some(
                                 (selected) => selected.id === endpoint.id
@@ -779,6 +806,7 @@ const QueueEdit = () => {
                             />
                           </ListItemIcon>
                           <ListItemText
+                            onClick={() => handleToggle(endpoint)}
                             primary={endpoint.username}
                             secondary={
                               <>
@@ -794,10 +822,30 @@ const QueueEdit = () => {
                                 >
                                   ●{" "}
                                 </Typography>
-                                {/* {`Extension: ${endpoint.extension} (${endpoint.status})`} */}
-                                {`Extension: ${endpoint.extension} (Penalty: ${endpoint.penalty})`}
+                                {`Extension: ${endpoint.extension}`}
                               </>
                             }
+                          />
+                          <TextField
+                            type="number"
+                            size="small"
+                            value={endpoint.penalty ?? 0}
+                            onChange={(e) =>
+                              handlePenaltyChange(endpoint.extension, e.target.value)
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            inputProps={{ min: 0, max: 99, style: { textAlign: "center" } }}
+                            sx={{
+                              width: "70px",
+                              ml: 1,
+                              backgroundColor: "white",
+                              borderRadius: "4px",
+                              "& .MuiOutlinedInput-root": {
+                                "& fieldset": { borderColor: "#ccc" },
+                              },
+                            }}
+                            label="Penalty"
+                            InputLabelProps={{ shrink: true }}
                           />
                         </ListItem>
                       ))}

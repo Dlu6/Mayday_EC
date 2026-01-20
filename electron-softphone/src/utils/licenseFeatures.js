@@ -75,7 +75,7 @@ export const FEATURE_DESCRIPTIONS = {
 export const ROUTE_FEATURE_MAP = {
   // Dashboard is always available
   '/dashboard': null,
-  
+
   // Voice routes
   '/voice': FEATURE_KEYS.CALLS,
   '/voice/voiceQueues': FEATURE_KEYS.CALLS,
@@ -83,40 +83,40 @@ export const ROUTE_FEATURE_MAP = {
   '/voice/outboundRoutes': FEATURE_KEYS.CALLS,
   '/voice/recordings': FEATURE_KEYS.RECORDING,
   '/voice/realtime': FEATURE_KEYS.CALLS,
-  
+
   // Analytics
   '/analytics': FEATURE_KEYS.REPORTS,
   '/analytics/reports': FEATURE_KEYS.REPORTS,
-  
+
   // Integrations
   '/integrations': FEATURE_KEYS.THIRD_PARTY_INTEGRATIONS,
   '/integrations/salesforceAccount': FEATURE_KEYS.SALESFORCE,
   '/whatsapp': FEATURE_KEYS.WHATSAPP,
-  
+
   // IVR routes
   '/ivr': FEATURE_KEYS.CALLS,
   '/ivr/projects': FEATURE_KEYS.CALLS,
   '/ivr/odbc': FEATURE_KEYS.CALLS,
-  
+
   // Tools - generally available with calls
   '/tools': FEATURE_KEYS.CALLS,
   '/tools/trunks': FEATURE_KEYS.CALLS,
   '/tools/audio': FEATURE_KEYS.CALLS,
   '/tools/intervals': FEATURE_KEYS.CALLS,
-  
+
   // Settings - always available
   '/settings': null,
   '/settings/networks': null,
   '/settings/license': null,
-  
+
   // Staff/Agents
   '/staff': null,
   '/agents': null,
-  
+
   // Support - always available
   '/support': null,
   '/support/about': null,
-  
+
   // Profile - always available
   '/profile': null,
 };
@@ -125,23 +125,26 @@ export const ROUTE_FEATURE_MAP = {
 export const MENU_FEATURE_MAP = {
   // Dashboard is always available
   dashboard: null,
-  
+
   // Call-related features
   callHistory: FEATURE_KEYS.CALLS,
   agentDirectory: FEATURE_KEYS.CALLS,
   transferHistory: FEATURE_KEYS.TRANSFERS,
-  
+
   // Reports
   reports: FEATURE_KEYS.REPORTS,
-  
+
   // Agent status - always available
   agentStatus: null,
-  
+
+  // Tickets - always available
+  tickets: null,
+
   // Integrations
   whatsapp: FEATURE_KEYS.WHATSAPP,
   email: FEATURE_KEYS.EMAIL,
   facebook: FEATURE_KEYS.FACEBOOK,
-  
+
   // Info and updates - always available
   info: null,
   updates: null,
@@ -156,7 +159,7 @@ export const MENU_FEATURE_MAP = {
  */
 export const parseFeatures = (features) => {
   if (!features) return {};
-  
+
   if (typeof features === 'string') {
     try {
       return JSON.parse(features);
@@ -165,7 +168,7 @@ export const parseFeatures = (features) => {
       return {};
     }
   }
-  
+
   return features;
 };
 
@@ -178,11 +181,11 @@ export const parseFeatures = (features) => {
 export const hasFeature = (license, featureKey) => {
   if (!license) return false;
   if (!featureKey) return true; // No feature requirement means always allowed
-  
+
   // Handle nested license structure
   const features = license.features || license.license_type?.features || {};
   const parsedFeatures = parseFeatures(features);
-  
+
   return Boolean(parsedFeatures[featureKey]);
 };
 
@@ -194,10 +197,10 @@ export const hasFeature = (license, featureKey) => {
  */
 export const isRouteAccessible = (license, path) => {
   const requiredFeature = ROUTE_FEATURE_MAP[path];
-  
+
   // No feature requirement means always accessible
   if (!requiredFeature) return true;
-  
+
   return hasFeature(license, requiredFeature);
 };
 
@@ -209,10 +212,10 @@ export const isRouteAccessible = (license, path) => {
  */
 export const isMenuItemAccessible = (license, menuId) => {
   const requiredFeature = MENU_FEATURE_MAP[menuId];
-  
+
   // No feature requirement means always accessible
   if (!requiredFeature) return true;
-  
+
   return hasFeature(license, requiredFeature);
 };
 
@@ -223,10 +226,10 @@ export const isMenuItemAccessible = (license, menuId) => {
  */
 export const getEnabledFeatures = (license) => {
   if (!license) return [];
-  
+
   const features = license.features || license.license_type?.features || {};
   const parsedFeatures = parseFeatures(features);
-  
+
   return Object.entries(parsedFeatures)
     .filter(([_, enabled]) => enabled)
     .map(([key]) => key);
@@ -239,10 +242,10 @@ export const getEnabledFeatures = (license) => {
  */
 export const getDisabledFeatures = (license) => {
   if (!license) return Object.values(FEATURE_KEYS);
-  
+
   const features = license.features || license.license_type?.features || {};
   const parsedFeatures = parseFeatures(features);
-  
+
   return Object.entries(parsedFeatures)
     .filter(([_, enabled]) => !enabled)
     .map(([key]) => key);
@@ -256,19 +259,19 @@ export const getDisabledFeatures = (license) => {
  */
 export const filterRoutesByLicense = (routes, license) => {
   if (!routes || !Array.isArray(routes)) return [];
-  
+
   return routes.reduce((acc, route) => {
     // Check if the route itself is accessible
     if (!isRouteAccessible(license, route.path)) {
       return acc;
     }
-    
+
     // If the route has children, filter them as well
     if (route.children && Array.isArray(route.children)) {
-      const filteredChildren = route.children.filter(child => 
+      const filteredChildren = route.children.filter(child =>
         isRouteAccessible(license, child.path)
       );
-      
+
       // Only include the parent if it has accessible children or is itself accessible
       if (filteredChildren.length > 0) {
         acc.push({
@@ -279,7 +282,7 @@ export const filterRoutesByLicense = (routes, license) => {
     } else {
       acc.push(route);
     }
-    
+
     return acc;
   }, []);
 };
@@ -292,7 +295,7 @@ export const filterRoutesByLicense = (routes, license) => {
  */
 export const filterMenuItemsByLicense = (menuItems, license) => {
   if (!menuItems || !Array.isArray(menuItems)) return [];
-  
+
   return menuItems.filter(item => isMenuItemAccessible(license, item.id));
 };
 
@@ -321,16 +324,16 @@ export const getMenuItemRequiredFeature = (menuId) => {
  */
 export const isLicenseValid = (license) => {
   if (!license) return false;
-  
+
   // Check status
   if (license.status !== 'active') return false;
-  
+
   // Check expiration
   if (license.expires_at) {
     const expiresAt = new Date(license.expires_at);
     if (expiresAt < new Date()) return false;
   }
-  
+
   return true;
 };
 
@@ -341,7 +344,7 @@ export const isLicenseValid = (license) => {
  */
 export const isDevelopmentLicense = (license) => {
   if (!license) return false;
-  
+
   return (
     license.organization_name === 'Development License' ||
     license.license_type_name === 'Development' ||

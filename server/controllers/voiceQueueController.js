@@ -316,3 +316,56 @@ export const getQueueMembersController = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch queue members" });
   }
 };
+
+// Update Queue Member Penalty
+export const updateQueueMemberPenaltyController = async (req, res) => {
+  const { queueId } = req.params;
+  const { Interface, Penalty } = req.body;
+  const transaction = await sequelize.transaction();
+
+  try {
+    const voiceQueue = await VoiceQueue.findByPk(queueId);
+
+    if (!voiceQueue) {
+      await transaction.rollback();
+      return res.status(404).json({ message: "Voice queue not found" });
+    }
+
+    // Update penalty in database
+    const [updated] = await QueueMember.update(
+      { penalty: Penalty },
+      {
+        where: {
+          queue_id: queueId,
+          interface: Interface,
+        },
+        transaction,
+      }
+    );
+
+    if (updated === 0) {
+      await transaction.rollback();
+      return res.status(404).json({ message: "Queue member not found" });
+    }
+
+    await transaction.commit();
+
+    // Reload queues in Asterisk to apply penalty change
+    await amiService.executeAction({
+      Action: "Command",
+      Command: "queue reload all",
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Queue member penalty updated successfully",
+      queue: voiceQueue.name,
+      Interface,
+      Penalty,
+    });
+  } catch (error) {
+    await transaction.rollback();
+    console.error("❌ Error updating queue member penalty:", error);
+    res.status(500).json({ message: "Failed to update queue member penalty" });
+  }
+};

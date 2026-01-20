@@ -63,6 +63,7 @@ const getUserRoutes = (user, license = null) => {
           { name: "Trunks", path: "/tools/trunks" },
           { name: "Audio Manager", path: "/tools/audio" },
           { name: "Intervals", path: "/tools/intervals" },
+          { name: "Ticket Forms", path: "/tools/ticket-forms" },
 
           // { name: "Triggers", path: "/tools/triggers" },
           // { name: "Variables", path: "/tools/variables" },
@@ -107,12 +108,11 @@ const getUserRoutes = (user, license = null) => {
         ],
       },
       {
-        name: "Support", // Add the Networks menu
+        name: "Support",
         path: "/support",
         children: [
+          { name: "Wiki/FAQ", path: "/support/wiki" },
           { name: "About", path: "/support/about" },
-          // { name: "Tickets", path: "/support/ticket" },
-          // Add more submenus as needed (e.g., /networks/devices, etc.)
         ],
       },
       // ...other admin routes
@@ -130,12 +130,12 @@ const getUserRoutes = (user, license = null) => {
 
   // Get routes for the user's role
   const roleRoutes = routes[user.role] || [];
-  
+
   // If no license provided, return all role routes
   if (!license) {
     return roleRoutes;
   }
-  
+
   // Filter routes based on license features
   return filterRoutesByLicense(roleRoutes, license);
 };
