@@ -651,7 +651,7 @@ export const getSubmissions = async (req, res) => {
                 {
                     model: TicketForm,
                     as: "form",
-                    attributes: ["id", "name"],
+                    attributes: ["id", "name", "schema"],
                 },
             ],
             order: [["createdAt", "DESC"]],
@@ -755,6 +755,121 @@ export const updateSubmissionStatus = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Failed to update submission status",
+            error: error.message,
+        });
+    }
+};
+
+/**
+ * Update submission data (for agents to edit their tickets)
+ */
+export const updateSubmission = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const agentId = req.user?.id;
+        const { formValues, callerNumber, agentExtension, callId, notes } = req.body;
+
+        const submission = await TicketSubmission.findByPk(id, {
+            include: [{ model: TicketForm, as: "form" }],
+        });
+
+        if (!submission) {
+            return res.status(404).json({
+                success: false,
+                message: "Submission not found",
+            });
+        }
+
+        // Verify agent owns this submission
+        if (submission.agentId !== agentId) {
+            return res.status(403).json({
+                success: false,
+                message: "You can only edit your own submissions",
+            });
+        }
+
+        // Only allow editing if status is not closed
+        if (submission.status === "closed") {
+            return res.status(400).json({
+                success: false,
+                message: "Cannot edit closed submissions",
+            });
+        }
+
+        const updateData = {};
+        if (formValues !== undefined) updateData.formValues = formValues;
+        if (callerNumber !== undefined) updateData.callerNumber = callerNumber;
+        if (agentExtension !== undefined) updateData.agentExtension = agentExtension;
+        if (callId !== undefined) updateData.callId = callId;
+        if (notes !== undefined) updateData.notes = notes;
+        updateData.updatedAt = new Date();
+
+        await submission.update(updateData);
+
+        // Reload with form association
+        await submission.reload({
+            include: [{ model: TicketForm, as: "form", attributes: ["id", "name"] }],
+        });
+
+        res.json({
+            success: true,
+            message: "Submission updated successfully",
+            submission,
+        });
+    } catch (error) {
+        console.error("Error updating submission:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to update submission",
+            error: error.message,
+        });
+    }
+};
+
+/**
+ * Delete submission (for agents to delete their tickets)
+ */
+export const deleteSubmission = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const agentId = req.user?.id;
+
+        const submission = await TicketSubmission.findByPk(id);
+
+        if (!submission) {
+            return res.status(404).json({
+                success: false,
+                message: "Submission not found",
+            });
+        }
+
+        // Verify agent owns this submission
+        if (submission.agentId !== agentId) {
+            return res.status(403).json({
+                success: false,
+                message: "You can only delete your own submissions",
+            });
+        }
+
+        // Only allow deleting drafts
+        if (submission.status !== "draft") {
+            return res.status(400).json({
+                success: false,
+                message: "Only draft submissions can be deleted",
+            });
+        }
+
+        await submission.destroy();
+
+        res.json({
+            success: true,
+            message: "Submission deleted successfully",
+        });
+    } catch (error) {
+        console.error("Error deleting submission:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to delete submission",
             error: error.message,
         });
     }

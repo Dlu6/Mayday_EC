@@ -52,6 +52,7 @@ import Recordings from "./components/Routes/Recordings.js";
 import LicenseManagement from "./components/LicenseManagement.jsx";
 import TicketForms from "./components/TicketForms.js";
 import TicketFormEdit from "./components/TicketFormEdit.js";
+import TicketSubmissions from "./components/TicketSubmissions.js";
 const App = () => {
   useWebSocket();
 
@@ -142,6 +143,7 @@ const App = () => {
                 <Route path="ivr/odbc" element={<Odbc />} />
                 <Route path="tools/ticket-forms" element={<TicketForms />} />
                 <Route path="tools/ticket-forms/:formId" element={<TicketFormEdit />} />
+                <Route path="ticket-submissions" element={<TicketSubmissions />} />
                 <Route path="whatsapp" element={
                   <FeatureGate feature={FEATURE_KEYS.WHATSAPP}>
                     <WhatsappWebConfig />

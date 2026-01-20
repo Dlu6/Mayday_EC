@@ -14,6 +14,8 @@ import {
     submitTicket,
     getSubmissions,
     getSubmission,
+    updateSubmission,
+    deleteSubmission,
     updateSubmissionStatus,
     getCallerHistory,
     parseGoogleForm,
@@ -438,6 +440,61 @@ router.get("/submissions/:id", sipAuthMiddleware, getSubmission);
  *         description: Status updated successfully
  */
 router.patch("/submissions/:id/status", sipAuthMiddleware, updateSubmissionStatus);
+
+/**
+ * @swagger
+ * /api/tickets/submissions/{id}:
+ *   put:
+ *     summary: Update a submission (agent can edit own ticket)
+ *     tags: [Tickets]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               formValues:
+ *                 type: object
+ *               callerNumber:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Submission updated successfully
+ *       403:
+ *         description: Not authorized (not your submission)
+ */
+router.put("/submissions/:id", sipAuthMiddleware, updateSubmission);
+
+/**
+ * @swagger
+ * /api/tickets/submissions/{id}:
+ *   delete:
+ *     summary: Delete a submission (agent can delete own draft tickets)
+ *     tags: [Tickets]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Submission deleted successfully
+ *       403:
+ *         description: Not authorized (not your submission)
+ *       400:
+ *         description: Only draft submissions can be deleted
+ */
+router.delete("/submissions/:id", sipAuthMiddleware, deleteSubmission);
 
 // ============================================
 // CALLER HISTORY ROUTE

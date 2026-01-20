@@ -35,6 +35,14 @@ const DynamicFormField = ({ field, value, onChange, error }) => {
         onChange(field.id, newValue);
     };
 
+    // Normalize label to sentence case for professional display
+    const normalizeLabel = (label) => {
+        if (!label) return "";
+        return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
+    };
+
+    const normalizedLabel = normalizeLabel(field.label);
+
     const commonProps = {
         fullWidth: true,
         error: !!error,
@@ -51,7 +59,7 @@ const DynamicFormField = ({ field, value, onChange, error }) => {
             return (
                 <TextField
                     {...commonProps}
-                    label={field.label}
+                    label={normalizedLabel}
                     value={value || ""}
                     onChange={(e) => handleChange(e.target.value)}
                     placeholder={field.placeholder}
@@ -63,7 +71,7 @@ const DynamicFormField = ({ field, value, onChange, error }) => {
             return (
                 <TextField
                     {...commonProps}
-                    label={field.label}
+                    label={normalizedLabel}
                     value={value || ""}
                     onChange={(e) => handleChange(e.target.value)}
                     placeholder={field.placeholder}
@@ -78,7 +86,7 @@ const DynamicFormField = ({ field, value, onChange, error }) => {
                 <TextField
                     {...commonProps}
                     type="number"
-                    label={field.label}
+                    label={normalizedLabel}
                     value={value || ""}
                     onChange={(e) => handleChange(e.target.value)}
                     placeholder={field.placeholder}
@@ -98,7 +106,7 @@ const DynamicFormField = ({ field, value, onChange, error }) => {
                     <Select
                         value={value || ""}
                         onChange={(e) => handleChange(e.target.value)}
-                        label={field.label}
+                        label={normalizedLabel}
                     >
                         <MenuItem value="">
                             <em>Select...</em>
@@ -116,7 +124,7 @@ const DynamicFormField = ({ field, value, onChange, error }) => {
         case "radio":
             return (
                 <FormControl {...commonProps} required={field.required} component="fieldset">
-                    <FormLabel component="legend" sx={{ fontWeight: 600 }}>{field.label}</FormLabel>
+                    <FormLabel component="legend" sx={{ fontWeight: 600 }}>{normalizedLabel}</FormLabel>
                     <RadioGroup
                         value={value || ""}
                         onChange={(e) => handleChange(e.target.value)}
@@ -148,7 +156,7 @@ const DynamicFormField = ({ field, value, onChange, error }) => {
 
             return (
                 <FormControl {...commonProps} component="fieldset">
-                    <FormLabel component="legend" sx={{ fontWeight: 600 }}>{field.label}</FormLabel>
+                    <FormLabel component="legend" sx={{ fontWeight: 600 }}>{normalizedLabel}</FormLabel>
                     <FormGroup>
                         {(field.options || []).map((option, idx) => (
                             <FormControlLabel
@@ -172,7 +180,7 @@ const DynamicFormField = ({ field, value, onChange, error }) => {
             return (
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                     <DatePicker
-                        label={field.label}
+                        label={normalizedLabel}
                         value={value ? dayjs(value) : null}
                         onChange={(newValue) => handleChange(newValue?.toISOString() || null)}
                         slotProps={{
@@ -214,7 +222,7 @@ const DynamicFormField = ({ field, value, onChange, error }) => {
             return (
                 <TextField
                     {...commonProps}
-                    label={field.label}
+                    label={normalizedLabel}
                     value={value || ""}
                     onChange={(e) => handleChange(e.target.value)}
                     placeholder={field.placeholder}
