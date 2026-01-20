@@ -11,10 +11,6 @@ import {
     Tabs,
     Tab,
     Chip,
-    List,
-    ListItem,
-    ListItemIcon,
-    ListItemText,
     Divider,
     Card,
     CardContent,
@@ -479,7 +475,7 @@ const WikiFAQ = () => {
                 {/* Footer */}
                 <Divider sx={{ mt: 4, mb: 2 }} />
                 <Typography variant="body2" color="text.secondary" align="center">
-                    Can't find what you're looking for? Contact your system administrator
+                    Cannot find what you are looking for? Contact your system administrator
                     for assistance.
                 </Typography>
             </Paper>
