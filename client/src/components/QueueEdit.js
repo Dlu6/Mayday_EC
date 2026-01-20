@@ -71,8 +71,6 @@ const QueueEdit = () => {
   const dispatch = useDispatch();
   const { enqueueSnackbar } = useSnackbar();
   const [openDialog, setOpenDialog] = useState(false);
-  const [availableAgents, setAvailableAgents] = useState(agents);
-  const [selectedAgents, setSelectedAgents] = useState([]);
   const [asteriskEndpoints, setAsteriskEndpoints] = useState([]);
   const [selectedEndpoints, setSelectedEndpoints] = useState([]);
   const [searchAvailable, setSearchAvailable] = useState("");
