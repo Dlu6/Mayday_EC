@@ -68,9 +68,9 @@ const TicketForm = sequelize.define(
             comment: "Parsed Google Form field structure with entry IDs",
         },
         createdBy: {
-            type: DataTypes.INTEGER,
+            type: DataTypes.STRING(36),
             allowNull: true,
-            comment: "Admin user ID who created the form",
+            comment: "Admin user ID (UUID) who created the form",
         },
         sortOrder: {
             type: DataTypes.INTEGER,
