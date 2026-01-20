@@ -80,9 +80,9 @@ const TicketSubmissions = () => {
             setSubmissions(subs);
             setTotal(response.data.total || 0);
 
-            // Use form data from first submission if form not already loaded
-            if (subs.length > 0 && subs[0].form && !form) {
-                setForm(subs[0].form);
+            // Use form data from first submission if available
+            if (subs.length > 0 && subs[0].form) {
+                setForm(prevForm => prevForm || subs[0].form);
             }
         } catch (error) {
             console.error("Failed to fetch submissions:", error);
@@ -90,7 +90,7 @@ const TicketSubmissions = () => {
         } finally {
             setLoading(false);
         }
-    }, [formId, page, rowsPerPage, searchQuery, form]);
+    }, [formId, page, rowsPerPage, searchQuery]);
 
     useEffect(() => {
         fetchForm();
@@ -279,17 +279,36 @@ const TicketSubmissions = () => {
                                 Form Responses
                             </Typography>
 
-                            {getFormFields().map((field) => {
-                                const values = parseResponses(viewDialog.submission.responses);
-                                return (
-                                    <Box key={field.id} sx={{ mb: 2 }}>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {normalizeLabel(field.label)}
-                                        </Typography>
-                                        <Typography>{values[field.id] || "-"}</Typography>
-                                    </Box>
-                                );
-                            })}
+                            <TableContainer component={Paper} variant="outlined">
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
+                                            <TableCell sx={{ fontWeight: 600 }}>Field</TableCell>
+                                            <TableCell sx={{ fontWeight: 600 }}>Value</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {getFormFields().map((field) => {
+                                            const values = parseResponses(viewDialog.submission.responses);
+                                            return (
+                                                <TableRow key={field.id} hover>
+                                                    <TableCell sx={{ color: "text.secondary", width: "40%" }}>
+                                                        {normalizeLabel(field.label)}
+                                                    </TableCell>
+                                                    <TableCell>{values[field.id] || "-"}</TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                        {getFormFields().length === 0 && (
+                                            <TableRow>
+                                                <TableCell colSpan={2} align="center" sx={{ fontStyle: "italic" }}>
+                                                    No form fields available
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
                         </>
                     )}
                 </DialogContent>
