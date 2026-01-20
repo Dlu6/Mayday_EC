@@ -64,7 +64,7 @@ import apiClient from "../api/apiClient.js";
 import LoadingIndicator from "./common/LoadingIndicator.js";
 
 const QueueEdit = () => {
-  const { agents, loading } = useSelector((state) => state.agents);
+  const { loading } = useSelector((state) => state.agents);
   const { queueId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
