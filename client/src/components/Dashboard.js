@@ -237,12 +237,25 @@ const Dashboard = () => {
         (call) => call.status === "answered" || call.status === "in-progress"
       ).length;
 
+      // Get abandoned count from queue stats (more accurate than CDR for queue-based calls)
+      // Queue stats track when callers hang up while waiting, which CDR misses
+      // because Queue app "answers" the channel (sets disposition to ANSWERED)
+      const queueStatus = data.queueStatus || [];
+      const queueAbandonedCalls = queueStatus.reduce(
+        (total, queue) => total + (queue.abandonedCalls || queue.abandoned || 0),
+        0
+      );
+
+      // Use the higher of CDR abandoned count or queue abandoned count
+      // CDR catches non-queue abandoned, queue stats catch queue abandoned
+      const abandonedCalls = Math.max(data.abandonedCalls || 0, queueAbandonedCalls);
+
       // Build callStats object from real-time data
       const callStats = {
         waiting: waiting,
         talking: talking,
-        answered: data.totalCalls - data.abandonedCalls || 0,
-        abandoned: data.abandonedCalls || 0,
+        answered: Math.max(0, (data.totalCalls || 0) - abandonedCalls),
+        abandoned: abandonedCalls,
         totalOffered: data.totalCalls || 0,
         avgHoldTime: 0, // Would need to be calculated from queue data
       };
