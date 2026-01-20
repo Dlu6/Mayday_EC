@@ -40,6 +40,7 @@ import ReportsAdminView from "./components/ReportsAdminView.js";
 import Realtime from "./components/Realtime.js";
 import ChanSpy from "./components/ChanSpy.jsx";
 import About from "./components/About.js";
+import WikiFAQ from "./components/WikiFAQ.js";
 import IVRBuilder from "./components/ivr/IVRBuilder.jsx";
 import Odbc from "./components/Odbc.js";
 import IVRProjects from "./components/ivr/IVRProjects.js";
@@ -133,6 +134,7 @@ const App = () => {
                 <Route path="integrations" element={<Integrations />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="support/about" element={<About />} />
+                <Route path="support/wiki" element={<WikiFAQ />} />
                 <Route path="ivr/projects" element={<IVRProjects />} />
                 <Route path="ivr/projects/:id" element={<IVRBuilder />} />
                 <Route path="ivr/odbc" element={<Odbc />} />
