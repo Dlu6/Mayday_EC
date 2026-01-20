@@ -172,57 +172,69 @@ const TicketSubmissions = () => {
             </Paper>
 
             {/* Table */}
-            <TableContainer component={Paper}>
-                <Table>
+            <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
+                <Table stickyHeader size="small">
                     <TableHead>
-                        <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
-                            <TableCell>ID</TableCell>
-                            <TableCell>Caller</TableCell>
-                            <TableCell>Status</TableCell>
-                            <TableCell>Submitted</TableCell>
-                            <TableCell align="right">Actions</TableCell>
+                        <TableRow>
+                            <TableCell sx={{ fontWeight: 600, backgroundColor: "#f5f5f5" }}>ID</TableCell>
+                            <TableCell sx={{ fontWeight: 600, backgroundColor: "#f5f5f5" }}>Status</TableCell>
+                            <TableCell sx={{ fontWeight: 600, backgroundColor: "#f5f5f5" }}>Submitted</TableCell>
+                            {/* Dynamic columns from form schema */}
+                            {getFormFields().slice(0, 5).map((field) => (
+                                <TableCell key={field.id} sx={{ fontWeight: 600, backgroundColor: "#f5f5f5", minWidth: 150 }}>
+                                    {normalizeLabel(field.label)}
+                                </TableCell>
+                            ))}
+                            {getFormFields().length > 5 && (
+                                <TableCell sx={{ fontWeight: 600, backgroundColor: "#f5f5f5" }}>...</TableCell>
+                            )}
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={3 + Math.min(getFormFields().length, 5) + (getFormFields().length > 5 ? 1 : 0)} align="center" sx={{ py: 4 }}>
                                     <CircularProgress size={24} />
                                 </TableCell>
                             </TableRow>
                         ) : submissions.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={3 + Math.min(getFormFields().length, 5) + (getFormFields().length > 5 ? 1 : 0)} align="center" sx={{ py: 4 }}>
                                     No submissions yet
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            submissions.map((sub) => (
-                                <TableRow key={sub.id} hover>
-                                    <TableCell>{sub.id}</TableCell>
-                                    <TableCell>{sub.callerNumber || "N/A"}</TableCell>
-                                    <TableCell>
-                                        <Chip
-                                            size="small"
-                                            label={sub.status}
-                                            color={getStatusColor(sub.status)}
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        {new Date(sub.createdAt).toLocaleString()}
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Tooltip title="View Details">
-                                            <IconButton
+                            submissions.map((sub) => {
+                                const values = parseResponses(sub.responses);
+                                return (
+                                    <TableRow key={sub.id} hover sx={{ cursor: "pointer" }} onClick={() => handleViewSubmission(sub)}>
+                                        <TableCell>{sub.id}</TableCell>
+                                        <TableCell>
+                                            <Chip
                                                 size="small"
-                                                onClick={() => handleViewSubmission(sub)}
-                                            >
-                                                <VisibilityIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </TableCell>
-                                </TableRow>
-                            ))
+                                                label={sub.status}
+                                                color={getStatusColor(sub.status)}
+                                            />
+                                        </TableCell>
+                                        <TableCell sx={{ whiteSpace: "nowrap" }}>
+                                            {new Date(sub.createdAt).toLocaleString()}
+                                        </TableCell>
+                                        {/* Dynamic values from responses */}
+                                        {getFormFields().slice(0, 5).map((field) => (
+                                            <TableCell key={field.id} sx={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                {values[field.id] || "-"}
+                                            </TableCell>
+                                        ))}
+                                        {getFormFields().length > 5 && (
+                                            <TableCell>
+                                                <Tooltip title="Click to view all fields">
+                                                    <VisibilityIcon fontSize="small" color="action" />
+                                                </Tooltip>
+                                            </TableCell>
+                                        )}
+                                    </TableRow>
+                                );
+                            })
                         )}
                     </TableBody>
                 </Table>
