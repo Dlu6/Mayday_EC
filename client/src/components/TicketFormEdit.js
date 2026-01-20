@@ -459,7 +459,7 @@ const TicketFormEdit = () => {
                                         </Grid>
                                     )}
 
-                                    {formData.googleFormFields && formData.googleFormFields.length > 0 && (
+                                    {Array.isArray(formData.googleFormFields) && formData.googleFormFields.length > 0 && (
                                         <Grid item xs={12}>
                                             <Alert severity="success" sx={{ mb: 2 }}>
                                                 Successfully parsed {formData.googleFormFields.length} fields from Google Form
