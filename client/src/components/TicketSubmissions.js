@@ -29,7 +29,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import PageTitle from "./PageTitle";
+
 import apiClient from "../api";
 
 const TicketSubmissions = () => {
@@ -127,7 +127,7 @@ const TicketSubmissions = () => {
 
     return (
         <Box sx={{ p: 3 }}>
-            <PageTitle title={form?.name ? `Submissions: ${form.name}` : "Ticket Submissions"} />
+
 
             {/* Header */}
             <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3 }}>
