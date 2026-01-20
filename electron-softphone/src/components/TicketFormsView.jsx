@@ -374,6 +374,9 @@ const TicketFormsView = ({
                             overflow: "auto",
                             display: "flex",
                             flexDirection: "column",
+                            maxWidth: 600,
+                            mx: "auto",
+                            width: "100%",
                         }}
                     >
                         {/* Form Header Card */}
