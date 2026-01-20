@@ -76,15 +76,21 @@ const TicketSubmissions = () => {
             if (searchQuery) params.append("callerNumber", searchQuery);
 
             const response = await apiClient.get(`/api/tickets/submissions?${params}`);
-            setSubmissions(response.data.submissions || []);
+            const subs = response.data.submissions || [];
+            setSubmissions(subs);
             setTotal(response.data.total || 0);
+
+            // Use form data from first submission if form not already loaded
+            if (subs.length > 0 && subs[0].form && !form) {
+                setForm(subs[0].form);
+            }
         } catch (error) {
             console.error("Failed to fetch submissions:", error);
             setSubmissions([]);
         } finally {
             setLoading(false);
         }
-    }, [formId, page, rowsPerPage, searchQuery]);
+    }, [formId, page, rowsPerPage, searchQuery, form]);
 
     useEffect(() => {
         fetchForm();
