@@ -30,7 +30,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
-import apiClient from "../api";
+import apiClient from "../api/apiClient";
 
 const TicketSubmissions = () => {
     const [searchParams] = useSearchParams();
