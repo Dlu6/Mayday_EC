@@ -397,138 +397,410 @@ Recordings are saved in WAV or MP3 format based on system configuration.`,
 • Agent-to-form assignments (control who sees which forms)
 • Ticket status workflow (Draft → Submitted → Reviewed → Closed)
 • Caller history lookup (view previous tickets from same caller)
-• Optional Google Sheets export`,
+• Optional Google Forms/Sheets sync for external data collection
+• Agent read-only view of their submitted tickets ("My Tickets" tab)`,
+            highlight: true,
+        },
+        {
+            question: "How does the Ticket System architecture work?",
+            answer: `The Ticket System has **3 main components**:
+
+**1. Admin UI (Client Dashboard)**
+• Create and configure ticket forms with custom fields
+• Set up Google Forms integration (sync submissions externally)
+• Assign agents to specific forms
+• View all ticket submissions in a searchable table
+• Route: \`/tools/ticket-forms\` and \`/ticket-submissions?formId=X\`
+
+**2. Electron Softphone (Agent App)**
+• **Fill Tickets Tab**: Active forms assigned to the agent for filling during calls
+• **My Tickets Tab**: Read-only view of agent's own submitted tickets
+• Automatic caller number capture during active calls
+• Local form validation before submission
+• Dynamic form rendering (text, dropdowns, checkboxes, etc.)
+
+**3. Backend Server**
+• Sequelize models: \`TicketForm\`, \`TicketSubmission\`, \`TicketFormAgent\`
+• REST API endpoints under \`/api/tickets/\`
+• Google Forms API integration for external sync
+• Real-time form updates via WebSocket`,
             highlight: true,
         },
         {
             question: "How do I create a Ticket Form?",
-            answer: `1. Go to **Ticket Forms** (accessible from main navigation)
+            answer: `1. Go to **Tools > Ticket Forms** in the Admin UI
 2. Click **Create Form**
 3. Configure the **Settings** tab:
    • Form name and description
    • Active/Inactive toggle
    • Optional Google Sheet ID for export
+   • Optional Google Form URL for sync
 4. Add fields in the **Fields** tab:
    • Click **Add Field**
    • Select field type (text, dropdown, checkbox, etc.)
-   • Set label and required status
-5. Click **Save Form**`,
+   • Set label, placeholder, and required status
+   • For dropdowns/radios: add options
+5. Click **Save Form**
+
+**Important**: Forms must be marked as **Active** and have **agents assigned** for them to appear in the Electron softphone.`,
         },
         {
             question: "What field types are available?",
-            answer: `**8 Field Types**:
+            answer: `**8 Field Types** (rendered by \`DynamicFormField.jsx\`):
 
 • **Short Text**: Single-line text input
 • **Long Text**: Multi-line textarea
 • **Dropdown**: Select from predefined options
 • **Radio Buttons**: Single choice from options
 • **Checkboxes**: Multiple choice from options
-• **Date**: Date picker
-• **Number**: Numeric input with optional min/max
-• **Scale/Rating**: Slider for ratings (e.g., 1-5)`,
+• **Date**: Date picker (uses MUI DatePicker)
+• **Number**: Numeric input with optional min/max validation
+• **Scale/Rating**: Slider for ratings (e.g., 1-5, 1-10)
+
+**Label Formatting**: All field labels are automatically normalized to sentence case (first letter capitalized, rest lowercase) for professional display.`,
         },
         {
             question: "How do I assign agents to a form?",
-            answer: `1. Go to **Ticket Forms** and click on a form
+            answer: `**In Admin UI**:
+1. Go to **Tools > Ticket Forms** and click on a form
 2. Navigate to the **Agent Assignment** tab
 3. Use the dual-list interface:
-   • **Left list**: Available agents
+   • **Left list**: Available agents (not assigned)
    • **Right list**: Assigned agents
    • Click an agent to move between lists
-   • Use **>>** to add all, **<<** to remove all
+   • Use **>>** to add all agents at once
+   • Use **<<** to remove all agents at once
 4. Click **Save Assignments**
 
-**Note**: Only assigned agents will see the form in their Electron softphone.`,
+**Database**: Assignments stored in \`ticket_form_agents\` table linking \`formId\` to \`agentId\`.
+
+**Important**: Only assigned agents will see the form in their Electron softphone's "Fill Tickets" tab. Agents not assigned will not see the form at all.`,
+        },
+        {
+            question: "How does the Electron Softphone ticket workflow work?",
+            answer: `**Agent Workflow in Softphone (\`TicketFormsView.jsx\`)**:
+
+**FILL TICKETS TAB**:
+1. Agent receives a call → softphone shows active call info
+2. Agent clicks **Tickets** button → opens TicketFormsView
+3. **Fill Tickets** tab shows forms assigned to this agent
+4. Agent selects a form → dynamic fields render
+5. Agent fills in the form fields
+6. **Caller number is auto-captured** from active call (\`currentCall.remoteIdentity\`)
+7. Agent clicks **Submit** → form validated → sent to backend
+8. Submission stored with: agentId, formId, responses, callerNumber, status
+
+**MY TICKETS TAB** (Read-Only):
+1. Agent clicks **My Tickets** tab
+2. Shows all tickets previously submitted by this agent
+3. **Search/Filter**: By caller number, form name, or status
+4. **Card View**: Each ticket shows form name, status chip, caller, timestamp
+5. **View Details**: Click eye icon → dialog shows all field values
+6. **No editing allowed**: Google Forms cannot be edited after submission
+
+**Call Linking**:
+When a call is active, the \`currentCall\` prop contains:
+• \`callId\`: Unique call identifier
+• \`callerNumber\`: Remote identity / phone number
+• \`timestamp\`: Call start time
+
+This data is automatically included in the ticket submission.`,
+            highlight: true,
+        },
+        {
+            question: "Why can't agents edit submitted tickets?",
+            answer: `**Tickets are READ-ONLY after submission** for these reasons:
+
+1. **Google Forms Limitation**: The Google Forms API does not support editing existing responses programmatically. Once a form response is submitted, it cannot be modified via API.
+
+2. **Data Integrity**: Prevents accidental or unauthorized changes to historical records.
+
+3. **Audit Trail**: Maintains accurate record of what was recorded at time of submission.
+
+**Agent View ("My Tickets" tab)**:
+• Agents can view all their submitted tickets
+• Can search by caller number, form name, or status
+• Can click "View Details" to see all field values
+• **Cannot edit, delete, or modify** any submitted ticket
+
+**Admin Capability**:
+• Administrators can update ticket **status** (submitted → reviewed → closed)
+• View all submissions in **Ticket Submissions** page
+• Export data via Google Sheets integration`,
+        },
+        {
+            question: "How does Google Forms integration work?",
+            answer: `**Overview**: The system can sync ticket submissions to an external Google Form, creating a backup in Google's infrastructure and enabling Google Forms' built-in analytics.
+
+**SETUP PROCESS**:
+
+**Step 1: Create a Google Form**
+• Go to \`forms.google.com\` and create a new form
+• Add fields that match your ticket form fields
+• **Important**: Form must be set to "Anyone with the link can respond"
+
+**Step 2: Get the Form URL**
+• Click **Send** button in Google Forms
+• Copy the form link (ends with \`/viewform\`)
+• Example: \`https://docs.google.com/forms/d/e/1FAIpQL.../viewform\`
+
+**Step 3: Configure in Admin UI**
+• Go to **Tools > Ticket Forms** → Edit your form
+• Enable **"Sync submissions to Google Form"** toggle
+• Paste the complete Google Form URL
+• Click **Fetch Fields** button
+
+**Step 4: Field Mapping**
+The system fetches all fields from the Google Form and displays them. Auto-mapping automatically detects:
+• **Caller Number** → Fields containing "phone", "caller", "number", "contact"
+• **Agent Extension** → Fields containing "agent", "extension", "operator"
+• **Call ID** → Fields containing "call id", "reference", "ticket"
+• **Timestamp** → Fields containing "date", "time", "when"
+
+Blue chips indicate which call data will auto-fill which Google Form fields.
+
+**Step 5: Save and Test**
+• Save the form configuration
+• Have an agent submit a test ticket
+• Verify the submission appears in both the database AND Google Forms responses
+
+**TECHNICAL DETAILS** (\`googleFormsService.js\`):
+• Uses Google Forms API to fetch form structure
+• Uses Google Forms API to submit responses programmatically
+• Service account authentication via credentials file
+• Responses appear in Google Forms as normal submissions`,
+            highlight: true,
+        },
+        {
+            question: "What about Google Sheets export vs Google Forms sync?",
+            answer: `**Two Different Integrations**:
+
+**1. Google Sheets Export** (Database → Spreadsheet):
+• Exports ticket data to a Google Spreadsheet
+• Requires: Sheet ID in form configuration
+• Data flows: Database → Google Sheets
+• Use for: Reporting, data analysis, sharing with stakeholders
+• Updates append new rows to the spreadsheet
+
+**2. Google Forms Sync** (Agent → Google Form):
+• Submits responses directly to a Google Form
+• Requires: Google Form URL in form configuration
+• Data flows: Agent Submission → Database + Google Form
+• Use for: Capturing data in Google's ecosystem, using Google Forms analytics
+• Creates actual form responses in Google Forms
+
+**Can I use both?**
+Yes! You can configure a form to:
+• Store submissions in the database
+• Export to Google Sheets
+• Sync to Google Forms
+All three can work simultaneously.`,
+        },
+        {
+            question: "How do I view ticket submissions in Admin UI?",
+            answer: `**Ticket Submissions Page** (\`/ticket-submissions?formId=X\`):
+
+**Accessing the Page**:
+1. Go to **Tools > Ticket Forms**
+2. Click **View Submissions** button on any form
+3. Opens the submissions table for that form
+
+**Table Features**:
+• **Dynamic Columns**: Shows ID, Status, Submitted date, plus form field values
+• **Up to 5 fields shown inline** (additional fields require click to view details)
+• **Clickable rows**: Click any row to open full details dialog
+• **Search**: Filter by caller number
+• **Pagination**: 10, 25, or 50 rows per page
+• **Sticky header**: Column headers remain visible while scrolling
+
+**View Details Dialog**:
+• Shows all submission metadata (status, caller, timestamp)
+• Shows all form field values in a table format
+• Field names displayed in sentence case
+
+**Status Workflow**:
+Submissions flow through: Draft → Submitted → Reviewed → Closed`,
         },
         {
             question: "How does call linking work?",
-            answer: `When an agent fills a ticket during a call, the system **automatically captures**:
+            answer: `**Automatic Call Data Capture**:
 
-• **Caller Number**: The phone number of the caller
-• **Call ID**: Unique identifier for the call (used for recording lookup)
-• **Call Timestamp**: When the call started
-• **Agent Extension**: The agent handling the call
+When an agent fills a ticket during an **active call**, the system automatically captures:
 
-This data is stored with the ticket for reference and reporting.`,
+| Field | Source | Description |
+|-------|--------|-------------|
+| **Caller Number** | \`currentCall.remoteIdentity\` | Phone number of the caller |
+| **Call ID** | \`currentCall.callId\` | Unique identifier for call recording lookup |
+| **Agent ID** | Logged-in agent | The agent handling the call |
+| **Timestamp** | Auto-generated | When the ticket was submitted |
+
+**How It Works** (\`Appbar.jsx\` → \`TicketFormsView.jsx\`):
+1. \`Appbar.jsx\` tracks call state via SIP.js
+2. When call is active, it passes \`currentCall\` object to TicketFormsView
+3. TicketFormsView includes \`callerNumber: currentCall.callerNumber\` in submission
+4. If no active call, \`callerNumber\` is null (shows as "N/A")
+
+**In Admin Submissions View**:
+• Caller number is displayed in the table
+• Can search/filter by caller number
+• Links tickets to specific calls for reference`,
         },
         {
             question: "What is the ticket status workflow?",
-            answer: `Tickets follow a 4-stage workflow:
+            answer: `Tickets follow a **4-stage workflow**:
 
-1. **Draft**: Saved but not submitted (agent can continue editing)
-2. **Submitted**: Agent completed and submitted the ticket
-3. **Reviewed**: Supervisor reviewed the ticket
-4. **Closed**: Ticket fully processed and closed
+| Status | Description | Who Sets It |
+|--------|-------------|-------------|
+| **Draft** | Saved but not submitted | Agent (auto-saved) |
+| **Submitted** | Agent completed and submitted | Agent (on submit) |
+| **Reviewed** | Supervisor reviewed | Admin (manual) |
+| **Closed** | Ticket fully processed | Admin (manual) |
 
-Supervisors can update status and add notes via the submissions view.`,
+**Status Colors** (UI display):
+• Draft: Gray (default)
+• Submitted: Blue (primary)
+• Reviewed: Green (success)
+• Closed: Purple (secondary)
+
+**Agent View**: Can only see their own tickets, cannot change status
+**Admin View**: Can see all tickets, can update status via submissions page`,
         },
         {
             question: "How do I view caller history?",
-            answer: `**In Electron Softphone**:
-When an agent receives a call, the system automatically looks up previous tickets from the same caller number. The caller history panel shows:
-• Previous ticket forms used
-• Submission dates
-• Ticket status
+            answer: `**Caller History** allows viewing all previous tickets from the same phone number.
 
-**In Admin UI**:
-Go to **Ticket Submissions** and filter by caller number.`,
+**In Electron Softphone**:
+When an agent is on a call or viewing tickets:
+• System looks up tickets by caller number
+• Shows previous submissions from same caller
+• Helps agents understand caller's history
+
+**In Admin UI (\`/ticket-submissions\`)**:
+1. Go to **Tools > Ticket Forms**
+2. Click **View Submissions** on any form
+3. Use the **Search by caller number** field
+4. Enter phone number (partial match supported)
+5. Table filters to show only matching submissions
+
+**API Endpoint**: 
+\`GET /api/tickets/caller/:phoneNumber\` returns all tickets for a caller`,
         },
         {
-            question: "How do I export tickets to Google Sheets?",
-            answer: `**Step 1: Create and Share the Sheet**
-• Create a new Google Sheet
-• Share it with the service account email (contact your admin for this)
+            question: "What are the backend API endpoints?",
+            answer: `**Ticket Forms Endpoints** (\`/api/tickets/forms\`):
 
-**Step 2: Find the Sheet ID**
-• Open your Google Sheet
-• Look at the URL in your browser
-• The Sheet ID is the long string between \`/d/\` and \`/edit\`
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | \`/forms\` | List all forms |
+| GET | \`/forms/:id\` | Get single form details |
+| POST | \`/forms\` | Create new form |
+| PUT | \`/forms/:id\` | Update form |
+| DELETE | \`/forms/:id\` | Delete form |
+| GET | \`/forms/agent/:agentId\` | Get forms assigned to agent |
+| GET | \`/forms/:id/agents\` | Get agents assigned to form |
+| POST | \`/forms/:id/agents\` | Assign agents to form |
 
-**Example URL:**
-\`docs.google.com/spreadsheets/d/\`**1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms**\`/edit\`
+**Ticket Submissions Endpoints** (\`/api/tickets/submissions\`):
 
-In this example, the Sheet ID is: \`1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms\`
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | \`/submissions\` | List submissions (with filters) |
+| GET | \`/submissions/:id\` | Get single submission |
+| POST | \`/submissions\` | Create new submission |
+| PUT | \`/submissions/:id\` | Update submission |
+| DELETE | \`/submissions/:id\` | Delete submission |
+| GET | \`/caller/:phoneNumber\` | Get caller history |
 
-**Step 3: Add to Form**
-• Edit your form in **Tools > Ticket Forms**
-• Paste the Sheet ID in the **Google Sheet ID** field
-• Click **Save Form**
-
-Submissions will sync automatically when agents submit tickets.
-
-**Note**: Requires Google Sheets API credentials. Contact your administrator if integration isn't working.`,
+**Query Parameters for GET /submissions**:
+• \`formId\`: Filter by form
+• \`agentId\`: Filter by agent
+• \`status\`: Filter by status
+• \`callerNumber\`: Search by phone (partial match)
+• \`limit\` / \`offset\`: Pagination`,
         },
         {
-            question: "How do I link a Google Form to sync agent submissions?",
-            answer: `**Step 1: Create a Google Form**
-• Go to Google Forms and create a new form
-• Add fields for the data you want to collect
-• **Important**: The form must be public (Anyone with the link can respond)
+            question: "What are the database models?",
+            answer: `**Sequelize Models** (\`ticketFormModel.js\`):
 
-**Step 2: Get the Form URL**
-• Click **Send** in Google Forms
-• Copy the link (it will look like: https://docs.google.com/forms/d/e/1FAIpQL.../viewform)
+**TicketForm** (ticket_forms table):
+\`\`\`
+id: UUID (primary key)
+name: STRING (form name)
+description: TEXT (optional)
+schema: JSON (field definitions)
+googleSheetId: STRING (optional, for export)
+googleFormUrl: STRING (optional, for sync)
+isActive: BOOLEAN (default true)
+createdBy: UUID (admin who created)
+\`\`\`
 
-**Step 3: Link in Admin UI**
-• Go to **Tools > Ticket Forms**
-• Create or edit a form
-• Enable **"Sync submissions to Google Form"**
-• Paste the Google Form URL
-• Click **Fetch Fields**
+**TicketSubmission** (ticket_submissions table):
+\`\`\`
+id: INTEGER (auto-increment)
+formId: UUID (references TicketForm)
+agentId: UUID (references Users)
+callerNumber: STRING (phone number, nullable)
+callId: STRING (for recording lookup, nullable)
+responses: JSON (field values)
+status: ENUM('draft','submitted','reviewed','closed')
+createdAt, updatedAt: DATETIME
+\`\`\`
 
-**Step 4: Review Auto-Mapping**
-The system automatically maps call data to form fields based on field labels:
-• **Caller Number** → Fields with "phone", "caller", "number", "contact"
-• **Agent Extension** → Fields with "agent", "extension", "operator"
-• **Call ID** → Fields with "call id", "reference", "ticket"
-• **Timestamp** → Fields with "date", "time", "when"
+**TicketFormAgent** (ticket_form_agents table):
+\`\`\`
+id: INTEGER
+formId: UUID (references TicketForm)
+agentId: UUID (references Users)
+assignedAt: DATETIME
+\`\`\`
 
-Blue chips indicate fields that will be auto-filled with call data.
+**Field Schema Structure** (within TicketForm.schema):
+\`\`\`json
+{
+  "fields": [
+    {
+      "id": "uuid",
+      "type": "text|dropdown|radio|checkbox|date|number|scale",
+      "label": "Field Label",
+      "required": true|false,
+      "placeholder": "Optional placeholder",
+      "options": ["Option1", "Option2"] // for dropdown/radio/checkbox
+    }
+  ]
+}
+\`\`\``,
+        },
+        {
+            question: "How do I troubleshoot Google Forms integration?",
+            answer: `**Common Issues and Solutions**:
 
-**Step 5: Save and Test**
-• Click **Save Form**
-• Assign agents to the form
-• When agents submit tickets, data syncs to Google Forms automatically!`,
+**Issue: "Fetch Fields" button returns error**
+• Verify Google Form URL is complete (ends with \`/viewform\`)
+• Check form is set to "Anyone with link can respond"
+• Verify server has Google API credentials configured
+
+**Issue: Submissions not appearing in Google Forms**
+• Check server logs for API errors
+• Verify service account has access
+• Test with a simple form first
+
+**Issue: Field mapping seems wrong**
+• Auto-mapping uses keyword detection
+• Rename Google Form field labels to include "phone", "agent", etc.
+• Or manually verify mapping before saving
+
+**Issue: Agent can't see form in softphone**
+• Verify agent is assigned to the form (Agent Assignment tab)
+• Verify form is marked as Active
+• Have agent refresh the softphone / re-login
+
+**Issue: Caller number shows "N/A"**
+• Caller number only captured during active calls
+• If agent submits after call ends, caller number will be null
+• This is expected behavior
+
+**Server Logs**: Check PM2 logs for detailed error messages:
+\`pm2 logs mayday\``,
         },
     ],
 };
