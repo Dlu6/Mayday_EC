@@ -63,6 +63,7 @@ const getUserRoutes = (user, license = null) => {
           { name: "Trunks", path: "/tools/trunks" },
           { name: "Audio Manager", path: "/tools/audio" },
           { name: "Intervals", path: "/tools/intervals" },
+          { name: "Ticket Forms", path: "/tools/ticket-forms" },
 
           // { name: "Triggers", path: "/tools/triggers" },
           // { name: "Variables", path: "/tools/variables" },

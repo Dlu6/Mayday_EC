@@ -63,6 +63,7 @@ import amiRoutes from "./routes/amiRoutes.js";
 import pauseRoutes from "./routes/pauseRoutes.js";
 import { seedPauseReasons } from "./models/pauseReasonModel.js";
 import licenseRoutes from "./routes/licenseRoutes.js";
+import ticketRoutes from "./routes/ticketRoutes.js";
 import setupDefaultIntervals from "./utils/setupDefaultIntervals.js";
 // Increase EventEmitter limit
 EventEmitter.defaultMaxListeners = 15;
@@ -433,6 +434,7 @@ app.use("/api/calls", callsRoutes);
 app.use("/api/ami", amiRoutes);
 app.use("/api/pause", pauseRoutes);
 app.use("/api/license", licenseRoutes);
+app.use("/api/tickets", ticketRoutes);
 
 // app.use("/api/sip", sipRoutes);
 

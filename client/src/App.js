@@ -50,6 +50,8 @@ import store from "./store.js";
 import IntervalsComponent from "./components/intervalsComponent.js";
 import Recordings from "./components/Routes/Recordings.js";
 import LicenseManagement from "./components/LicenseManagement.jsx";
+import TicketForms from "./components/TicketForms.js";
+import TicketFormEdit from "./components/TicketFormEdit.js";
 const App = () => {
   useWebSocket();
 
@@ -138,6 +140,8 @@ const App = () => {
                 <Route path="ivr/projects" element={<IVRProjects />} />
                 <Route path="ivr/projects/:id" element={<IVRBuilder />} />
                 <Route path="ivr/odbc" element={<Odbc />} />
+                <Route path="tools/ticket-forms" element={<TicketForms />} />
+                <Route path="tools/ticket-forms/:formId" element={<TicketFormEdit />} />
                 <Route path="whatsapp" element={
                   <FeatureGate feature={FEATURE_KEYS.WHATSAPP}>
                     <WhatsappWebConfig />

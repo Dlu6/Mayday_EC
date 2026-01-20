@@ -26,6 +26,7 @@ import ArticleIcon from "@mui/icons-material/Article";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import RouteIcon from "@mui/icons-material/AltRoute";
 import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOver";
+import ConfirmationNumberIcon from "@mui/icons-material/ConfirmationNumber";
 
 // ============================================
 // FAQ DATA - Organized by Category
@@ -385,6 +386,151 @@ Recordings are saved in WAV or MP3 format based on system configuration.`,
 • Route calls differently after hours`,
         },
     ],
+    tickets: [
+        {
+            question: "What are Ticket Forms?",
+            answer: `Ticket Forms are dynamic forms that agents can fill during or after calls to capture customer information, issues, and resolutions.
+
+**Key Features**:
+• Admin-defined custom fields (text, dropdowns, checkboxes, etc.)
+• Automatic call linking (caller ID, call ID, timestamp)
+• Agent-to-form assignments (control who sees which forms)
+• Ticket status workflow (Draft → Submitted → Reviewed → Closed)
+• Caller history lookup (view previous tickets from same caller)
+• Optional Google Sheets export`,
+            highlight: true,
+        },
+        {
+            question: "How do I create a Ticket Form?",
+            answer: `1. Go to **Ticket Forms** (accessible from main navigation)
+2. Click **Create Form**
+3. Configure the **Settings** tab:
+   • Form name and description
+   • Active/Inactive toggle
+   • Optional Google Sheet ID for export
+4. Add fields in the **Fields** tab:
+   • Click **Add Field**
+   • Select field type (text, dropdown, checkbox, etc.)
+   • Set label and required status
+5. Click **Save Form**`,
+        },
+        {
+            question: "What field types are available?",
+            answer: `**8 Field Types**:
+
+• **Short Text**: Single-line text input
+• **Long Text**: Multi-line textarea
+• **Dropdown**: Select from predefined options
+• **Radio Buttons**: Single choice from options
+• **Checkboxes**: Multiple choice from options
+• **Date**: Date picker
+• **Number**: Numeric input with optional min/max
+• **Scale/Rating**: Slider for ratings (e.g., 1-5)`,
+        },
+        {
+            question: "How do I assign agents to a form?",
+            answer: `1. Go to **Ticket Forms** and click on a form
+2. Navigate to the **Agent Assignment** tab
+3. Use the dual-list interface:
+   • **Left list**: Available agents
+   • **Right list**: Assigned agents
+   • Click an agent to move between lists
+   • Use **>>** to add all, **<<** to remove all
+4. Click **Save Assignments**
+
+**Note**: Only assigned agents will see the form in their Electron softphone.`,
+        },
+        {
+            question: "How does call linking work?",
+            answer: `When an agent fills a ticket during a call, the system **automatically captures**:
+
+• **Caller Number**: The phone number of the caller
+• **Call ID**: Unique identifier for the call (used for recording lookup)
+• **Call Timestamp**: When the call started
+• **Agent Extension**: The agent handling the call
+
+This data is stored with the ticket for reference and reporting.`,
+        },
+        {
+            question: "What is the ticket status workflow?",
+            answer: `Tickets follow a 4-stage workflow:
+
+1. **Draft**: Saved but not submitted (agent can continue editing)
+2. **Submitted**: Agent completed and submitted the ticket
+3. **Reviewed**: Supervisor reviewed the ticket
+4. **Closed**: Ticket fully processed and closed
+
+Supervisors can update status and add notes via the submissions view.`,
+        },
+        {
+            question: "How do I view caller history?",
+            answer: `**In Electron Softphone**:
+When an agent receives a call, the system automatically looks up previous tickets from the same caller number. The caller history panel shows:
+• Previous ticket forms used
+• Submission dates
+• Ticket status
+
+**In Admin UI**:
+Go to **Ticket Submissions** and filter by caller number.`,
+        },
+        {
+            question: "How do I export tickets to Google Sheets?",
+            answer: `**Step 1: Create and Share the Sheet**
+• Create a new Google Sheet
+• Share it with the service account email (contact your admin for this)
+
+**Step 2: Find the Sheet ID**
+• Open your Google Sheet
+• Look at the URL in your browser
+• The Sheet ID is the long string between \`/d/\` and \`/edit\`
+
+**Example URL:**
+\`docs.google.com/spreadsheets/d/\`**1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms**\`/edit\`
+
+In this example, the Sheet ID is: \`1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms\`
+
+**Step 3: Add to Form**
+• Edit your form in **Tools > Ticket Forms**
+• Paste the Sheet ID in the **Google Sheet ID** field
+• Click **Save Form**
+
+Submissions will sync automatically when agents submit tickets.
+
+**Note**: Requires Google Sheets API credentials. Contact your administrator if integration isn't working.`,
+        },
+        {
+            question: "How do I link a Google Form to sync agent submissions?",
+            answer: `**Step 1: Create a Google Form**
+• Go to Google Forms and create a new form
+• Add fields for the data you want to collect
+• **Important**: The form must be public (Anyone with the link can respond)
+
+**Step 2: Get the Form URL**
+• Click **Send** in Google Forms
+• Copy the link (it will look like: https://docs.google.com/forms/d/e/1FAIpQL.../viewform)
+
+**Step 3: Link in Admin UI**
+• Go to **Tools > Ticket Forms**
+• Create or edit a form
+• Enable **"Sync submissions to Google Form"**
+• Paste the Google Form URL
+• Click **Fetch Fields**
+
+**Step 4: Review Auto-Mapping**
+The system automatically maps call data to form fields based on field labels:
+• **Caller Number** → Fields with "phone", "caller", "number", "contact"
+• **Agent Extension** → Fields with "agent", "extension", "operator"
+• **Call ID** → Fields with "call id", "reference", "ticket"
+• **Timestamp** → Fields with "date", "time", "when"
+
+Blue chips indicate fields that will be auto-filled with call data.
+
+**Step 5: Save and Test**
+• Click **Save Form**
+• Assign agents to the form
+• When agents submit tickets, data syncs to Google Forms automatically!`,
+        },
+    ],
 };
 
 // ============================================
@@ -397,37 +543,37 @@ const knowledgeArticles = [
         description: "Everything you need to know about creating and managing voice queues",
         content: `## Creating a Queue
 
-1. Navigate to **Voice > Voice Queues**
-2. Click **Add Queue**
-3. Enter queue details:
-   - Name (no spaces)
-   - Strategy
-   - Timeout and retry values
+1. Navigate to ** Voice > Voice Queues **
+    2. Click ** Add Queue **
+        3. Enter queue details:
+- Name(no spaces)
+    - Strategy
+    - Timeout and retry values
 
 ## Queue Parameters Explained
 
-| Parameter | Description | Recommended |
-|-----------|-------------|-------------|
+    | Parameter | Description | Recommended |
+| -----------| -------------| -------------|
 | Strategy | How calls are distributed | Round Robin Memory |
-| Timeout | Ring time per agent | 15-30 seconds |
+| Timeout | Ring time per agent | 15 - 30 seconds |
 | Retry | Wait before retrying | 5 seconds |
-| Wrapup Time | Post-call delay | 10-30 seconds |
-| Max Length | Queue capacity | 0 (unlimited) |
+| Wrapup Time | Post - call delay | 10 - 30 seconds |
+| Max Length | Queue capacity | 0(unlimited) |
 | Music Class | Hold music | default |
 
 ## Agent Penalties
 
 Penalties create call priority tiers:
-- **Penalty 0**: Primary agents (first to receive calls)
-- **Penalty 1**: Secondary agents (when primary busy)
-- **Penalty 2+**: Overflow agents (emergency backup)
+- ** Penalty 0 **: Primary agents(first to receive calls)
+    - ** Penalty 1 **: Secondary agents(when primary busy)
+        - ** Penalty 2 +**: Overflow agents(emergency backup)
 
 ## Best Practices
 
-1. **Balance workload**: Use Round Robin or Least Recent strategy
-2. **Set realistic timeouts**: 15-30 seconds prevents caller frustration
-3. **Use wrapup time**: Give agents time for post-call work
-4. **Monitor performance**: Check Dashboard for wait times and abandonment`,
+1. ** Balance workload **: Use Round Robin or Least Recent strategy
+2. ** Set realistic timeouts **: 15 - 30 seconds prevents caller frustration
+3. ** Use wrapup time **: Give agents time for post - call work
+4. ** Monitor performance **: Check Dashboard for wait times and abandonment`,
     },
     {
         title: "Agent Configuration Reference",
@@ -435,43 +581,43 @@ Penalties create call priority tiers:
         description: "Complete reference for all agent settings and configuration options",
         content: `## Account Settings
 
-| Field | Description |
-|-------|-------------|
+    | Field | Description |
+| -------| -------------|
 | Username | Login identifier |
-| Extension | Phone number (1000-9999) |
+| Extension | Phone number(1000 - 9999) |
 | Email | Contact email |
 | Role | admin, manager, or agent |
 
-## Voice/SIP Settings
+## Voice / SIP Settings
 
-| Setting | Options | Notes |
-|---------|---------|-------|
+    | Setting | Options | Notes |
+| ---------| ---------| -------|
 | Transport | UDP, TCP, TLS | UDP is default |
-| Context | from-internal | For internal routing |
+| Context | from - internal | For internal routing |
 | NAT | yes, no, force_rport | Enable if behind NAT |
 | DTMF Mode | rfc4733, inband, info | rfc4733 recommended |
 
 ## Codec Priority
 
 Best to worst quality:
-1. **G.722** - HD voice (16kHz)
-2. **ULAW** - Standard (North America)
-3. **ALAW** - Standard (Europe/International)
-4. **GSM** - Low bandwidth
+1. ** G.722 ** - HD voice(16kHz)
+2. ** ULAW ** - Standard(North America)
+3. ** ALAW ** - Standard(Europe / International)
+4. ** GSM ** - Low bandwidth
 
 ## Phonebar Settings
 
-| Setting | Description |
-|---------|-------------|
+    | Setting | Description |
+| ---------| -------------|
 | Auto Answer | Answer calls automatically |
 | Ringtone | Sound for incoming calls |
 | Hotkeys | Keyboard shortcuts |
 
 ## Security
 
-- Passwords must be 8+ characters
-- Include numbers and symbols
-- Change every 90 days (recommended)`,
+    - Passwords must be 8 + characters
+        - Include numbers and symbols
+            - Change every 90 days(recommended)`,
     },
     {
         title: "SIP Trunk Configuration",
@@ -480,31 +626,31 @@ Best to worst quality:
         content: `## Required Information
 
 Get from your SIP provider:
-- SIP Server/Host address
-- Port (usually 5060 or 5061 for TLS)
-- Username and Password
-- Authentication method
-- Supported codecs
+- SIP Server / Host address
+    - Port(usually 5060 or 5061 for TLS)
+    - Username and Password
+        - Authentication method
+            - Supported codecs
 
 ## Basic Configuration
 
-1. **Name**: Descriptive identifier
-2. **Host**: Provider SIP server
-3. **Username**: Your account ID
-4. **Password**: Account password
-5. **Context**: from-trunk (for inbound)
+1. ** Name **: Descriptive identifier
+2. ** Host **: Provider SIP server
+3. ** Username **: Your account ID
+4. ** Password **: Account password
+5. ** Context **: from - trunk(for inbound)
 
 ## Registration
 
-Enable registration if your provider requires it. This sends periodic "heartbeat" messages to keep the connection active.
+Enable registration if your provider requires it.This sends periodic "heartbeat" messages to keep the connection active.
 
 ## Common Issues
 
-| Problem | Solution |
-|---------|----------|
+    | Problem | Solution |
+| ---------| ----------|
 | No outbound calls | Check trunk credentials and host |
 | No inbound calls | Verify registration and context |
-| One-way audio | Check NAT settings and port forwarding |
+| One - way audio | Check NAT settings and port forwarding |
 | Poor quality | Check codecs and network bandwidth |
 
 ## Testing
@@ -522,21 +668,21 @@ After setup:
         content: `## Inbound Routes
 
 Direct incoming calls based on:
-- **DID**: The number that was called
-- **Caller ID**: Who is calling
-- **Time**: Business hours conditions
+- ** DID **: The number that was called
+    - ** Caller ID **: Who is calling
+        - ** Time **: Business hours conditions
 
 ### Priority
 
-Lower numbers = higher priority. If multiple routes match, lowest priority wins.
+Lower numbers = higher priority.If multiple routes match, lowest priority wins.
 
 ### Destinations
 
-- Queue
-- Extension
-- IVR
-- Voicemail
-- External Number
+    - Queue
+    - Extension
+    - IVR
+    - Voicemail
+    - External Number
 
 ## Outbound Routes
 
@@ -544,24 +690,24 @@ Control how outgoing calls are placed.
 
 ### Dial Patterns
 
-| Pattern | Matches | Example |
-|---------|---------|---------|
-| NXXNXXXXXX | 10-digit US | 2125551234 |
-| 1NXXNXXXXXX | 11-digit US | 12125551234 |
+    | Pattern | Matches | Example |
+| ---------| ---------| ---------|
+| NXXNXXXXXX | 10 - digit US | 2125551234 |
+| 1NXXNXXXXXX | 11 - digit US | 12125551234 |
 | 0XXXXXXXXX | Local | 0771234567 |
 | 00. | International | 0044... |
 
 ### Pattern Syntax
 
-- X = any digit (0-9)
-- N = any digit (2-9)
-- Z = any digit (1-9)
-- [abc] = a, b, or c
-- . = one or more of any
+    - X = any digit(0 - 9)
+        - N = any digit(2 - 9)
+            - Z = any digit(1 - 9)
+                - [abc] = a, b, or c
+                    - . = one or more of any
 
 ## Route Order
 
-Routes are evaluated top to bottom. More specific patterns should be higher priority.`,
+Routes are evaluated top to bottom.More specific patterns should be higher priority.`,
     },
     {
         title: "Call Monitoring for Supervisors",
@@ -569,25 +715,25 @@ Routes are evaluated top to bottom. More specific patterns should be higher prio
         description: "Guide to monitoring, coaching, and managing live calls",
         content: `## Monitoring Modes
 
-### Listen (Silent)
-- You hear both parties
-- No one knows you are listening
-- Best for: Quality assurance, training review
+### Listen(Silent)
+    - You hear both parties
+        - No one knows you are listening
+            - Best for: Quality assurance, training review
 
 ### Whisper
-- You speak to agent only
-- Caller cannot hear you
-- Best for: Real-time coaching, providing info
+    - You speak to agent only
+        - Caller cannot hear you
+            - Best for: Real - time coaching, providing info
 
 ### Barge
-- You speak to both parties
-- Creates 3-way call
-- Best for: Escalation, customer intervention
+    - You speak to both parties
+        - Creates 3 - way call
+            - Best for: Escalation, customer intervention
 
 ## How to Monitor
 
-1. Go to **Voice > Call Monitoring**
-2. See list of active calls
+1. Go to ** Voice > Call Monitoring **
+    2. See list of active calls
 3. Click monitor icon on target call
 4. Select mode
 5. Your phone rings - answer it
@@ -595,36 +741,36 @@ Routes are evaluated top to bottom. More specific patterns should be higher prio
 
 ## Best Practices
 
-- Use Listen mode for routine QA
-- Use Whisper sparingly to avoid agent distraction
-- Use Barge only for escalations
-- Document coaching sessions
-- Review recordings for training`,
+    - Use Listen mode for routine QA
+        - Use Whisper sparingly to avoid agent distraction
+            - Use Barge only for escalations
+                - Document coaching sessions
+    - Review recordings for training`,
     },
     {
         title: "Dashboard Metrics Explained",
         category: "Reporting",
         description: "Understanding real-time and historical call center metrics",
-        content: `## Real-Time Metrics
+        content: `## Real - Time Metrics
 
-| Metric | Description | Target |
-|--------|-------------|--------|
+    | Metric | Description | Target |
+| --------| -------------| --------|
 | Waiting Calls | Calls in queue | < 5 |
 | Talking Calls | Active conversations | - |
 | Available Agents | Ready for calls | > Waiting |
-| Abandoned Calls | Caller hung up | < 5% |
+| Abandoned Calls | Caller hung up | < 5 % |
 | Avg Wait Time | Queue wait | < 30 sec |
 
 ## Service Level
 
-Percentage of calls answered within target time (e.g., 80% in 20 seconds).
+Percentage of calls answered within target time(e.g., 80 % in 20 seconds).
 
-Formula: (Calls answered in X seconds / Total calls) x 100
+    Formula: (Calls answered in X seconds / Total calls) x 100
 
 ## Agent States
 
-| State | Color | Meaning |
-|-------|-------|---------|
+    | State | Color | Meaning |
+| -------| -------| ---------|
 | Available | Green | Ready for calls |
 | On Call | Blue | Currently talking |
 | Paused | Yellow | Temporarily unavailable |
@@ -632,20 +778,20 @@ Formula: (Calls answered in X seconds / Total calls) x 100
 
 ## Improving Metrics
 
-**High Abandonment**:
+    ** High Abandonment **:
 - Add more agents
-- Reduce wait times
-- Improve announcements
+    - Reduce wait times
+        - Improve announcements
 
-**Long Wait Times**:
+            ** Long Wait Times **:
 - Adjust strategies
-- Lower penalties on backups
-- Review agent availability
+    - Lower penalties on backups
+        - Review agent availability
 
-**Low Service Level**:
+            ** Low Service Level **:
 - Monitor peak hours
-- Schedule appropriately
-- Consider callback options`,
+    - Schedule appropriately
+        - Consider callback options`,
     },
 ];
 
@@ -659,6 +805,7 @@ const faqCategories = [
     { key: "recordings", label: "Recordings", icon: <RecordVoiceOverIcon /> },
     { key: "monitoring", label: "Monitoring", icon: <RecordVoiceOverIcon /> },
     { key: "ivr", label: "IVR", icon: <PhoneIcon /> },
+    { key: "tickets", label: "Ticket Forms", icon: <ConfirmationNumberIcon /> },
     { key: "integrations", label: "Integrations", icon: <SettingsIcon /> },
     { key: "settings", label: "Settings", icon: <SettingsIcon /> },
 ];
@@ -758,12 +905,12 @@ const WikiFAQ = () => {
                     sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}
                 >
                     <Tab
-                        label={`FAQs (${totalFAQs})`}
+                        label={`FAQs(${totalFAQs})`}
                         icon={<HelpOutlineIcon />}
                         iconPosition="start"
                     />
                     <Tab
-                        label={`Guides (${filteredArticles.length})`}
+                        label={`Guides(${filteredArticles.length})`}
                         icon={<ArticleIcon />}
                         iconPosition="start"
                     />
@@ -783,7 +930,7 @@ const WikiFAQ = () => {
                                     label={`${cat.label} (${count})`}
                                     onClick={() => {
                                         document
-                                            .getElementById(`category-${cat.key}`)
+                                            .getElementById(`category - ${cat.key} `)
                                             ?.scrollIntoView({ behavior: "smooth" });
                                     }}
                                     sx={{ cursor: "pointer" }}
@@ -799,7 +946,7 @@ const WikiFAQ = () => {
                         if (faqs.length === 0) return null;
 
                         return (
-                            <Box key={cat.key} id={`category-${cat.key}`} sx={{ mb: 4 }}>
+                            <Box key={cat.key} id={`category - ${cat.key} `} sx={{ mb: 4 }}>
                                 <Typography
                                     variant="h6"
                                     sx={{
