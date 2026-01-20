@@ -1,5 +1,5 @@
 // client/src/components/TicketSubmissions.js
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
     Box,
