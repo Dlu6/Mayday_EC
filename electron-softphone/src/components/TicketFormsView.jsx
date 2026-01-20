@@ -372,59 +372,168 @@ const TicketFormsView = ({
                         sx={{
                             flexGrow: 1,
                             overflow: "auto",
-                            p: 2,
-                            border: 1,
-                            borderColor: "divider",
-                            borderRadius: 1,
-                            bgcolor: "background.paper",
+                            display: "flex",
+                            flexDirection: "column",
                         }}
                     >
-                        <Typography variant="subtitle1" gutterBottom>
-                            {selectedForm.name}
-                        </Typography>
-                        {selectedForm.description && (
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                {selectedForm.description}
-                            </Typography>
-                        )}
-
-                        <Divider sx={{ mb: 2 }} />
-
-                        {/* Call Info */}
-                        {currentCall && (
-                            <Alert severity="info" sx={{ mb: 2 }}>
-                                <Typography variant="body2">
-                                    <strong>Caller:</strong> {currentCall.callerNumber || "Unknown"}
-                                    {currentCall.callId && ` • Call ID: ${currentCall.callId}`}
+                        {/* Form Header Card */}
+                        <Card
+                            elevation={0}
+                            sx={{
+                                mb: 2,
+                                background: "#be0055f6",
+                                borderRadius: 2,
+                            }}
+                        >
+                            <CardContent sx={{ py: 2 }}>
+                                <Typography
+                                    variant="h6"
+                                    sx={{
+                                        fontWeight: 600,
+                                        color: "white",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                    }}
+                                >
+                                    {selectedForm.name}
                                 </Typography>
-                            </Alert>
+                                {selectedForm.description && (
+                                    <Typography
+                                        variant="body2"
+                                        sx={{
+                                            color: "rgba(255,255,255,0.85)",
+                                            mt: 0.2,
+                                            mb: 0.5,
+                                        }}
+                                    >
+                                        {selectedForm.description}
+                                    </Typography>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Call Info Banner */}
+                        {currentCall && (
+                            <Card
+                                elevation={0}
+                                sx={{
+                                    mb: 2,
+                                    bgcolor: "rgba(25, 118, 210, 0.08)",
+                                    border: "1px solid rgba(25, 118, 210, 0.2)",
+                                    borderRadius: 2,
+                                }}
+                            >
+                                <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                        <Box
+                                            sx={{
+                                                width: 8,
+                                                height: 8,
+                                                borderRadius: "50%",
+                                                bgcolor: "success.main",
+                                                animation: "pulse 2s infinite",
+                                                "@keyframes pulse": {
+                                                    "0%": { opacity: 1 },
+                                                    "50%": { opacity: 0.4 },
+                                                    "100%": { opacity: 1 },
+                                                },
+                                            }}
+                                        />
+                                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                            📞 Active Call: {currentCall.callerNumber || "Unknown"}
+                                        </Typography>
+                                        {currentCall.callId && (
+                                            <Typography variant="caption" color="text.secondary">
+                                                ID: {currentCall.callId}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                </CardContent>
+                            </Card>
                         )}
 
-                        {/* Form Fields */}
-                        {(selectedForm.schema?.fields || []).map((field) => (
-                            <DynamicFormField
-                                key={field.id}
-                                field={field}
-                                value={formValues[field.id]}
-                                onChange={handleFieldChange}
-                                error={formErrors[field.id]}
-                            />
-                        ))}
+                        {/* Form Fields Container */}
+                        <Card
+                            elevation={0}
+                            sx={{
+                                flexGrow: 1,
+                                border: "1px solid",
+                                borderColor: "divider",
+                                borderRadius: 2,
+                                overflow: "auto",
+                            }}
+                        >
+                            <CardContent sx={{ p: 2 }}>
+                                <Typography
+                                    variant="overline"
+                                    sx={{
+                                        display: "block",
+                                        mb: 2,
+                                        color: "text.secondary",
+                                        fontWeight: 600,
+                                        letterSpacing: 1,
+                                    }}
+                                >
+                                    Form Fields ({(selectedForm.schema?.fields || []).length})
+                                </Typography>
+
+                                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                    {(selectedForm.schema?.fields || []).map((field) => (
+                                        <DynamicFormField
+                                            key={field.id}
+                                            field={field}
+                                            value={formValues[field.id]}
+                                            onChange={handleFieldChange}
+                                            error={formErrors[field.id]}
+                                        />
+                                    ))}
+                                </Box>
+
+                                {(selectedForm.schema?.fields || []).length === 0 && (
+                                    <Box sx={{ textAlign: "center", py: 4 }}>
+                                        <Typography color="text.secondary">
+                                            No fields in this form
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </CardContent>
+                        </Card>
 
                         {/* Submit Status */}
                         {submitStatus && (
-                            <Alert severity={submitStatus.type} sx={{ mb: 2 }}>
+                            <Alert
+                                severity={submitStatus.type}
+                                sx={{
+                                    mt: 2,
+                                    borderRadius: 2,
+                                }}
+                            >
                                 {submitStatus.message}
                             </Alert>
                         )}
 
                         {/* Action Buttons */}
-                        <Box sx={{ display: "flex", gap: 1, mt: 2 }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                gap: 1.5,
+                                mt: 2,
+                                pt: 2,
+                                borderTop: "1px solid",
+                                borderColor: "divider",
+                            }}
+                        >
                             <Button
                                 variant="outlined"
                                 startIcon={<SaveIcon />}
                                 onClick={() => handleSubmit("draft")}
                                 disabled={submitting}
+                                sx={{
+                                    borderRadius: 2,
+                                    textTransform: "none",
+                                    px: 3,
+                                }}
                             >
                                 Save Draft
                             </Button>
@@ -433,6 +542,15 @@ const TicketFormsView = ({
                                 startIcon={<SendIcon />}
                                 onClick={() => handleSubmit("submitted")}
                                 disabled={submitting}
+                                sx={{
+                                    borderRadius: 2,
+                                    textTransform: "none",
+                                    px: 3,
+                                    background: "#001ea2ff",
+                                    "&:hover": {
+                                        background: "#001ea2ff",
+                                    },
+                                }}
                             >
                                 {submitting ? "Submitting..." : "Submit Ticket"}
                             </Button>
