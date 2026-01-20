@@ -182,10 +182,7 @@ export const createTicketForm = async (req, res) => {
         });
 
         // Emit WebSocket event
-        const io = socketService.getIO();
-        if (io) {
-            io.emit("ticket:form_updated", { formId: form.id, action: "created" });
-        }
+        socketService.broadcast("ticket:form_updated", { formId: form.id, action: "created" });
 
         res.status(201).json({
             success: true,
@@ -249,10 +246,7 @@ export const updateTicketForm = async (req, res) => {
         });
 
         // Emit WebSocket event
-        const io = socketService.getIO();
-        if (io) {
-            io.emit("ticket:form_updated", { formId: form.id, action: "updated" });
-        }
+        socketService.broadcast("ticket:form_updated", { formId: form.id, action: "updated" });
 
         res.json({
             success: true,
@@ -304,10 +298,7 @@ export const deleteTicketForm = async (req, res) => {
         await form.destroy();
 
         // Emit WebSocket event
-        const io = socketService.getIO();
-        if (io) {
-            io.emit("ticket:form_updated", { formId: id, action: "deleted" });
-        }
+        socketService.broadcast("ticket:form_updated", { formId: id, action: "deleted" });
 
         res.json({
             success: true,
@@ -342,10 +333,7 @@ export const toggleTicketFormStatus = async (req, res) => {
         await form.update({ isActive: !form.isActive });
 
         // Emit WebSocket event
-        const io = socketService.getIO();
-        if (io) {
-            io.emit("ticket:form_updated", { formId: form.id, action: "toggled", isActive: form.isActive });
-        }
+        socketService.broadcast("ticket:form_updated", { formId: form.id, action: "toggled", isActive: form.isActive });
 
         res.json({
             success: true,
@@ -444,15 +432,13 @@ export const assignAgentsToForm = async (req, res) => {
         const added = results.filter((r) => r.created).length;
 
         // Emit WebSocket events to affected agents
-        const io = socketService.getIO();
-        if (io) {
-            agentIds.forEach((agentId) => {
-                io.to(`agent:${agentId}`).emit("ticket:assignment_changed", {
-                    formId: parseInt(id),
-                    assigned: true,
-                });
+        agentIds.forEach((agentId) => {
+            socketService.broadcast("ticket:assignment_changed", {
+                formId: parseInt(id),
+                agentId,
+                assigned: true,
             });
-        }
+        });
 
         res.json({
             success: true,
@@ -492,15 +478,13 @@ export const removeAgentsFromForm = async (req, res) => {
         });
 
         // Emit WebSocket events to affected agents
-        const io = socketService.getIO();
-        if (io) {
-            agentIds.forEach((agentId) => {
-                io.to(`agent:${agentId}`).emit("ticket:assignment_changed", {
-                    formId: parseInt(id),
-                    assigned: false,
-                });
+        agentIds.forEach((agentId) => {
+            socketService.broadcast("ticket:assignment_changed", {
+                formId: parseInt(id),
+                agentId,
+                assigned: false,
             });
-        }
+        });
 
         res.json({
             success: true,
@@ -609,16 +593,13 @@ export const submitTicket = async (req, res) => {
         // This will be implemented in Phase 3
 
         // Emit WebSocket event to admins
-        const io = socketService.getIO();
-        if (io) {
-            io.emit("ticket:new_submission", {
-                submissionId: submission.id,
-                formId,
-                formName: form.name,
-                agentId,
-                status: submission.status,
-            });
-        }
+        socketService.broadcast("ticket:new_submission", {
+            submissionId: submission.id,
+            formId,
+            formName: form.name,
+            agentId,
+            status: submission.status,
+        });
 
         res.status(201).json({
             success: true,
