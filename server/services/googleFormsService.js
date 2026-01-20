@@ -13,11 +13,12 @@
 import fetch from "node-fetch";
 
 // Regex patterns for extracting form IDs from various URL formats
+// IMPORTANT: Order matters! More specific patterns must come first
 const FORM_ID_PATTERNS = [
+    // Published form URL: /forms/d/e/RESPONSE_ID/viewform (must come first!)
+    /\/forms\/d\/e\/([a-zA-Z0-9_-]+)/,
     // Standard form URL: /forms/d/FORM_ID/edit or /forms/d/FORM_ID/viewform
     /\/forms\/d\/([a-zA-Z0-9_-]+)/,
-    // Published form URL: /forms/d/e/RESPONSE_ID/viewform
-    /\/forms\/d\/e\/([a-zA-Z0-9_-]+)/,
 ];
 
 /**
