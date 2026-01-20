@@ -237,13 +237,19 @@ const Dashboard = () => {
         (call) => call.status === "answered" || call.status === "in-progress"
       ).length;
 
+      // Use CDR-based abandoned count (already filtered for today by the server)
+      // Queue stats are cumulative since Asterisk restart, not daily filtered
+      const totalCalls = data.totalCalls || 0;
+      const abandonedCalls = Math.min(data.abandonedCalls || 0, totalCalls);
+      const answeredCalls = Math.max(0, totalCalls - abandonedCalls);
+
       // Build callStats object from real-time data
       const callStats = {
         waiting: waiting,
         talking: talking,
-        answered: data.totalCalls - data.abandonedCalls || 0,
-        abandoned: data.abandonedCalls || 0,
-        totalOffered: data.totalCalls || 0,
+        answered: answeredCalls,
+        abandoned: abandonedCalls,
+        totalOffered: totalCalls,
         avgHoldTime: 0, // Would need to be calculated from queue data
       };
 
