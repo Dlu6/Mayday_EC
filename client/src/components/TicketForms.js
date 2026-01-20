@@ -342,13 +342,24 @@ const TicketForms = () => {
             field: "schema",
             headerName: "Fields",
             width: 80,
-            renderCell: (params) => (
-                <Chip
-                    label={params.value?.fields?.length || 0}
-                    size="small"
-                    variant="outlined"
-                />
-            ),
+            renderCell: (params) => {
+                // Parse schema if it's a string (from API)
+                let schema = params.value;
+                if (typeof schema === "string") {
+                    try {
+                        schema = JSON.parse(schema);
+                    } catch (e) {
+                        schema = { fields: [] };
+                    }
+                }
+                return (
+                    <Chip
+                        label={schema?.fields?.length || 0}
+                        size="small"
+                        variant="outlined"
+                    />
+                );
+            },
         },
         {
             field: "createdAt",
