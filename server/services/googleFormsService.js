@@ -362,8 +362,14 @@ export function buildSubmissionEntries(formValues, googleFormFields, callData = 
         const normalizedGoogleLabel = (field.label || "").toLowerCase().trim();
         let value = null;
 
+        // For fields with options (radio, checkbox, select), always use user-entered values
+        // Auto-mapping only makes sense for text fields
+        const hasOptions = field.type === "radio" || field.type === "checkbox" || field.type === "select" ||
+            field.googleType === 2 || field.googleType === 4; // googleType 2=radio, 4=checkbox
+
         // 1. Check if this field is auto-mapped to call data AND call data exists
-        if (field.autoMap && callData[field.autoMap]) {
+        //    BUT only for text fields (not radio/checkbox/select)
+        if (!hasOptions && field.autoMap && callData[field.autoMap]) {
             value = callData[field.autoMap];
             console.log(`[GoogleForms] Auto-mapped ${entryKey} (${field.label}) -> ${value}`);
         }
