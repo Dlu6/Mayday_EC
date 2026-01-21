@@ -559,7 +559,8 @@ export const submitTicket = async (req, res) => {
                 const entries = googleFormsService.buildSubmissionEntries(
                     responses,
                     form.googleFormFields,
-                    callData
+                    callData,
+                    form.schema // Pass schema for label-based mapping
                 );
 
                 // Submit to Google Form
