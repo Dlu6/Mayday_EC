@@ -91,6 +91,7 @@ const DynamicFormField = ({ field, value, onChange, error }) => {
                     onChange={(e) => handleChange(e.target.value)}
                     placeholder={field.placeholder}
                     required={field.required}
+                    onWheel={(e) => e.target.blur()} // Prevent scroll from changing value
                     inputProps={{
                         min: field.min,
                         max: field.max,

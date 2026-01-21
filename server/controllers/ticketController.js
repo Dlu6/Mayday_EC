@@ -559,7 +559,8 @@ export const submitTicket = async (req, res) => {
                 const entries = googleFormsService.buildSubmissionEntries(
                     responses,
                     form.googleFormFields,
-                    callData
+                    callData,
+                    form.schema // Pass schema for label-based mapping
                 );
 
                 // Submit to Google Form
@@ -827,12 +828,13 @@ export const updateSubmission = async (req, res) => {
 };
 
 /**
- * Delete submission (for agents to delete their tickets)
+ * Delete submission (agents can delete own drafts, admins can delete any)
  */
 export const deleteSubmission = async (req, res) => {
     try {
         const { id } = req.params;
-        const agentId = req.user?.id;
+        const userId = req.user?.id;
+        const userRole = req.user?.role;
 
         const submission = await TicketSubmission.findByPk(id);
 
@@ -843,23 +845,30 @@ export const deleteSubmission = async (req, res) => {
             });
         }
 
-        // Verify agent owns this submission
-        if (submission.agentId !== agentId) {
-            return res.status(403).json({
-                success: false,
-                message: "You can only delete your own submissions",
-            });
-        }
+        // Admins and managers can delete any submission
+        const isAdmin = userRole === "admin" || userRole === "manager";
 
-        // Only allow deleting drafts
-        if (submission.status !== "draft") {
-            return res.status(400).json({
-                success: false,
-                message: "Only draft submissions can be deleted",
-            });
+        if (!isAdmin) {
+            // Agents can only delete their own submissions
+            if (submission.agentId !== userId) {
+                return res.status(403).json({
+                    success: false,
+                    message: "You can only delete your own submissions",
+                });
+            }
+
+            // Agents can only delete drafts
+            if (submission.status !== "draft") {
+                return res.status(400).json({
+                    success: false,
+                    message: "Only draft submissions can be deleted",
+                });
+            }
         }
 
         await submission.destroy();
+
+        console.log(`[Tickets] Submission ${id} deleted by ${userRole} (${userId})`);
 
         res.json({
             success: true,

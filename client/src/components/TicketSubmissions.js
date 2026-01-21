@@ -29,6 +29,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import DeleteIcon from "@mui/icons-material/Delete";
 
 import apiClient from "../api/apiClient";
 
@@ -45,6 +46,8 @@ const TicketSubmissions = () => {
     const [total, setTotal] = useState(0);
     const [searchQuery, setSearchQuery] = useState("");
     const [viewDialog, setViewDialog] = useState({ open: false, submission: null });
+    const [deleteDialog, setDeleteDialog] = useState({ open: false, submission: null });
+    const [deleting, setDeleting] = useState(false);
 
     // Normalize label to sentence case
     const normalizeLabel = (label) => {
@@ -131,6 +134,25 @@ const TicketSubmissions = () => {
         setViewDialog({ open: true, submission });
     };
 
+    const handleDeleteClick = (e, submission) => {
+        e.stopPropagation(); // Prevent row click
+        setDeleteDialog({ open: true, submission });
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteDialog.submission) return;
+        setDeleting(true);
+        try {
+            await apiClient.delete(`/tickets/submissions/${deleteDialog.submission.id}`);
+            setDeleteDialog({ open: false, submission: null });
+            fetchSubmissions(); // Refresh list
+        } catch (error) {
+            console.error("Failed to delete submission:", error);
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     return (
         <Box sx={{ p: 3 }}>
 
@@ -188,18 +210,19 @@ const TicketSubmissions = () => {
                             {getFormFields().length > 5 && (
                                 <TableCell sx={{ fontWeight: 600, backgroundColor: "#f5f5f5" }}>...</TableCell>
                             )}
+                            <TableCell sx={{ fontWeight: 600, backgroundColor: "#f5f5f5", width: 80 }}>Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={3 + Math.min(getFormFields().length, 5) + (getFormFields().length > 5 ? 1 : 0)} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={4 + Math.min(getFormFields().length, 5) + (getFormFields().length > 5 ? 1 : 0)} align="center" sx={{ py: 4 }}>
                                     <CircularProgress size={24} />
                                 </TableCell>
                             </TableRow>
                         ) : submissions.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={3 + Math.min(getFormFields().length, 5) + (getFormFields().length > 5 ? 1 : 0)} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={4 + Math.min(getFormFields().length, 5) + (getFormFields().length > 5 ? 1 : 0)} align="center" sx={{ py: 4 }}>
                                     No submissions yet
                                 </TableCell>
                             </TableRow>
@@ -232,6 +255,17 @@ const TicketSubmissions = () => {
                                                 </Tooltip>
                                             </TableCell>
                                         )}
+                                        <TableCell>
+                                            <Tooltip title="Delete submission">
+                                                <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={(e) => handleDeleteClick(e, sub)}
+                                                >
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </TableCell>
                                     </TableRow>
                                 );
                             })
@@ -327,6 +361,36 @@ const TicketSubmissions = () => {
                 <DialogActions>
                     <Button onClick={() => setViewDialog({ open: false, submission: null })}>
                         Close
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog
+                open={deleteDialog.open}
+                onClose={() => setDeleteDialog({ open: false, submission: null })}
+            >
+                <DialogTitle>Delete Submission</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to delete submission #{deleteDialog.submission?.id}?
+                        This action cannot be undone.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={() => setDeleteDialog({ open: false, submission: null })}
+                        disabled={deleting}
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        color="error"
+                        variant="contained"
+                        onClick={handleDeleteConfirm}
+                        disabled={deleting}
+                    >
+                        {deleting ? "Deleting..." : "Delete"}
                     </Button>
                 </DialogActions>
             </Dialog>

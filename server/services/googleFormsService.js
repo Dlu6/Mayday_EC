@@ -296,27 +296,79 @@ export async function submitToGoogleForm(formId, isPublished, entries) {
 
 /**
  * Build submission entries from form values and field mapping
- * @param {Object} formValues - User-entered values keyed by field id
- * @param {Array} googleFormFields - Google Form field definitions
+ * @param {Object} formValues - User-entered values keyed by internal field id (field_XXX)
+ * @param {Array} googleFormFields - Google Form field definitions with entry.XXX ids
  * @param {Object} callData - Call context {callerNumber, agentExtension, callId, timestamp}
+ * @param {Object} formSchema - Internal form schema with field_XXX ids
  * @returns {Object} Entries object for submission
  */
-export function buildSubmissionEntries(formValues, googleFormFields, callData = {}) {
+export function buildSubmissionEntries(formValues, googleFormFields, callData = {}, formSchema = null) {
     const entries = {};
 
-    for (const field of googleFormFields) {
+    // Parse schema if it's a string
+    let parsedSchema = formSchema;
+    if (typeof formSchema === "string") {
+        try {
+            parsedSchema = JSON.parse(formSchema);
+        } catch (e) {
+            console.error("[GoogleForms] Failed to parse schema:", e.message);
+            parsedSchema = null;
+        }
+    }
+
+    console.log("[GoogleForms] formValues received:", JSON.stringify(formValues));
+    console.log("[GoogleForms] parsedSchema fields:", parsedSchema?.fields?.length || 0);
+
+    // Build a map of label -> value from formValues using formSchema
+    const labelToValue = {};
+    if (parsedSchema && parsedSchema.fields) {
+        for (const schemaField of parsedSchema.fields) {
+            const value = formValues[schemaField.id];
+            console.log(`[GoogleForms] Checking field ${schemaField.id} (${schemaField.label}): ${value}`);
+            if (value !== undefined && value !== null && value !== "") {
+                // Normalize label for matching (lowercase, trimmed)
+                const normalizedLabel = (schemaField.label || "").toLowerCase().trim();
+                labelToValue[normalizedLabel] = value;
+            }
+        }
+    }
+
+    console.log("[GoogleForms] Label to value map:", labelToValue);
+
+    // Parse googleFormFields if it's a string
+    let parsedGoogleFields = googleFormFields;
+    if (typeof googleFormFields === "string") {
+        try {
+            parsedGoogleFields = JSON.parse(googleFormFields);
+        } catch (e) {
+            console.error("[GoogleForms] Failed to parse googleFormFields:", e.message);
+            parsedGoogleFields = [];
+        }
+    }
+
+    console.log("[GoogleForms] Google form fields count:", (parsedGoogleFields || []).length);
+
+    for (const field of (parsedGoogleFields || [])) {
         const entryKey = field.id; // e.g., entry.123456789
+        const normalizedGoogleLabel = (field.label || "").toLowerCase().trim();
 
         // Check if this field is auto-mapped to call data
         if (field.autoMap && callData[field.autoMap]) {
             entries[entryKey] = callData[field.autoMap];
+            console.log(`[GoogleForms] Auto-mapped ${entryKey} (${field.label}) -> ${callData[field.autoMap]}`);
         }
-        // Otherwise use the form value
+        // Otherwise, match by label
+        else if (labelToValue[normalizedGoogleLabel] !== undefined) {
+            entries[entryKey] = labelToValue[normalizedGoogleLabel];
+            console.log(`[GoogleForms] Mapped ${entryKey} (${field.label}) -> ${labelToValue[normalizedGoogleLabel]}`);
+        }
+        // Fallback: try direct field.id match (old behavior)
         else if (formValues[field.id] !== undefined) {
             entries[entryKey] = formValues[field.id];
         }
     }
 
+    console.log("[GoogleForms] Final entries:", entries);
     return entries;
 }
 
