@@ -335,7 +335,20 @@ export function buildSubmissionEntries(formValues, googleFormFields, callData = 
 
     console.log("[GoogleForms] Label to value map:", labelToValue);
 
-    for (const field of googleFormFields) {
+    // Parse googleFormFields if it's a string
+    let parsedGoogleFields = googleFormFields;
+    if (typeof googleFormFields === "string") {
+        try {
+            parsedGoogleFields = JSON.parse(googleFormFields);
+        } catch (e) {
+            console.error("[GoogleForms] Failed to parse googleFormFields:", e.message);
+            parsedGoogleFields = [];
+        }
+    }
+
+    console.log("[GoogleForms] Google form fields count:", (parsedGoogleFields || []).length);
+
+    for (const field of (parsedGoogleFields || [])) {
         const entryKey = field.id; // e.g., entry.123456789
         const normalizedGoogleLabel = (field.label || "").toLowerCase().trim();
 
