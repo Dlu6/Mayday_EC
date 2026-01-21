@@ -763,6 +763,25 @@ const TicketFormsView = ({
                                                         </Typography>
                                                     </Box>
 
+                                                    {/* Show first 2 form field values */}
+                                                    {ticket.form?.schema?.fields?.slice(0, 2).map((field) => {
+                                                        const responses = typeof ticket.responses === "string"
+                                                            ? JSON.parse(ticket.responses)
+                                                            : ticket.responses;
+                                                        const value = responses?.[field.id];
+                                                        if (!value) return null;
+                                                        return (
+                                                            <Box key={field.id} sx={{ mb: 0.5 }}>
+                                                                <Typography variant="caption" color="text.secondary">
+                                                                    {field.label}
+                                                                </Typography>
+                                                                <Typography variant="body2" noWrap>
+                                                                    {String(value).substring(0, 30)}{String(value).length > 30 ? "..." : ""}
+                                                                </Typography>
+                                                            </Box>
+                                                        );
+                                                    })}
+
                                                     <Divider sx={{ my: 1 }} />
 
                                                     <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
