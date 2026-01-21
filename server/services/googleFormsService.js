@@ -249,6 +249,7 @@ export async function submitToGoogleForm(formId, isPublished, entries) {
     try {
         const formResponseUrl = buildFormResponseUrl(formId, isPublished);
         console.log(`[GoogleForms] Submitting to: ${formResponseUrl}`);
+        console.log(`[GoogleForms] Entries to submit:`, JSON.stringify(entries, null, 2));
 
         // Build form data
         const formData = new URLSearchParams();
@@ -265,6 +266,8 @@ export async function submitToGoogleForm(formId, isPublished, entries) {
             }
         }
 
+        console.log(`[GoogleForms] Form data string: ${formData.toString()}`);
+
         const response = await fetch(formResponseUrl, {
             method: "POST",
             headers: {
@@ -275,11 +278,17 @@ export async function submitToGoogleForm(formId, isPublished, entries) {
             redirect: "manual", // Google Forms redirects on success
         });
 
+        console.log(`[GoogleForms] Response status: ${response.status}`);
+
         // Google Forms returns 302/303 redirect on successful submission
         if (response.status === 302 || response.status === 303 || response.status === 200) {
             console.log(`[GoogleForms] Submission successful (HTTP ${response.status})`);
             return { success: true };
         }
+
+        // Log error response body for debugging
+        const responseText = await response.text();
+        console.error(`[GoogleForms] Error response body (first 500 chars): ${responseText.substring(0, 500)}`);
 
         return {
             success: false,
