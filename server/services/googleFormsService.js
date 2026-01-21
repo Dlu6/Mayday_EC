@@ -305,11 +305,26 @@ export async function submitToGoogleForm(formId, isPublished, entries) {
 export function buildSubmissionEntries(formValues, googleFormFields, callData = {}, formSchema = null) {
     const entries = {};
 
+    // Parse schema if it's a string
+    let parsedSchema = formSchema;
+    if (typeof formSchema === "string") {
+        try {
+            parsedSchema = JSON.parse(formSchema);
+        } catch (e) {
+            console.error("[GoogleForms] Failed to parse schema:", e.message);
+            parsedSchema = null;
+        }
+    }
+
+    console.log("[GoogleForms] formValues received:", JSON.stringify(formValues));
+    console.log("[GoogleForms] parsedSchema fields:", parsedSchema?.fields?.length || 0);
+
     // Build a map of label -> value from formValues using formSchema
     const labelToValue = {};
-    if (formSchema && formSchema.fields) {
-        for (const schemaField of formSchema.fields) {
+    if (parsedSchema && parsedSchema.fields) {
+        for (const schemaField of parsedSchema.fields) {
             const value = formValues[schemaField.id];
+            console.log(`[GoogleForms] Checking field ${schemaField.id} (${schemaField.label}): ${value}`);
             if (value !== undefined && value !== null && value !== "") {
                 // Normalize label for matching (lowercase, trimmed)
                 const normalizedLabel = (schemaField.label || "").toLowerCase().trim();
