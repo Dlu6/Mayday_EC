@@ -360,20 +360,31 @@ export function buildSubmissionEntries(formValues, googleFormFields, callData = 
     for (const field of (parsedGoogleFields || [])) {
         const entryKey = field.id; // e.g., entry.123456789
         const normalizedGoogleLabel = (field.label || "").toLowerCase().trim();
+        let value = null;
 
-        // Check if this field is auto-mapped to call data
+        // 1. Check if this field is auto-mapped to call data AND call data exists
         if (field.autoMap && callData[field.autoMap]) {
-            entries[entryKey] = callData[field.autoMap];
-            console.log(`[GoogleForms] Auto-mapped ${entryKey} (${field.label}) -> ${callData[field.autoMap]}`);
+            value = callData[field.autoMap];
+            console.log(`[GoogleForms] Auto-mapped ${entryKey} (${field.label}) -> ${value}`);
         }
-        // Otherwise, match by label
-        else if (labelToValue[normalizedGoogleLabel] !== undefined) {
-            entries[entryKey] = labelToValue[normalizedGoogleLabel];
-            console.log(`[GoogleForms] Mapped ${entryKey} (${field.label}) -> ${labelToValue[normalizedGoogleLabel]}`);
+
+        // 2. If no auto-map value, try to match by label
+        if (value === null && labelToValue[normalizedGoogleLabel] !== undefined) {
+            value = labelToValue[normalizedGoogleLabel];
+            console.log(`[GoogleForms] Mapped ${entryKey} (${field.label}) -> ${value}`);
         }
-        // Fallback: try direct field.id match (old behavior)
-        else if (formValues[field.id] !== undefined) {
-            entries[entryKey] = formValues[field.id];
+
+        // 3. Fallback: try direct field.id match (old behavior)
+        if (value === null && formValues[field.id] !== undefined) {
+            value = formValues[field.id];
+            console.log(`[GoogleForms] Direct match ${entryKey} (${field.label}) -> ${value}`);
+        }
+
+        // Set the entry if we found a value
+        if (value !== null && value !== undefined && value !== "") {
+            entries[entryKey] = value;
+        } else {
+            console.log(`[GoogleForms] WARNING: No value for ${entryKey} (${field.label}) - required: ${field.required}`);
         }
     }
 
