@@ -764,23 +764,34 @@ const TicketFormsView = ({
                                                     </Box>
 
                                                     {/* Show first 2 form field values */}
-                                                    {ticket.form?.schema?.fields?.slice(0, 2).map((field) => {
-                                                        const responses = typeof ticket.responses === "string"
-                                                            ? JSON.parse(ticket.responses)
-                                                            : ticket.responses;
-                                                        const value = responses?.[field.id];
-                                                        if (!value) return null;
-                                                        return (
-                                                            <Box key={field.id} sx={{ mb: 0.5 }}>
-                                                                <Typography variant="caption" color="text.secondary">
-                                                                    {field.label}
-                                                                </Typography>
-                                                                <Typography variant="body2" noWrap>
-                                                                    {String(value).substring(0, 30)}{String(value).length > 30 ? "..." : ""}
-                                                                </Typography>
-                                                            </Box>
-                                                        );
-                                                    })}
+                                                    {(() => {
+                                                        // Parse schema if it's a string
+                                                        let schema = ticket.form?.schema;
+                                                        if (typeof schema === "string") {
+                                                            try { schema = JSON.parse(schema); } catch (e) { schema = null; }
+                                                        }
+                                                        // Parse responses if it's a string
+                                                        let responses = ticket.responses;
+                                                        if (typeof responses === "string") {
+                                                            try { responses = JSON.parse(responses); } catch (e) { responses = {}; }
+                                                        }
+
+                                                        const fields = schema?.fields?.slice(0, 2) || [];
+                                                        return fields.map((field) => {
+                                                            const value = responses?.[field.id];
+                                                            if (!value) return null;
+                                                            return (
+                                                                <Box key={field.id} sx={{ mb: 0.5 }}>
+                                                                    <Typography variant="caption" color="text.secondary">
+                                                                        {field.label}
+                                                                    </Typography>
+                                                                    <Typography variant="body2" noWrap>
+                                                                        {String(value).substring(0, 30)}{String(value).length > 30 ? "..." : ""}
+                                                                    </Typography>
+                                                                </Box>
+                                                            );
+                                                        });
+                                                    })()}
 
                                                     <Divider sx={{ my: 1 }} />
 
