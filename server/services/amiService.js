@@ -475,7 +475,7 @@ const createAmiService = () => {
         // This is the correct logic - registration status is what matters
         const hasValidRegistration =
           !!contact.uri &&
-          contact.uri !== "sip:${extension}@offline" &&
+          contact.uri !== `sip:${extension}@offline` &&
           !isExpired;
 
         // Determine actual reachability status
@@ -821,8 +821,7 @@ const createAmiService = () => {
         if (failed || channelMissing) {
           console.warn(
             chalk.yellow(
-              `[AMI] BlindTransfer failed (${
-                result?.Message || "unknown"
+              `[AMI] BlindTransfer failed (${result?.Message || "unknown"
               }). Falling back to Redirect...`
             )
           );
