@@ -191,30 +191,40 @@
     "mayday-pbx-server": {
       "command": "ssh",
       "args": [
-        "-i",
-        "~/.ssh/id_ed25519",
+        "-t",
         "mayday@192.168.1.15"
       ],
       "env": {
         "TERM": "xterm-256color"
       },
       "cwd": "/home/mayday",
-      "description": "New HPE ProLiant DL380 Gen11 server (192.168.1.15) - SSH key authentication"
+      "description": "HPE ProLiant DL380 Gen11 server (192.168.1.15) - Password: Pasword@1759, then use 'su -' with same password for root"
     },
     "mayday-pbx-root": {
+      "_note": "SSH as mayday, then run 'su -' with password Pasword@1759 to become root. PM2 runs under root.",
       "command": "ssh",
       "args": [
-        "-i",
-        "~/.ssh/id_ed25519",
         "-t",
-        "mayday@192.168.1.15",
-        "echo 'Pasword@1759' | sudo -S su -"
+        "mayday@192.168.1.15"
       ],
       "env": {
         "TERM": "xterm-256color"
       },
       "cwd": "/",
-      "description": "New HPE ProLiant server as ROOT - use for admin operations"
+      "description": "HPE server - SSH then 'su -' for root. Password: Pasword@1759. PM2 logs: pm2 logs mayday --lines 100 --nostream"
+    },
+    "mayday-hpe-deploy": {
+      "_note": "Deployment: SSH as mayday → su - → cd /home/mayday/Mayday_EC → git pull origin HPE → pm2 restart mayday",
+      "steps": [
+        "ssh -t mayday@192.168.1.15",
+        "Enter password: Pasword@1759",
+        "su -",
+        "Enter password: Pasword@1759",
+        "cd /home/mayday/Mayday_EC",
+        "git pull origin HPE",
+        "pm2 restart mayday"
+      ],
+      "description": "HPE Server Deployment Steps - manual interactive SSH session required"
     }
   },
   "context7": {
