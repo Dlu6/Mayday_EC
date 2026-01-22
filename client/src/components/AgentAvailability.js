@@ -24,13 +24,22 @@ import WifiOffIcon from "@mui/icons-material/WifiOff";
 import { useState, useEffect } from "react";
 import callStatsService from "../services/callStatsService";
 
-const AgentAvailability = () => {
+const AgentAvailability = ({ agents: propAgents = [] }) => {
   const theme = useTheme();
   const [agents, setAgents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState(null);
 
+  // Use agents from prop (WebSocket) if available, otherwise fetch via REST API as fallback
   useEffect(() => {
+    // If we have agents from WebSocket prop, use them
+    if (propAgents && propAgents.length > 0) {
+      setAgents(propAgents);
+      setIsLoading(false);
+      return;
+    }
+
+    // Fallback: Fetch via REST API if WebSocket data not available
     const fetchAgents = async () => {
       setIsLoading(true);
       try {
@@ -46,10 +55,10 @@ const AgentAvailability = () => {
 
     fetchAgents();
 
-    // Refresh every 30 seconds
+    // Refresh every 30 seconds as backup
     const intervalId = setInterval(fetchAgents, 30000);
     return () => clearInterval(intervalId);
-  }, []);
+  }, [propAgents]);
 
   const getStatusColor = (status) => {
     const normalizedStatus = status?.toLowerCase();

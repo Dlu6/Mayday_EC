@@ -158,6 +158,7 @@ const Dashboard = () => {
   const [abandonRateStats, setAbandonRateStats] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isConnected, setIsConnected] = useState(false);
+  const [activeAgentsList, setActiveAgentsList] = useState([]);
 
   // Reference to socket for refresh functionality
   const socketRef = useRef(null);
@@ -265,6 +266,11 @@ const Dashboard = () => {
           waitTime: 0,
           abandonRate: queue.abandonRate || 0,
         });
+      }
+
+      // Extract activeAgentsList from WebSocket data (same as Electron softphone)
+      if (data.activeAgentsList && Array.isArray(data.activeAgentsList)) {
+        setActiveAgentsList(data.activeAgentsList);
       }
 
       setLastUpdated(new Date());
@@ -804,7 +810,7 @@ const Dashboard = () => {
 
       {/* Agent Availability Section */}
       <Box sx={{ mt: 4 }}>
-        <AgentAvailability />
+        <AgentAvailability agents={activeAgentsList} />
       </Box>
     </Box>
   );
