@@ -24,41 +24,73 @@ import WifiOffIcon from "@mui/icons-material/WifiOff";
 import { useState, useEffect } from "react";
 import callStatsService from "../services/callStatsService";
 
+// Status priority for sorting (lower = higher priority)
+const getStatusPriority = (status) => {
+  const s = (status || "").toLowerCase();
+  if (s === "available" || s === "ready") return 0;
+  if (s === "registered" || s === "online") return 1;
+  if (s === "on call" || s === "oncall" || s === "busy" || s === "talking") return 2;
+  if (s === "paused" || s === "break" || s === "away") return 3;
+  return 4; // offline, unavailable, etc.
+};
+
 const AgentAvailability = ({ agents: propAgents = [] }) => {
   const theme = useTheme();
   const [agents, setAgents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState(null);
+  const [hasReceivedData, setHasReceivedData] = useState(false);
 
   // Use agents from prop (WebSocket) if available, otherwise fetch via REST API as fallback
   useEffect(() => {
-    // If we have agents from WebSocket prop, use them
+    // If we have agents from WebSocket prop, use them (sorted)
     if (propAgents && propAgents.length > 0) {
-      setAgents(propAgents);
+      // Sort agents: registered/available first, then by name
+      const sortedAgents = [...propAgents].sort((a, b) => {
+        const priorityA = getStatusPriority(a.status);
+        const priorityB = getStatusPriority(b.status);
+        if (priorityA !== priorityB) return priorityA - priorityB;
+        return (a.name || "").localeCompare(b.name || "");
+      });
+      setAgents(sortedAgents);
       setIsLoading(false);
+      setHasReceivedData(true);
       return;
     }
 
-    // Fallback: Fetch via REST API if WebSocket data not available
-    const fetchAgents = async () => {
-      setIsLoading(true);
+    // Don't show "no agents" while waiting for WebSocket data
+    // Only fetch via REST API as fallback after a short delay
+    if (!hasReceivedData) {
+      const timeoutId = setTimeout(() => {
+        // If still no data after timeout, try REST API
+        if (!hasReceivedData) {
+          fetchAgentsFromAPI();
+        }
+      }, 3000); // Wait 3s for WebSocket before falling back to REST
+      return () => clearTimeout(timeoutId);
+    }
+
+    async function fetchAgentsFromAPI() {
       try {
         const agentsData = await callStatsService.getAllAgentsWithStatus();
-        setAgents(agentsData || []);
+        if (agentsData && agentsData.length > 0) {
+          // Sort agents: registered/available first
+          const sortedAgents = [...agentsData].sort((a, b) => {
+            const priorityA = getStatusPriority(a.status);
+            const priorityB = getStatusPriority(b.status);
+            if (priorityA !== priorityB) return priorityA - priorityB;
+            return (a.name || "").localeCompare(b.name || "");
+          });
+          setAgents(sortedAgents);
+          setHasReceivedData(true);
+        }
       } catch (error) {
         console.error("Error fetching agents:", error);
-        setAgents([]);
       } finally {
         setIsLoading(false);
       }
-    };
-
-    fetchAgents();
-
-    // Refresh every 30 seconds as backup
-    const intervalId = setInterval(fetchAgents, 30000);
-    return () => clearInterval(intervalId);
-  }, [propAgents]);
+    }
+  }, [propAgents, hasReceivedData]);
 
   const getStatusColor = (status) => {
     const normalizedStatus = status?.toLowerCase();
