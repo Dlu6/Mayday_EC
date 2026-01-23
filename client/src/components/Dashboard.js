@@ -25,6 +25,8 @@ import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import SpeedIcon from "@mui/icons-material/Speed";
 import ShowChartIcon from "@mui/icons-material/ShowChart";
 import TrendingDownIcon from "@mui/icons-material/TrendingDown";
+import CallMadeIcon from "@mui/icons-material/CallMade";
+import PercentIcon from "@mui/icons-material/Percent";
 import { useState, useEffect, useRef } from "react";
 import callStatsService from "../services/callStatsService";
 import AgentAvailability from "./AgentAvailability";
@@ -149,6 +151,17 @@ const formatWaitTime = (seconds) => {
   }
 };
 
+// Helper function to format duration in HH:MM:SS format
+const formatDuration = (seconds) => {
+  if (!seconds && seconds !== 0) return "00:00:00";
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${hrs.toString().padStart(2, "0")}:${mins
+    .toString()
+    .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+};
+
 
 const Dashboard = () => {
   const theme = useTheme();
@@ -159,6 +172,13 @@ const Dashboard = () => {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isConnected, setIsConnected] = useState(false);
   const [activeAgentsList, setActiveAgentsList] = useState([]);
+  const [outboundStats, setOutboundStats] = useState({
+    total: 0,
+    answered: 0,
+    totalDuration: 0,
+    avgDuration: 0,
+    answerRate: 0,
+  });
 
   // Reference to socket for refresh functionality
   const socketRef = useRef(null);
@@ -239,18 +259,19 @@ const Dashboard = () => {
       ).length;
 
       // Use CDR-based abandoned count (already filtered for today by the server)
-      // Queue stats are cumulative since Asterisk restart, not daily filtered
-      const totalCalls = data.totalCalls || 0;
-      const abandonedCalls = Math.min(data.abandonedCalls || 0, totalCalls);
-      const answeredCalls = Math.max(0, totalCalls - abandonedCalls);
+      // KPIs section is for INBOUND calls only (queue activity)
+      // Use inboundCalls instead of totalCalls for accurate inbound-only metrics
+      const inboundCalls = data.inboundCalls || 0;
+      const abandonedCalls = Math.min(data.abandonedCalls || 0, inboundCalls);
+      const answeredCalls = Math.max(0, inboundCalls - abandonedCalls);
 
-      // Build callStats object from real-time data
+      // Build callStats object from real-time data (INBOUND only)
       const callStats = {
         waiting: waiting,
         talking: talking,
         answered: answeredCalls,
         abandoned: abandonedCalls,
-        totalOffered: totalCalls,
+        totalOffered: inboundCalls,
         avgHoldTime: 0, // Would need to be calculated from queue data
       };
 
@@ -272,6 +293,24 @@ const Dashboard = () => {
       if (data.activeAgentsList && Array.isArray(data.activeAgentsList)) {
         setActiveAgentsList(data.activeAgentsList);
       }
+
+      // Extract outbound stats from WebSocket data
+      const outboundTotal = data.outboundCalls || 0;
+      const outboundAnswered = data.outboundAnswered || 0;
+      const outboundTotalDuration = data.outboundTotalDuration || 0;
+      const outboundAvgDuration = data.outboundAvgDuration || 0;
+      const outboundAnswerRate =
+        outboundTotal > 0
+          ? Math.round((outboundAnswered / outboundTotal) * 100 * 10) / 10
+          : 0;
+
+      setOutboundStats({
+        total: outboundTotal,
+        answered: outboundAnswered,
+        totalDuration: outboundTotalDuration,
+        avgDuration: outboundAvgDuration,
+        answerRate: outboundAnswerRate,
+      });
 
       setLastUpdated(new Date());
       setIsLoading(false);
@@ -458,6 +497,72 @@ const Dashboard = () => {
               <StatCard {...stat} isLoading={isLoading} />
             </Grid>
           ))}
+        </Grid>
+      </Box>
+
+      {/* Outbound Daily Stats Section */}
+      <Box sx={{ mt: 3, mb: 2 }}>
+        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1.5 }}>
+          <CallMadeIcon sx={{ color: "text.secondary" }} />
+          <Typography
+            variant="subtitle1"
+            fontWeight="600"
+            sx={{ color: "text.secondary" }}
+          >
+            Outbound Daily Stats
+          </Typography>
+        </Stack>
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6} lg={2.4}>
+            <StatCard
+              title="TOTAL"
+              value={outboundStats.total}
+              icon={<CallMadeIcon />}
+              color={theme.palette.info.main}
+              tooltip="Total outbound calls made by agents today"
+              isLoading={isLoading}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} lg={2.4}>
+            <StatCard
+              title="ANSWERED"
+              value={outboundStats.answered}
+              icon={<AnswerIcon />}
+              color={theme.palette.success.main}
+              tooltip="Outbound calls answered by the recipient today"
+              isLoading={isLoading}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} lg={2.4}>
+            <StatCard
+              title="TOTAL DURATION"
+              value={formatDuration(outboundStats.totalDuration)}
+              icon={<TimerIcon />}
+              color={theme.palette.warning.main}
+              tooltip="Total talk time for all outbound calls today"
+              isLoading={isLoading}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} lg={2.4}>
+            <StatCard
+              title="AVERAGE DURATION"
+              value={formatDuration(outboundStats.avgDuration)}
+              icon={<AccessTimeIcon />}
+              color={theme.palette.primary.main}
+              tooltip="Average talk time per outbound call today"
+              isLoading={isLoading}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} lg={2.4}>
+            <StatCard
+              title="ANSWER RATE"
+              value={`${outboundStats.answerRate}%`}
+              icon={<PercentIcon />}
+              color={theme.palette.secondary.main}
+              tooltip="Percentage of outbound calls successfully answered"
+              isLoading={isLoading}
+            />
+          </Grid>
         </Grid>
       </Box>
 

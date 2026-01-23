@@ -64,6 +64,17 @@ const formatDuration = (seconds) => {
   return `${mins}:${secs.toString().padStart(2, "0")}`;
 };
 
+// Format seconds to HH:MM:SS for outbound stats
+const formatDurationHMS = (seconds) => {
+  if (!seconds && seconds !== 0) return "00:00:00";
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${hrs.toString().padStart(2, "0")}:${mins
+    .toString()
+    .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+};
+
 // CRITICAL: Utility function to check if disconnection should be allowed
 const shouldAllowDisconnection = () => {
   return !window.isLoggingOut && !window.isAuthenticating;
@@ -849,10 +860,19 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
   const getTimeRangeStats = useMemo(() => {
     switch (timeRange) {
       case 0: // Today
+        const outboundTotal = stats.outboundCalls || 0;
+        const outboundAnswered = stats.outboundAnswered || 0;
+        const outboundAnswerRate = outboundTotal > 0
+          ? Math.round((outboundAnswered / outboundTotal) * 100 * 10) / 10
+          : 0;
         return {
           totalCalls: stats.totalCalls || 0,
           inboundCalls: stats.inboundCalls || 0,
-          outboundCalls: stats.outboundCalls || 0,
+          outboundCalls: outboundTotal,
+          outboundAnswered: outboundAnswered,
+          outboundTotalDuration: stats.outboundTotalDuration || 0,
+          outboundAvgDuration: stats.outboundAvgDuration || 0,
+          outboundAnswerRate: outboundAnswerRate,
           abandonedCalls: stats.abandonedCalls || 0,
           dateFormatted: stats.todayDateFormatted,
           subtitle: "Today",
@@ -2017,6 +2037,65 @@ const DashboardView = ({ open, onClose, title, isCollapsed }) => {
                 subtitle="Currently online"
               />
             </Grid>
+
+            {/* Outbound Daily Stats Section */}
+            {timeRange === 0 && (
+              <>
+                <Grid item xs={12}>
+                  <Typography
+                    variant="subtitle1"
+                    sx={{ fontWeight: 600, color: "text.secondary", mb: 1 }}
+                  >
+                    ↗ Outbound Daily Stats
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <StatCard
+                    title="Total Outbound"
+                    value={getTimeRangeStats.outboundCalls}
+                    icon={<CallIcon sx={{ color: "#2196f3" }} />}
+                    color="#2196f3"
+                    subtitle="Calls made by agents"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <StatCard
+                    title="Answered"
+                    value={getTimeRangeStats.outboundAnswered}
+                    icon={<CallIcon sx={{ color: "#4caf50" }} />}
+                    color="#4caf50"
+                    subtitle="Successfully connected"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <StatCard
+                    title="Total Duration"
+                    value={formatDurationHMS(getTimeRangeStats.outboundTotalDuration)}
+                    icon={<AccessTime sx={{ color: "#ff9800" }} />}
+                    color="#ff9800"
+                    subtitle="Cumulative talk time"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <StatCard
+                    title="Avg Duration"
+                    value={formatDurationHMS(getTimeRangeStats.outboundAvgDuration)}
+                    icon={<AccessTime sx={{ color: "#9c27b0" }} />}
+                    color="#9c27b0"
+                    subtitle="Per answered call"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={2.4}>
+                  <StatCard
+                    title="Answer Rate"
+                    value={`${getTimeRangeStats.outboundAnswerRate}%`}
+                    icon={<Speed sx={{ color: "#e91e63" }} />}
+                    color="#e91e63"
+                    subtitle="Connection success"
+                  />
+                </Grid>
+              </>
+            )}
 
             {/* Call Volume Chart */}
             <Grid item xs={12} md={8}>
