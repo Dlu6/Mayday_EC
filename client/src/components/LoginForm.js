@@ -17,6 +17,7 @@ import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useSnackbar } from "notistack";
 import useAuth from "../hooks/useAuth";
 import maydaylogo from "../assets/images/mayday_logo_simi.png";
+import floaterBg from "../assets/images/floater.svg";
 const LoginForm = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -87,7 +88,17 @@ const LoginForm = () => {
       container
       alignItems="center"
       justifyContent="center"
-      style={{ minHeight: "100vh", backgroundColor: "#f0f4f8" }}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        backgroundImage: `url(${floaterBg})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
     >
       <Grid item xs={12} sm={6} md={4}>
         <Paper elevation={6} style={{ padding: "1.5rem" }}>
