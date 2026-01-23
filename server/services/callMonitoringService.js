@@ -2,7 +2,7 @@
 // import { EventBusService } from "./eventBus.js";
 import amiService from "./amiService.js";
 // import { ariService } from "./ariService.js";
-import { Op } from "../config/sequelize.js";
+import sequelize, { Op } from "../config/sequelize.js";
 import chalk from "chalk";
 import { socketService } from "./socketService.js";
 import CDR from "../models/cdr.js";
@@ -154,16 +154,14 @@ const getTotalCallsCount = async () => {
       },
     });
 
-    // Outbound: count calls from internal context where src is a short extension
-    // This excludes queue-generated extension rings
+    // Outbound: channel from internal extension, src is external number (7+ digits)
     const outbound = await CDR.count({
       col: "uniqueid",
       distinct: true,
       where: {
         dcontext: "from-internal",
-        src: { [Op.regexp]: "^[0-9]{3,4}$" },
-        // Exclude calls where channel contains trunk (these are queue callbacks)
-        channel: { [Op.notLike]: "%trunk%" },
+        channel: { [Op.regexp]: "^PJSIP/[0-9]{3,4}-" },
+        src: { [Op.regexp]: "^[0-9]{7,}$" },
         start: { [Op.gte]: todayMidnight },
       },
     });
@@ -199,20 +197,94 @@ const getOutboundCallsCount = async () => {
   try {
     const todayMidnight = new Date();
     todayMidnight.setHours(0, 0, 0, 0);
-    // Count calls from internal context where src is a short extension
-    // This excludes queue-generated extension rings
+    // Outbound calls: from-internal context, channel shows agent extension (PJSIP/XXXX-),
+    // and src contains the dialed external number (7+ digits)
     return await CDR.count({
       col: "uniqueid",
       distinct: true,
       where: {
         dcontext: "from-internal",
-        src: { [Op.regexp]: "^[0-9]{3,4}$" },
-        channel: { [Op.notLike]: "%trunk%" },
+        // Channel must be from an internal extension (3-4 digits)
+        channel: { [Op.regexp]: "^PJSIP/[0-9]{3,4}-" },
+        // Src is the dialed external number (7+ digits)
+        src: { [Op.regexp]: "^[0-9]{7,}$" },
         start: { [Op.gte]: todayMidnight },
       },
     });
   } catch (error) {
     log.error("Error getting outbound calls count:", error);
+    return 0;
+  }
+};
+
+// Get outbound calls answered count for today
+const getOutboundAnsweredCount = async () => {
+  try {
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+    return await CDR.count({
+      col: "uniqueid",
+      distinct: true,
+      where: {
+        dcontext: "from-internal",
+        channel: { [Op.regexp]: "^PJSIP/[0-9]{3,4}-" },
+        src: { [Op.regexp]: "^[0-9]{7,}$" },
+        disposition: { [Op.ne]: "NO ANSWER" },
+        start: { [Op.gte]: todayMidnight },
+      },
+    });
+  } catch (error) {
+    log.error("Error getting outbound answered count:", error);
+    return 0;
+  }
+};
+
+// Get outbound calls total duration (billsec sum) for today
+const getOutboundTotalDuration = async () => {
+  try {
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+    const result = await CDR.findOne({
+      attributes: [
+        [sequelize.fn("SUM", sequelize.col("billsec")), "totalDuration"],
+      ],
+      where: {
+        dcontext: "from-internal",
+        channel: { [Op.regexp]: "^PJSIP/[0-9]{3,4}-" },
+        src: { [Op.regexp]: "^[0-9]{7,}$" },
+        billsec: { [Op.gt]: 0 },
+        start: { [Op.gte]: todayMidnight },
+      },
+      raw: true,
+    });
+    return result?.totalDuration || 0;
+  } catch (error) {
+    log.error("Error getting outbound total duration:", error);
+    return 0;
+  }
+};
+
+// Get outbound calls average duration for today
+const getOutboundAvgDuration = async () => {
+  try {
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+    const result = await CDR.findOne({
+      attributes: [
+        [sequelize.fn("AVG", sequelize.col("billsec")), "avgDuration"],
+      ],
+      where: {
+        dcontext: "from-internal",
+        channel: { [Op.regexp]: "^PJSIP/[0-9]{3,4}-" },
+        src: { [Op.regexp]: "^[0-9]{7,}$" },
+        billsec: { [Op.gt]: 0 },
+        start: { [Op.gte]: todayMidnight },
+      },
+      raw: true,
+    });
+    return Math.round(result?.avgDuration || 0);
+  } catch (error) {
+    log.error("Error getting outbound avg duration:", error);
     return 0;
   }
 };
@@ -415,6 +487,9 @@ const broadcastStats = async () => {
       totalCalls: await getTotalCallsCount(),
       inboundCalls: await getInboundCallsCount(),
       outboundCalls: await getOutboundCallsCount(),
+      outboundAnswered: await getOutboundAnsweredCount(),
+      outboundTotalDuration: await getOutboundTotalDuration(),
+      outboundAvgDuration: await getOutboundAvgDuration(),
       abandonedCalls: await getAbandonedCallsCount(),
       weeklyTotalCalls: weeklyTotalCalls,
       weeklyAbandonedCalls: weeklyAbandonedCalls,
